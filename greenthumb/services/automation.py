@@ -82,9 +82,18 @@ class GreenThumbAutomation:
         self._latest: dict[int, SensorSample] = {
             address: unavailable_sample(address) for address in self.sensor_hub.addresses
         }
+        # _latest is pre-seeded with unavailable samples, so "every reading is
+        # -1" is also what a planter looks like one second after boot. This
+        # distinguishes the two.
+        self._has_polled = False
         self._last_watered: dict[str, datetime] = {}
         self.history = history or HistoryStore(settings.history_db_path or DEFAULT_DB_PATH)
         self._last_delivery: dict[str, object] | None = None
+        # Consecutive doses that reached nothing. One can be a clog on a single
+        # line; a run of them across plants is the shared thing, which is the
+        # tank. Seeded from history at startup so a reboot does not forget that
+        # the reservoir is empty.
+        self._delivery_failures = 0
         self._pump_timer: threading.Timer | None = None
         self._pump_lock_held = False
 
@@ -99,6 +108,7 @@ class GreenThumbAutomation:
         self.plants = default_plants()
         self.apply_default_led_ranges()
         self._warn_on_orphaned_plants()
+        self._seed_delivery_failures()
         # Plant edits, dose volumes, rail positions and LED preferences are all
         # user choices that used to live only in memory, so every restart reset
         # them to the literals above. Restore whatever was saved last.
@@ -366,6 +376,8 @@ class GreenThumbAutomation:
             if sample.moisture_raw >= 0:
                 self._history[address].append(sample.moisture_raw)
 
+        self._has_polled = True
+
         # One transaction for the whole tick. The store drops failed reads, and
         # a storage fault must not stop the loop from watering.
         try:
@@ -383,6 +395,110 @@ class GreenThumbAutomation:
         # being dropped from the averaged value -- the one that actually decides
         # watering and feeds the overview.
         return self.sensor_hub.raw_to_percent(sum(window) / len(window), address)
+
+    def _seed_delivery_failures(self) -> None:
+        """Count the run of failed deliveries at the end of the history."""
+        try:
+            recent = self.history.waterings(hours=24 * 7)
+        except Exception:
+            logger.exception("Could not read watering history for delivery state")
+            return
+        for watering in reversed(recent):
+            if watering.get("delivered") is False:
+                self._delivery_failures += 1
+            else:
+                # Stops at the first dose that worked or could not be checked:
+                # only an unbroken run means the tank is still empty now.
+                break
+
+    # --- what the owner is told ------------------------------------------
+
+    def system_status(self) -> dict[str, object]:
+        """The single most important thing to say about the planter right now.
+
+        The status bar used to show the newest log line, which meant it showed
+        whatever the software last felt like writing down -- timestamps, levels
+        and internal phrasing included. This answers a different question: of
+        everything true at this moment, what would the owner most want to know?
+
+        Ordered by urgency, first match wins. Anything that stops the planter
+        working comes before anything that is merely worth knowing.
+        """
+        def state(level: str, message: str) -> dict[str, object]:
+            return {"level": level, "message": message}
+
+        # 1. Nothing can be watered if the motion board is not answering.
+        movement = self.klipper.status()
+        if movement.get("ok") is False:
+            return state("problem", "Lost contact with the motion board. Nothing can be watered.")
+
+        # 2. Doses are running and nothing is coming out.
+        if self._delivery_failures >= 2:
+            return state(
+                "problem",
+                f"{self._delivery_failures} waterings in a row reached nothing. "
+                "The reservoir is probably empty.",
+            )
+        if self._delivery_failures == 1:
+            return state(
+                "attention",
+                "The last watering did not reach the plant. Check the water level, "
+                "then the line for a kink or a clog.",
+            )
+
+        # 3. A probe that answered, and answered that it is not there.
+        #
+        # Judged on the most recent sample rather than on an empty window:
+        # _poll_sensors only records successful reads, so an empty window means
+        # "not polled yet" and saying "no sensors are reporting" on a fresh
+        # boot would be alarming and wrong. A plant with no sample at all falls
+        # through to the gathering case below.
+        dead = [
+            plant.name
+            for plant in self.plants
+            if self._has_polled
+            and (latest := self._latest.get(plant.sensor_address)) is not None
+            and latest.moisture_raw < 0
+        ]
+        if len(dead) == len(self.plants) and dead:
+            return state("problem", "No sensors are reporting. Check the hub connection.")
+        if dead:
+            return state("attention", f"No reading from {', '.join(dead)}. Check the probe.")
+
+        # 4. Able to water, but not yet allowed to.
+        if not movement.get("homed"):
+            return state("attention", "The arm has not been homed, so watering is held.")
+
+        held = self.watering_suppressed()
+        if held:
+            return state("info", f"Automatic watering is paused: {held}.")
+
+        if not settings.auto_watering_enabled:
+            return state("info", "Watching only. Automatic watering is switched off.")
+
+        # 5. Working, but not yet able to act.
+        filling = [
+            plant.name
+            for plant in self.plants
+            if len(self._history.get(plant.sensor_address) or ()) < settings.moisture_window_size
+        ]
+        if filling:
+            return state(
+                "info",
+                f"Getting to know {', '.join(filling)} — watering starts once "
+                "there are enough readings.",
+            )
+
+        # 6. Nothing to report, which is the normal case.
+        thirsty = [
+            plant.name
+            for plant in self.plants
+            if 0 <= self.smoothed_percent(plant.sensor_address) < plant.moisture_target
+        ]
+        if thirsty:
+            return state("ok", f"{', '.join(thirsty)} due a drink shortly.")
+        count = len(self.plants)
+        return state("ok", f"All {count} plants are happy.")
 
     # --- quiet hours and snooze ------------------------------------------
 
@@ -607,6 +723,13 @@ class GreenThumbAutomation:
         elif settings.water_sensor_enabled and delivered is None:
             logger.warning("Could not verify delivery for %s, sensor unreadable", plant.plant_id)
 
+        if delivered is False:
+            self._delivery_failures += 1
+        elif delivered is True:
+            self._delivery_failures = 0
+        # delivered is None means the sensor did not answer, which is neither
+        # evidence of water nor of its absence, so the count is left alone.
+
         self._last_watered[plant.plant_id] = datetime.now()
         self._last_delivery = {
             "plant_id": plant.plant_id,
@@ -658,6 +781,9 @@ class GreenThumbAutomation:
             # So the UI can say why nothing is watering rather than leaving it
             # looking broken.
             "quiet": self.quiet_status(),
+            # What the status bar shows. Computed rather than echoed from the
+            # log, so it says what is true now instead of what was last written.
+            "system_status": self.system_status(),
         }
 
     def get_history(self, hours: float) -> dict[str, object]:

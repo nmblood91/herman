@@ -97,9 +97,19 @@ planter records that your plant was watered. Everything else here fails loudly;
 that one failed silently.
 
 When a pour delivers nothing, the planter says so in the status bar, writes a
-warning to the log, and marks it on the history chart in the Sensors tab as a **solid red line**
-instead of the usual dashed one. Nothing gets blocked — the next pour tries
-again — so refilling the tank quietly fixes it with nothing to reset.
+warning to the log, and marks it on the history chart in the Sensors tab as a
+**solid red line** instead of the usual dashed one.
+
+The status bar escalates if it keeps happening. One failed pour reads as "the
+last watering did not reach the plant" — that could be a kink or a clog on one
+line. **Two or more in a row says the reservoir is probably empty**, because a
+run of them across different plants points at the one thing they share. The
+count survives a restart, so a planter rebooted with an empty tank comes back
+still saying so rather than looking fine until the next dose fails.
+
+Nothing gets blocked — the next pour tries again — so refilling the tank
+quietly fixes it with nothing to reset, and the first dose that lands clears
+the warning.
 
 ## Quiet hours, and the snooze
 

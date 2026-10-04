@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TopBar } from './components/TopBar'
 import { TabBar } from './components/TabBar'
 import { ControlsPanel } from './components/ControlsPanel'
@@ -30,7 +30,21 @@ function App() {
   const [overview, setOverview] = useState(null)
   const [plants, setPlants] = useState([])
   const [logs, setLogs] = useState([])
-  const [status, setStatus] = useState('Waking Herman up...')
+  // Transient feedback from something the user just did. Clears itself so the
+  // bar falls back to the planter's actual state rather than freezing on the
+  // last thing that happened to be clicked.
+  const [action, setAction] = useState('')
+  const actionTimer = useRef(null)
+
+  const setStatus = useCallback((message, { sticky = false } = {}) => {
+    clearTimeout(actionTimer.current)
+    setAction(message)
+    if (!sticky) {
+      actionTimer.current = setTimeout(() => setAction(''), 6000)
+    }
+  }, [])
+
+  useEffect(() => () => clearTimeout(actionTimer.current), [])
 
   // Motion endpoints answer 200 with {ok: false, error} when Klipper refuses
   // the move, so a successful request is not a successful move.
@@ -48,17 +62,18 @@ function App() {
       setOverview(overviewData)
       setPlants(plantsData)
       setLogs(logsData)
-      if (logsData?.length) {
-        setStatus(logsData[0])
-      } else {
-        setStatus('System online and ready.')
-      }
+      // Deliberately does not touch `action` here. The status bar shows the
+      // planter's computed state from overview.system_status; this used to
+      // overwrite it with logsData[0], the newest raw log line, timestamp and
+      // level included -- and since this runs after every action, it also
+      // wiped the feedback from whatever the user had just done.
     } catch (error) {
       setStatus(`Connection failed: ${error.message}`)
     }
-    // Stable: it closes over nothing reactive, so the mount effect below can
-    // depend on it honestly instead of suppressing the dependency warning.
-  }, [])
+    // setStatus is itself a stable useCallback, so this stays stable too and
+    // the mount effect below can depend on it honestly rather than
+    // suppressing the dependency warning.
+  }, [setStatus])
 
   useEffect(() => {
     // Guarded rather than a bare loadDashboard(): a response that lands after
@@ -73,6 +88,11 @@ function App() {
       cancelled = true
     }
   }, [loadDashboard])
+
+  const systemStatus = overview?.system_status ?? {
+    level: 'info',
+    message: 'Waking Herman up...',
+  }
 
   const gantryPosition = useMemo(() => {
     const movement = overview?.movement ?? {}
@@ -90,7 +110,7 @@ function App() {
 
   const homeGantry = async () => {
     try {
-      setStatus('Homing gantry...')
+      setStatus('Homing gantry...', { sticky: true })
       const result = await fetchJson('/gantry/home', { method: 'POST' })
       setStatus(`Home gantry: ${describeResult(result)}`)
       await loadDashboard()
@@ -101,7 +121,7 @@ function App() {
 
   const moveGantry = async (distance) => {
     try {
-      setStatus(`Moving gantry ${distance} mm...`)
+      setStatus(`Moving gantry ${distance} mm...`, { sticky: true })
       const result = await fetchJson('/gantry/move', {
         method: 'POST',
         body: JSON.stringify({ distance_mm: distance }),
@@ -116,7 +136,7 @@ function App() {
   const moveToPlant = async (plantId) => {
     try {
       const plant = plants.find((item) => item.plant_id === plantId)
-      setStatus(`Moving gantry to ${plant?.name || plantId}...`)
+      setStatus(`Moving gantry to ${plant?.name || plantId}...`, { sticky: true })
       const result = await fetchJson(`/plants/${plantId}/move`, { method: 'POST' })
       setStatus(`Move to ${plant?.name || plantId}: ${describeResult(result)}`)
       await loadDashboard()
@@ -131,7 +151,7 @@ function App() {
       const label = plant?.name || plantId
       // The request does not return until the gantry has moved and the dose has
       // finished, which is over a minute, so say so rather than looking hung.
-      setStatus(`Watering ${label}, this takes a minute...`)
+      setStatus(`Watering ${label}, this takes a minute...`, { sticky: true })
       const result = await fetchJson(`/water/${plantId}`, { method: 'POST' })
       // delivered is null when no outlet sensor is fitted, so only false is a
       // failure — the pump ran and nothing came out the other end.
@@ -152,7 +172,7 @@ function App() {
 
   const savePlant = async (plant) => {
     try {
-      setStatus(`Saving ${plant.name}...`)
+      setStatus(`Saving ${plant.name}...`, { sticky: true })
 
       await fetchJson(`/plants/${plant.plant_id}/name`, {
         method: 'POST',
@@ -194,7 +214,13 @@ function App() {
     <div className="app-shell">
       <TopBar />
       <TabBar activeTab={activeTab} onChange={setActiveTab} />
-      <div className="status-bar">{status}</div>
+      {/* One line, and it answers "what is my planter doing". Shows feedback
+          from something you just did while that is fresh, otherwise the
+          planter's own computed state -- never the log, which is a record of
+          what was written rather than a description of what is true. */}
+      <div className={`status-bar ${action ? '' : `level-${systemStatus.level}`}`}>
+        {action || systemStatus.message}
+      </div>
 
       {/* Outside the tabs on purpose. A dose that delivered nothing is the one
           thing that should not be hidden behind whichever tab you are not on.

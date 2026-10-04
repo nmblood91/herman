@@ -425,3 +425,29 @@ input[type='color'] {
   color: #8fae9b;
   font-size: 0.75rem;
 }
+
+/* The status bar carries a severity when it is showing the planter's own
+   state rather than feedback from something you just pressed. Colour is a
+   second channel on top of the words, not a replacement for them -- the
+   message says what is wrong either way, which matters for anyone who does
+   not distinguish these hues. */
+.status-bar.level-ok {
+  border-color: #2a4737;
+}
+
+.status-bar.level-info {
+  border-color: #2f4a63;
+  color: #cfe2f3;
+}
+
+.status-bar.level-attention {
+  border-color: #7a6a2a;
+  background: rgba(46, 40, 18, 0.9);
+  color: #ffe9b0;
+}
+
+.status-bar.level-problem {
+  border-color: #7a3a2a;
+  background: rgba(52, 24, 18, 0.9);
+  color: #ffc9b8;
+}
