@@ -926,6 +926,10 @@ class GreenThumbAutomation:
             "brightness": result["brightness"],
         }
 
+    def home_gantry(self) -> dict[str, object]:
+        with self._exclusive("Homing gantry"):
+            return self.klipper.home_gantry()
+
     def move_gantry_relative(self, distance_mm: float) -> dict[str, object]:
         with self._exclusive("Gantry move"):
             return self.klipper.move_gantry_relative(distance_mm)
