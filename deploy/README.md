@@ -401,6 +401,18 @@ python3 /opt/greenthumb/deploy/pi/send-gcode.py "G90"
 The total distance from the trip point to the left end of usable travel is the
 real `position_endstop`.
 
+**Setting plant positions.** Jog the carriage until the nozzle sits over a
+pot, then use *Use current position* on that plant's card in the Plants tab.
+It fills the field without saving, so the number can be checked first. Aim the
+nozzle rather than the carriage body: the offset between them is the same
+error on every plant.
+
+It refuses an unhomed gantry, because an unhomed axis reports a position
+relative to wherever it powered up -- a meaningless number that looks like a
+real one. It also refuses anything outside the rail, and warns when the
+captured position is within 50 mm of another plant, which is what pressing the
+button on the wrong card looks like.
+
 **Plant positions have to fit inside it.** `position_max` is the furthest the
 carriage can go, and a plant configured past it simply cannot be reached --
 the move is refused and that plant is never watered. The defaults in

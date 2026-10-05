@@ -40,9 +40,59 @@ const describeMoisture = (status) => {
   return { text, hint: '' }
 }
 
-export function PlantsPanel({ plants, onSave, status }) {
+// How close two plants have to be before capturing one looks like a mix-up.
+// Pots on a metre of rail sit hundreds of millimetres apart, so anything this
+// near an already-configured plant almost certainly means the carriage was
+// parked over that plant and the button pressed on the wrong card.
+const CONFUSION_MARGIN_MM = 50
+
+export function PlantsPanel({ plants, onSave, status, movement }) {
   const [drafts, setDrafts] = useState({})
   const [expandedPlantIds, setExpandedPlantIds] = useState([])
+  // Keyed by plant so a warning about one card cannot appear under another.
+  const [captureNote, setCaptureNote] = useState({})
+
+  const capturePosition = (plant) => {
+    const note = (text) => setCaptureNote((current) => ({ ...current, [plant.plant_id]: text }))
+
+    // An unhomed axis reports a position relative to wherever it happened to
+    // power up, which is a meaningless number that looks like a real one.
+    if (!movement?.homed) {
+      note('Home the gantry first — until then its position is not a real measurement.')
+      return
+    }
+    // Checked before converting: Number(null) is 0, which is finite, so a
+    // board reporting nothing would otherwise sail through this and quietly
+    // set the plant's position to the left end of the rail.
+    const raw = movement.position
+    if (raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw))) {
+      note('No position reported. Is the motion board connected?')
+      return
+    }
+    const here = Number(raw)
+    const limit = Number(movement.max_x)
+    if (Number.isFinite(limit) && (here < 0 || here > limit)) {
+      note(`${here} mm is outside the usable rail (0 to ${limit} mm).`)
+      return
+    }
+
+    // The mistake this is guarding: jog to one pot, press the button on a
+    // different plant's card. The captured value then lands on top of a plant
+    // that is already configured there.
+    const clash = plants.find(
+      (other) =>
+        other.plant_id !== plant.plant_id &&
+        Math.abs(Number(other.position_mm) - here) < CONFUSION_MARGIN_MM,
+    )
+    updateDraft(plant.plant_id, 'position_mm', String(Math.round(here)))
+    note(
+      clash
+        ? `Set ${plant.name} to ${Math.round(here)} mm — but that is within ` +
+          `${CONFUSION_MARGIN_MM} mm of ${clash.name}. Check you are over the ` +
+          `right pot before saving.`
+        : `Set ${plant.name} to ${Math.round(here)} mm. Save to keep it.`,
+    )
+  }
 
   // Drafts mirror the plants prop, and resyncing them during render rather than
   // in an effect means the inputs never paint one frame of stale values after
@@ -154,6 +204,21 @@ export function PlantsPanel({ plants, onSave, status }) {
                         onChange={(event) => updateDraft(plant.plant_id, 'position_mm', event.target.value)}
                       />
                     </label>
+                    <div>
+                      {/* Names the plant on the button itself: the whole risk
+                          here is pressing this on the wrong card. */}
+                      <button type="button" onClick={() => capturePosition(plant)}>
+                        Use current position for {plant.name}
+                      </button>
+                      <p className="field-hint">
+                        Jog the carriage until the nozzle is over this pot, then
+                        press. Fills the field above — nothing is stored until
+                        you Save.
+                      </p>
+                      {captureNote[plant.plant_id] && (
+                        <p className="field-hint warning">{captureNote[plant.plant_id]}</p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="plant-actions-row">

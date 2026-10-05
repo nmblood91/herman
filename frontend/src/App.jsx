@@ -249,7 +249,12 @@ function App() {
       )}
 
       {activeTab === 'plants' && (
-        <PlantsPanel plants={plants} onSave={savePlant} status={overview?.plants} />
+        <PlantsPanel
+          plants={plants}
+          onSave={savePlant}
+          status={overview?.plants}
+          movement={overview?.movement}
+        />
       )}
 
       {activeTab === 'sensors' && (
