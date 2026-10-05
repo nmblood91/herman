@@ -191,7 +191,7 @@ and `spidev`, so they run on a development machine with no hardware attached.
 | Soil sensors | Real — I2C via the seesaw protocol, no simulation |
 | Gantry | Real — Klipper over its Unix socket |
 | Pump | Real — Klipper `output_pin` on the SKR's HE0 MOSFET |
-| LEDs | Real — WS2812B/WS2815/GS8208/WS2811 over SPI, strip type selectable in settings |
+| LEDs | Real — WS2811 (default), WS2815 or GS8208 over SPI, 12V only, strip type selectable in Settings |
 | Water level sensor | Real — non-contact sensor on the outlet tube, via Klipper; verifies a dose rather than gating it |
 | Camera | Not built — the UI controls for it are inert |
 

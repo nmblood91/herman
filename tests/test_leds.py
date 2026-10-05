@@ -10,7 +10,6 @@ from greenthumb.services.automation import within_window
 # --- bit encoding, per chip: this is what the strip actually sees on the wire ---
 # Datasheet high times, in ns: (T0H, T1H), each with +/-150 tolerance.
 DATASHEET = {
-    "WS2812B": (400, 800),
     "WS2815": (300, 900),
     "GS8208": (300, 900),
     "WS2811": (250, 600),

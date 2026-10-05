@@ -658,7 +658,7 @@ Three things keep it healthy:
   convincingly low. If your hubs have them, remove the resistors rather than
   buying different hubs.
 - **Route away from the LED data line and the stepper wiring.** 1.5 m of I2C run
-  parallel to an 800 kHz WS2812B data line will cause more trouble than the
+  parallel to an 800 kHz addressable-LED data line will cause more trouble than the
   capacitance ever will. Crossing at right angles is fine; running alongside is
   not. Sharing a few centimetres near the Pi header is harmless.
 
@@ -832,12 +832,14 @@ answered). Unknown is deliberately distinct from a failure: "we did not look" an
 
 Supported strips, selectable as **LED strip type** in the Settings tab:
 
+All 12V. A 5V strip is deliberately not supported: sixty 5V pixels pull about
+3.6A, well past what the 12V-to-5V converter can give on top of the Pi.
+
 | Chip | Supply | Pixels | Pads | Notes |
 |---|---|---|---|---|
-| WS2812B | 5V | one per LED | 3 | The common 5V strip |
+| **WS2811** | 12V | one per **3** LEDs | 3 | **Default.** Set LED count to LEDs / 3 |
 | WS2815 | 12V | one per LED | 4 | 4th pad is a backup data line |
 | GS8208 | 12V | one per LED | 3 | Often sold as "12V WS2812B" |
-| WS2811 | 12V | one per **3** LEDs | 3 | Set LED count to LEDs / 3 |
 
 They use different bit timing, so picking the wrong one gives no light or
 garbage rather than a subtle colour shift. **To tell 12V strips apart, check the
@@ -866,9 +868,10 @@ Two things that look like software faults but are not:
   supply, and the Pi only swings to 3.3V. Some strips tolerate it; flicker or junk
   on the first few pixels is this, not a bug.
 
-**Do not power the strip from the Pi.** A 5V WS2812B strip pulls about 3.6A at 60
-LEDs full white, far past the Pi's rail. 12V strips draw roughly a third of that,
-but either way the strip's supply must not touch the Pi's pins.
+**Do not power the strip from the Pi.** The supported 12V strips draw around
+1.2-1.5A at 60 LEDs full white, and a 5V strip of the same length would pull
+about 3.6A -- which is one of the reasons 5V is not supported. Either way the
+strip's supply must not touch the Pi's pins.
 
 If red and green come out swapped, change **LED colour order** in settings.
 Selecting a strip type resets that order to the one that chip normally uses, so

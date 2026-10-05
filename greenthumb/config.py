@@ -22,9 +22,11 @@ class Settings(BaseSettings):
     # regardless of what the browser does.
     pump_max_run_seconds: int = 120
     # Strip chip: sets the bit timing and the usual channel order. Selectable in
-    # the settings page. WS2812B/WS2815/GS8208 are one pixel per LED; WS2811
-    # drives three LEDs per pixel, so set led_count to LEDs/3 for it.
-    led_chip: str = "WS2812B"
+    # the Settings tab. All 12V: WS2815 and GS8208 are one pixel per LED, WS2811
+    # drives three LEDs per pixel so led_count is LEDs/3 for it. No 5V chip is
+    # offered -- sixty 5V pixels would pull about 3.6A, past what the DC-DC can
+    # give on top of the Pi.
+    led_chip: str = "WS2811"
     led_count: int = 60
     # Overrides the chip's usual order, for strips wired differently.
     led_color_order: str = "GRB"

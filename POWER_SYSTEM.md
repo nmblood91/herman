@@ -88,7 +88,8 @@ inrush. Size a pump fuse against the pump, not against the supply.
 the chip, and 2A is the usual 125-165% of maximum load. If it ever nuisance-blows
 on a full-white scene, move to 3A rather than assuming a fault.
 
-**A 5V strip does not belong on this branch at all.** Sixty WS2812B pixels pull
+**A 5V strip does not belong on this branch at all**, and the software no
+longer offers one: only 12V chips are selectable. Sixty WS2812B pixels pull
 about 3.6A at 5V, which the DC-DC converter's 3A budget cannot absorb on top of
 the Pi. A 5V strip needs its own 5V supply and its own fuse sized to it.
 

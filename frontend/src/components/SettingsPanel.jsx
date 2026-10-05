@@ -8,7 +8,7 @@ export function SettingsPanel({ overview, onQuietChange }) {
   const colorOrderOptions = lighting?.color_order_options ?? DEFAULT_COLOR_ORDERS
   const chipOptions = lighting?.chip_options ?? []
 
-  const [chip, setChip] = useState('WS2812B')
+  const [chip, setChip] = useState('WS2811')
   const [colorOrder, setColorOrder] = useState('GRB')
   const [status, setStatus] = useState('')
 

@@ -301,7 +301,9 @@ async def set_light_color_order(payload: dict[str, str] = Body(default_factory=d
 
 @app.post(f"{settings.api_prefix}/lights/chip")
 async def set_light_chip(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
-    chip = str(payload.get("chip", "WS2812B"))
+    # settings.led_chip, not a literal: a request with the key missing used to
+    # silently select a chip that is no longer even supported.
+    chip = str(payload.get("chip", settings.led_chip))
     result = automation.set_light_chip(chip)
     log_event(f"LED chip set to {result['chip']} ({result['color_order']})")
     return result

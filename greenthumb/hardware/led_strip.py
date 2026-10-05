@@ -21,10 +21,11 @@ class ChipSpec:
 # rate, clock it faster and spend several SPI bits per data bit, choosing a rate
 # where the high time lands mid-tolerance and a whole data byte still maps onto a
 # whole number of SPI bytes.
+# 12V only. A 5V strip is not offered here on purpose: sixty 5V pixels pull
+# about 3.6A, which the 12V-to-5V converter cannot supply on top of the Pi, so
+# listing one would invite wiring a strip this power system cannot feed. See
+# POWER_SYSTEM.md.
 CHIPS = {
-    # T0H 400ns, T1H 800ns, both +/-150. At 2.4MHz a SPI bit is 417ns, so 100
-    # holds high 417ns and 110 holds 833ns.
-    "WS2812B": ChipSpec(2_400_000, 3, 0b100, 0b110, "GRB", "5V, one pixel per LED"),
     # 12V, one pixel per LED, four pads because it carries a backup data line.
     # T0H 300ns, T1H 900ns: the same 417/833 sits inside both windows.
     "WS2815": ChipSpec(2_400_000, 3, 0b100, 0b110, "GRB", "12V, one pixel per LED, 4 pads"),
@@ -35,9 +36,11 @@ CHIPS = {
     "WS2811": ChipSpec(3_200_000, 4, 0b1000, 0b1100, "RGB", "12V, three LEDs per pixel"),
 }
 
-DEFAULT_CHIP = "WS2812B"
+# WS2811 is what this build ships with. Note it drives three LEDs per pixel,
+# so led_count is a third of the LEDs you can count on the strip.
+DEFAULT_CHIP = "WS2811"
 
-# The strip latches on a long low. Later WS2812B revisions want 280us rather than
+# The strip latches on a long low. Later WS281x revisions want 280us rather than
 # the original 50us, and idle bytes are nearly free. Sized for the fastest clock
 # here, so it still clears 280us at WS2811's 3.2MHz.
 RESET = b"\x00" * 120
