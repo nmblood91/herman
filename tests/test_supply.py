@@ -91,7 +91,11 @@ result = auto.water_plant("plant_1")
 assert result["status"] == "ok", "a failed delivery must not read as a refused dose"
 assert result["delivered"] is False, result
 assert pump.calls == [100], "dry outlet stopped the pump; it must not gate"
-assert klip.moves == [150], "dry outlet stopped the gantry; it must not gate"
+# Read rather than hardcoded: this used to assert 150 and broke when the
+# default moved with the measured rail length. What matters is that the
+# gantry went to the plant, not what that number happens to be.
+expected = next(p.position_mm for p in auto.plants if p.plant_id == "plant_1")
+assert klip.moves == [expected], "dry outlet stopped the gantry; it must not gate"
 assert store.waterings(1)[0]["delivered"] is False
 print("ok: dry outlet -> dose runs anyway, recorded as delivered False")
 

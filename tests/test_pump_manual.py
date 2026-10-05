@@ -107,8 +107,26 @@ settings.pump_max_run_seconds = 1
 auto, klip = build()
 auto.run_pump()
 assert auto.pump.is_running
-time.sleep(1.4)
-assert auto.pump.is_running is False, "auto-stop did not fire"
+
+
+def wait_until(predicate, timeout=10.0, interval=0.05):
+    """Wait for a real timer, without betting on how long it takes.
+
+    This used to be a flat sleep of 1.4s against a 1s timer. Four hundred
+    milliseconds of margin is not much to hand a thread scheduler, and the
+    suite failed intermittently because of it -- on a loaded machine, or on
+    the Pi, more so. Polling passes as soon as the condition holds and only
+    spends the full timeout when something is genuinely wrong.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return False
+
+
+assert wait_until(lambda: auto.pump.is_running is False), "auto-stop did not fire"
 assert klip.gcode[-1] == "SET_PIN PIN=pump VALUE=0", klip.gcode
 assert not auto._hardware_lock.locked(), "auto-stop left the lock held"
 auto.tick()
