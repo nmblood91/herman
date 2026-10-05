@@ -19,7 +19,14 @@ max_z_accel: 100
 # on the rail.
 [stepper_x]
 step_pin: PB13
-dir_pin: PB12
+# Negated to match this build. Which way a stepper turns depends on the order
+# of its coil pairs in the connector and on how the belt is routed, so this is
+# a property of the machine rather than of the board -- a differently wired
+# motor may need the plain PB12. Check it with FORCE_MOVE before ever running
+# G28, because homing_positive_dir sends homing toward the switch at 40 mm/s
+# and the wrong sign drives into the far end of the rail instead. The procedure
+# is in deploy/README.md.
+dir_pin: !PB12
 enable_pin: !PB14
 microsteps: 16
 rotation_distance: 40

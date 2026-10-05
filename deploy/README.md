@@ -344,6 +344,51 @@ Y and Z read `TRIGGERED` and should be ignored. They are placeholder axes with
 nothing wired to PC15 and PC14, and an unconnected pin with a pull-up reads high
 — which is deliberate, so a stray `G28 Y` fails fast.
 
+### Check the motor direction before homing
+
+`homing_positive_dir: True` sends `G28 X` toward the switch at
+`homing_speed: 40` mm/s. If the motor turns the other way it drives the
+carriage into the far end of the rail at that speed, belt and all. Which way
+it turns depends on the order of the coil pairs in the connector and on how
+the belt is routed, so it is a property of the machine, not something the
+board decides.
+
+Park the carriage mid-rail, then nudge it:
+
+```bash
+python3 /opt/greenthumb/deploy/pi/send-gcode.py   "FORCE_MOVE STEPPER=stepper_x DISTANCE=10 VELOCITY=20"
+```
+
+It must move **10 mm toward the switch**. If it moves away, invert `dir_pin`
+in `[stepper_x]` — `PB12` becomes `!PB12` or back again — and restart Klipper.
+This build needs `!PB12`.
+
+`FORCE_MOVE` ignores endstops and soft limits entirely, which is what makes it
+usable before homing and also why the distances here are small.
+
+**Put the value in `printer.cfg.example`, not just in the live config.**
+Re-running the install script regenerates `printer.cfg` from the template, so
+a direction fixed only on the Pi is backed up and then lost on the next
+install.
+
+### Do not jog to X0 until the rail is measured
+
+After homing, Klipper believes the carriage is at `position_endstop` and that
+there is that much travel below it. While that value is still the shipped
+placeholder, `G1 X0` is an instruction to drive the carriage somewhere that
+may be past the end of the rail.
+
+Work leftward in steps instead, watching:
+
+```bash
+python3 /opt/greenthumb/deploy/pi/send-gcode.py "G91"
+python3 /opt/greenthumb/deploy/pi/send-gcode.py "G1 X-100 F3000"   # repeat
+python3 /opt/greenthumb/deploy/pi/send-gcode.py "G90"
+```
+
+The total distance from the trip point to the left end of usable travel is the
+real `position_endstop`.
+
 **Calibrating `position_endstop`.** X960 is the last usable position and the
 switch sits past it, so homing can retract clear of the switch instead of resting
 on the upper limit. `position_endstop` is the coordinate at which the switch
