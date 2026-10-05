@@ -20,7 +20,7 @@ from greenthumb.models import PlantSpec
 
 def default_plants() -> list[PlantSpec]:
     """Fresh PlantSpec instances, so callers cannot mutate a shared default."""
-    # Positions are placeholders scaled to fit the measured 870 mm of travel.
+    # Positions are placeholders scaled to fit the measured 880 mm of travel.
     # Plant 4 used to sit at 900, which the carriage can no longer reach. Set
     # each properly once the pots are placed; the Plants tab writes them to
     # data/state.json and they persist from then on.
