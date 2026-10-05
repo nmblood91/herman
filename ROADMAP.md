@@ -67,16 +67,41 @@ shipping, not a nicety.
 **`herman.local` does not solve this.** mDNS resolves a hostname on a
 network the Pi has already joined -- it is link-local multicast, so with no
 connection there is no link to multicast over. A Pi with no WiFi configured
-broadcasts nothing and is simply unreachable. The answer has to be the device
-bringing up its own access point and serving a setup page.
+broadcasts nothing and is simply unreachable. Whatever the answer is, it has
+to reach a planter that is not yet on any network.
 
-Three constraints that shape it:
+There are two ways to do it, and they are not equally constrained.
+
+**Over the device's own access point.** The setup page is served by the Pi
+itself and the customer's phone joins its network to reach it. This is the
+browser-only path, and it carries a real limitation:
 
 - **The built-in WiFi chip cannot scan while acting as an access point.** So
   the setup page cannot offer "pick your network from a list" on a unit that
   has never connected -- there is nothing cached to list. Either the customer
   types their SSID, or the firmware cycles scan/AP, which is slow and
   unreliable. Design the screen around typing.
+
+**Over BLE, from a phone app.** Credentials arrive over Bluetooth while the
+WiFi radio stays in station mode, so **the scanning limitation above does not
+apply** -- the chip is free to scan and the app can show a real network picker.
+The Pi 3 A+ has BT 4.2 on the same combo chip as its WiFi; the two share an
+antenna, but coexistence is irrelevant for a one-time setup exchange.
+
+This is the better experience and it is why provisioning and the mobile app are
+one piece of work rather than two. It also settles authentication, which the
+API does not have yet: a phone provisioning over BLE is physically next to the
+planter, and that proximity is the proof of presence that issues the pairing
+token. A code on a sticker in the box is the recovery path for re-pairing
+later.
+
+The cost is that BLE provisioning cannot be done from a web page -- browsers
+cannot speak to a GATT server on iOS at all. So the AP path probably still has
+to exist as the fallback for a customer without the app, which means the
+typing-based screen above gets built either way.
+
+Two further constraints apply to both paths:
+
 - **The usual tools are mid-churn.** balena wifi-connect, comitup and RaspAP
   all have problems with the netplan + NetworkManager stack that current
   Raspberry Pi OS is moving to. Newer options exist but are young. Whatever is
