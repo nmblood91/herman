@@ -9,10 +9,13 @@ max_accel: 4000
 max_z_velocity: 15
 max_z_accel: 100
 
-# X coordinates: the endstop switch trips at X980, inside the dead zone at the
-# right end, next to the motor. Usable travel is X0 to X960; the 20 mm at each
-# end of the 1 m rail is unreachable by the carriage. Measure position_endstop
-# against your own switch mounting -- see deploy/README.md.
+# X coordinates, measured on this machine rather than estimated. Homing was run,
+# then the carriage jogged left until it reached the end of the rail 900 mm from
+# the trip point. position_endstop is set 30 mm short of that, so X0 sits clear
+# of the hard stop: the crash point is not known precisely, and any error here
+# propagates into every plant position.
+#
+# Measure these against your own switch mounting -- see deploy/README.md.
 #
 # Homing at the motor end keeps the belt span between pulley and carriage at its
 # shortest when the switch trips, so the reference is the most repeatable point
@@ -36,8 +39,8 @@ rotation_distance: 40
 # it would give up the fail-safe described in deploy/README.md.
 endstop_pin: ^PC0
 position_min: 0
-position_max: 980
-position_endstop: 980
+position_max: 870
+position_endstop: 870
 # Stated rather than inferred: Klipper would work this out from position_endstop
 # sitting at the top of the range, but then a later edit to position_max could
 # silently reverse the homing direction.
@@ -65,7 +68,7 @@ gcode:
     # its script runs and dispatches a nested G28 to the real homing routine.
     G28 X
     G90
-    G1 X960 F3000
+    G1 X850 F3000
 
 [force_move]
 enable_force_move: True

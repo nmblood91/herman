@@ -401,6 +401,14 @@ python3 /opt/greenthumb/deploy/pi/send-gcode.py "G90"
 The total distance from the trip point to the left end of usable travel is the
 real `position_endstop`.
 
+**Plant positions have to fit inside it.** `position_max` is the furthest the
+carriage can go, and a plant configured past it simply cannot be reached --
+the move is refused and that plant is never watered. The defaults in
+`greenthumb/plants.py` are scaled to the travel measured here; if yours is
+shorter, they need scaling again. The app asks Klipper for the real limit
+rather than keeping its own copy, so it follows `position_max` automatically
+once Klipper is restarted.
+
 **Calibrating `position_endstop`.** X960 is the last usable position and the
 switch sits past it, so homing can retract clear of the switch instead of resting
 on the upper limit. `position_endstop` is the coordinate at which the switch

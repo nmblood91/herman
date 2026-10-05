@@ -21,17 +21,26 @@ class KlipperClient:
 
     def status(self) -> dict[str, Any]:
         response = self._send_command(
-            "objects/query", {"objects": {"toolhead": ["position", "homed_axes"]}}
+            "objects/query",
+            # axis_maximum so the rest of the app can ask Klipper how far the
+            # rail goes instead of keeping its own copy of the number. The
+            # limit lives in printer.cfg as position_max, and a second copy in
+            # .env drifts the moment the rail is measured properly.
+            {"objects": {"toolhead": ["position", "homed_axes", "axis_maximum"]}},
         )
         if not response.get("ok"):
             return {"ok": False, "error": response.get("error"), "position": 0.0, "homed": False}
 
         toolhead = response.get("result", {}).get("status", {}).get("toolhead", {})
         position = toolhead.get("position") or [0.0]
+        maximum = toolhead.get("axis_maximum") or []
         return {
             "ok": True,
             "position": round(float(position[0]), 1),
             "homed": "x" in (toolhead.get("homed_axes") or ""),
+            # None when Klipper did not report it, so callers can tell "not
+            # known" from a real limit of zero.
+            "max_x": round(float(maximum[0]), 1) if maximum else None,
         }
 
     def water_supply_present(self) -> bool | None:

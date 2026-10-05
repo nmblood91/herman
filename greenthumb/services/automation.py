@@ -294,7 +294,20 @@ class GreenThumbAutomation:
             self.plants[-1].led_end_index = total_leds - 1
 
     def usable_travel_mm(self) -> float:
-        """Reachable X range, where 0 is the first position the carriage can occupy."""
+        """Reachable X range, where 0 is the first position the carriage can occupy.
+
+        Asks Klipper, because Klipper is the one enforcing it: position_max in
+        printer.cfg is the real limit, and it changes whenever the rail is
+        measured properly. Deriving a second answer from the rail length and a
+        margin meant the two disagreed the moment that happened -- which is how
+        a plant ended up configured at a position the carriage could not reach.
+
+        Falls back to the configured estimate when Klipper is not answering, so
+        a plant position can still be saved with the board unplugged.
+        """
+        reported = self.klipper.status().get("max_x")
+        if reported:
+            return max(float(reported), 1.0)
         rail_length = max(float(settings.gantry_rail_length_mm), 1.0)
         margin = max(float(settings.gantry_position_margin_mm), 0.0)
         return max(rail_length - (margin * 2), 1.0)
