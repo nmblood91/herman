@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from greenthumb.config import settings
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
-from greenthumb import system_clock
+from greenthumb import system_clock, version
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
 
 setup_logging()
@@ -121,6 +121,12 @@ def get_overview() -> dict[str, object]:
 @app.get(f"{settings.api_prefix}/sensors")
 async def read_sensors() -> list[dict[str, object]]:
     return automation.read_sensors()
+
+
+@app.get(f"{settings.api_prefix}/version")
+def get_version() -> dict[str, object]:
+    """What is running, and whether the checkout has moved on without it."""
+    return version.status()
 
 
 @app.get(f"{settings.api_prefix}/system/time")

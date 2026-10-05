@@ -17,6 +17,7 @@ export function SettingsPanel({ overview, onQuietChange }) {
   const [quietStart, setQuietStart] = useState('21:00')
   const [quietStop, setQuietStop] = useState('08:00')
   const [quietMsg, setQuietMsg] = useState('')
+  const [build, setBuild] = useState(null)
 
   const [clock, setClock] = useState(null)
   const [clockStatus, setClockStatus] = useState('')
@@ -125,6 +126,23 @@ export function SettingsPanel({ overview, onQuietChange }) {
       setStatus(`Save failed: ${error.message}`)
     }
   }
+
+  useEffect(() => {
+    let cancelled = false
+    async function readVersion() {
+      try {
+        const response = await fetch(`${API_BASE}/version`)
+        if (!response.ok || cancelled) return
+        setBuild(await response.json())
+      } catch {
+        // Leaves the panel without a version rather than breaking it.
+      }
+    }
+    readVersion()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const saveQuiet = async () => {
     setQuietMsg('')
@@ -251,6 +269,31 @@ export function SettingsPanel({ overview, onQuietChange }) {
             </p>
           )}
           {clockStatus && <p className="field-hint warning">{clockStatus}</p>}
+        </div>
+
+        <div className="field-row">
+          <label>Software</label>
+          <p className="field-hint">
+            Version {build?.version ?? '—'} · API {build?.running_commit ?? '—'} ·
+            page {__BUILD_COMMIT__}
+          </p>
+          {build?.stale && (
+            <p className="field-hint warning">
+              The planter has newer code on disk ({build.checkout_commit}) than
+              the service is running ({build.running_commit}). Something was
+              pulled without restarting. Run{' '}
+              <code>sudo systemctl restart greenthumb-api</code> on the Pi.
+            </p>
+          )}
+          {build?.running_commit &&
+            __BUILD_COMMIT__ !== 'unknown' &&
+            build.running_commit !== __BUILD_COMMIT__ && (
+              <p className="field-hint warning">
+                This page was built from {__BUILD_COMMIT__} but the API is
+                running {build.running_commit}. Rebuild the frontend, or you
+                will hit features the API does not have.
+              </p>
+            )}
         </div>
 
         <button type="button" className="primary save-settings-button" onClick={save}>

@@ -80,6 +80,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/lights/...` | mode, brightness, colour, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
 | `/system/time`, `/system/timezone` | the planter's clock |
+| `/version` | what is running, and whether the checkout has moved on without it |
 
 **The full, current list is generated from the routes themselves** at
 <http://herman.local:8000/docs> — interactive, and it cannot go stale the
