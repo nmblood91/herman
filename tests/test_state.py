@@ -148,3 +148,31 @@ got = auto.smoothed_percent(0x36)
 # 600 sits midway between this sensor's calibrated 500 and 700.
 assert got == 50.0, f"expected the calibrated 50.0, got {got} (global span would give ~40)"
 print("ok: the averaged moisture uses the sensor's own calibration, not the global span")
+
+
+# --- superseded keys do not live forever ---
+# A state file carrying both "zones" and "plants", with different names in
+# each, cost real debugging time: only one was live and nothing said which.
+
+p = temp_path()
+state.save_state({
+    "zones": [{"plant_id": "plant_1", "name": "Basil"}],
+    "plants": [{"plant_id": "plant_1", "name": "Rosemary"}],
+    "moisture_calibration": {"0x36": {"dry": 330}},
+}, p)
+state.update_state({"leds": {"mode": "off"}}, p)
+after = state.load_state(p)
+assert "zones" not in after, after
+assert [x["name"] for x in after["plants"]] == ["Rosemary"], after
+assert "moisture_calibration" in after, "unrelated keys must survive the sweep"
+assert after["leds"] == {"mode": "off"}
+print("ok: a superseded key is dropped once its replacement exists")
+
+# The guard that matters: never throw away the only copy. If the replacement
+# has not been written yet, the old key is still the live one.
+p = temp_path()
+state.save_state({"zones": [{"plant_id": "plant_1", "name": "Basil"}]}, p)
+state.update_state({"leds": {"mode": "off"}}, p)
+after = state.load_state(p)
+assert "zones" in after, "dropped the old key while it was still the only copy"
+print("ok: an old key is kept while nothing has replaced it")

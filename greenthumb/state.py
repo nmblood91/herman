@@ -94,12 +94,37 @@ def save_state(data: dict[str, Any], path: str | Path | None = None) -> bool:
     return True
 
 
+# Keys written by an older version that nothing reads any more. Merging rather
+# than replacing on save is deliberate -- storing plants must not clobber
+# calibration -- but the side effect is that a renamed key lives forever. One
+# of these cost real debugging time: a state file carrying both "zones" and
+# "plants" with different names in each, where only one was live.
+SUPERSEDED_KEYS = {
+    "zones": "plants",  # renamed when zones became plants
+}
+
+
+def _drop_superseded(data: dict[str, Any]) -> bool:
+    """Remove dead keys, but only once their replacement exists."""
+    dropped = False
+    for old_key, replacement in SUPERSEDED_KEYS.items():
+        # Guarded on the replacement being present so this never throws away
+        # the only copy: if the rename has not happened yet, the old key is
+        # still the live one.
+        if old_key in data and replacement in data:
+            del data[old_key]
+            dropped = True
+            logger.info("Removed superseded state key %r, replaced by %r", old_key, replacement)
+    return dropped
+
+
 def update_state(
     changes: dict[str, Any], path: str | Path | None = None
 ) -> dict[str, Any]:
     """Merge top-level keys into the stored state and write it back."""
     data = load_state(path)
     data.update(changes)
+    _drop_superseded(data)
     save_state(data, path)
     return data
 
