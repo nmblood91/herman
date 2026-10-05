@@ -56,8 +56,21 @@ uart_address: 0
 run_current: 0.7
 stealthchop_threshold: 999999
 
-# Park clear of the switch after homing so the first move in either direction
-# is legal; sitting on position_max makes any rightward jog fail.
+# Park at X0 after homing, the far end from the switch.
+#
+# Chosen for the person who owns one of these rather than for the person who
+# built it: the app shows the carriage position, and "0 mm" means something to
+# someone who has never used a machine like this, while "870 mm" is a number
+# they have no way to interpret.
+#
+# The cost is the traverse -- the whole rail after every home, which happens at
+# startup and after any Klipper restart. Raise the feedrate below if that wait
+# annoys you; max_velocity allows a good deal more than this.
+#
+# Parking here does mean a leftward jog is refused while sitting at X0, the
+# same way a rightward one would be refused at position_max. That is the better
+# end to have it on: "cannot go further left, you are at the left end" explains
+# itself, whereas the same error at 890 does not.
 [homing_override]
 axes: x
 gcode:
@@ -68,7 +81,7 @@ gcode:
     # its script runs and dispatches a nested G28 to the real homing routine.
     G28 X
     G90
-    G1 X870 F3000
+    G1 X0 F3000
 
 [force_move]
 enable_force_move: True

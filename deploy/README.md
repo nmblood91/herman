@@ -429,6 +429,13 @@ mounting, then set `position_max` to the same value and park 20 mm short of it i
 `homing_override`. X0 stays the left end of usable travel, so plant positions are
 unaffected by which end the switch lives at.
 
+**Homing parks the carriage at X0**, the far end from the switch, rather than
+leaving it where it tripped. That is a choice about who reads the screen: the
+app shows the carriage position, and `0 mm` means something to the person who
+owns one of these, while `870 mm` is a number they cannot interpret. It costs a
+full traverse of the rail after every home, so raise the feedrate in
+`homing_override` if the wait is irritating.
+
 `homing_positive_dir: True` is stated explicitly. Klipper would infer it from
 `position_endstop` sitting at the top of the range, but then a later edit to
 `position_max` could silently reverse which way the carriage homes.
