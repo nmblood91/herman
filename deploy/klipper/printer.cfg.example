@@ -58,7 +58,12 @@ stealthchop_threshold: 999999
 [homing_override]
 axes: x
 gcode:
-    G28.1 X
+    # Plain G28, not G28.1. G28.1 is a Marlin command and Klipper answers
+    # "Unknown command", which left the override failing on its first line and
+    # the move below refusing with "Must home axis first". Calling G28 from
+    # inside the override does not recurse: homing_override sets a flag while
+    # its script runs and dispatches a nested G28 to the real homing routine.
+    G28 X
     G90
     G1 X960 F3000
 

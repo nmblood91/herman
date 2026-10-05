@@ -344,6 +344,18 @@ Y and Z read `TRIGGERED` and should be ignored. They are placeholder axes with
 nothing wired to PC15 and PC14, and an unconnected pin with a pull-up reads high
 — which is deliberate, so a stray `G28 Y` fails fast.
 
+### If homing reports "Unknown command: G28.1"
+
+The `homing_override` block must call plain `G28`, not `G28.1`. `G28.1` is a
+Marlin command; Klipper does not have it, so the override fails on its first
+line and the park move that follows refuses with `Must home axis first`,
+leaving the axis unhomed with two errors that do not obviously point at the
+config.
+
+Calling `G28` from inside `homing_override` looks like it would recurse
+forever and does not: Klipper sets a flag while the override script runs and
+dispatches a nested `G28` to the real homing routine.
+
 ### Check the motor direction before homing
 
 `homing_positive_dir: True` sends `G28 X` toward the switch at
