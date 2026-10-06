@@ -190,13 +190,13 @@ line is in *Power and electronics*.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| 12 V power supply, 5 A min (7 A recommended) | 1 | $10.00 | $10.00 | the only supply in the build |
+| 12 V power supply, 5 A min (7 A recommended) | 1 | $15.00 | $15.00 | the only supply in the build |
 | DC-DC converter, 12 V to 5 V @ 3 A | 1 | $10.00 | $10.00 | Yipin hexa; this is what powers the Pi |
 | Fuse, 5 A fast-blow | 1 | TBD | TBD | charger output into the busbar |
 | Fuse, 1 A fast-blow | 1 | TBD | TBD | SKR HE0 to pump positive |
 | Fuse, 2 A fast-blow | 1 | TBD | TBD | busbar to strip +12 V |
 | Inline fuse holder, 16 AWG leads | 3 | TBD | TBD | one per fuse above |
-| 1N5822 flyback diode, 3 A Schottky | 1 | TBD | TBD | **required**, see [POWER_SYSTEM.md](POWER_SYSTEM.md) |
+| 1N5822 flyback diode, 3 A Schottky | 1 | 2 | TBD | **required**, see [POWER_SYSTEM.md](POWER_SYSTEM.md) |
 | 74AHCT125 level shifter | 1 | TBD | TBD | LED data line |
 | Wiring harness and cable routing | TBD | TBD | TBD | |
 | Heat shrink, assorted | TBD | TBD | TBD | used throughout, not only on the LED runs |

@@ -304,12 +304,12 @@ export function SettingsPanel({ overview, onRefresh }) {
         </div>
 
         <div className="field-row">
-          <label>Planter time</label>
           <div className="slider-row">
-            <span className="position-readout">{planterClock}</span>
             <button type="button" disabled={syncing || !clock?.can_set} onClick={syncTimezone}>
               {syncing ? 'Syncing…' : 'Sync to Local Time'}
             </button>
+            {/* Names itself, so there is no separate field label above it. */}
+            <span className="position-readout">Herman&apos;s clock: {planterClock}</span>
           </div>
           <p className="field-hint">
             The planter runs its lighting schedule on its own clock, so if this

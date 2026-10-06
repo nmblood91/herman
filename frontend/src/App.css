@@ -284,6 +284,13 @@ option {
   color: #edf8ee;
 }
 
+/* Standalone it wants its own spacing, but beside a button in a flex row those
+   margins push it off the button's centre line. */
+.slider-row .position-readout {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 .general-settings-form {
   display: grid;
   gap: 18px;
