@@ -142,9 +142,21 @@ number of LEDs you can count.
 ## Wiring & Connectors
 
 ### Main Busbar
-- Use a **3-pad solder busbar** or **distribution block** (commonly called "power distribution board")
-- Pads: +12V, Ground, Ground (or +12V, +5V, Ground if integrating 5V rail)
-- Wire gauge: **14 AWG minimum** (10 AWG recommended for 12V runs > 2 meters)
+
+**The busbar is not a separate component.** It is the pair of 5-slot Wago 221
+lever connectors at the main electronics rear — one for +12V, one for ground.
+Every "busbar" in this document means those two.
+
+Lever connectors rather than a solder busbar or a screw block, for the same
+reason the pump leads land in Wagos rather than on the pump terminals: the
+joints have to open for service without a soldering iron.
+
+- Wire gauge: **14 AWG** for the 12V runs here, all of which are short
+- A 221-412/413/415 accepts 24–12 AWG. The older advice to step up to 10 AWG
+  past two metres does not apply — **10 AWG will not fit a 221**, and a run
+  that genuinely needed it would want the larger 221-6xx family instead
+- Priced in [PRINTED_PARTS.md](PRINTED_PARTS.md), which is where the Wagos
+  are counted
 
 ### Fuse Holders
 - Inline fuse holders with **16 AWG or larger wire leads**

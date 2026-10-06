@@ -20,13 +20,13 @@ cannot be subtotalled yet.
 | Sensing | $48.00 | 3 — three hubs, two inter-hub cables |
 | Watering system | $35.00 | 2 — intake weight, level sensor |
 | Lighting | $10.00 | 3 — hook-up wire, diffuser, connectors |
-| Power and electronics | $20.00 | 9 — fuses and holders, diode, shifter, busbar, harness, heat shrink |
-| **Running total** | **~$388–394** | **22 lines outstanding** |
+| Power and electronics | $20.00 | 8 — fuses and holders, diode, shifter, harness, heat shrink |
+| **Running total** | **~$388–394** | **21 lines outstanding** |
 
 Still a floor rather than an estimate, but a much closer one: the expensive
 items are all in now. What is left is small hardware — fuses, a diode, a
-level shifter, a busbar, connectors and wire — plus the three hubs and the
-liquid level sensor. None of that is likely to move the total by more than
+level shifter, connectors and wire — plus the three hubs and the liquid level
+sensor. None of that is likely to move the total by more than
 $30 or so, which puts a finished prototype somewhere near **$420**.
 
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
@@ -201,12 +201,14 @@ line is in *Power and electronics*.
 | Inline fuse holder, 16 AWG leads | 3 | TBD | TBD | one per fuse above |
 | 1N5822 flyback diode, 3 A Schottky | 1 | TBD | TBD | **required**, see [POWER_SYSTEM.md](POWER_SYSTEM.md) |
 | 74AHCT125 level shifter | 1 | TBD | TBD | LED data line |
-| Busbar / power distribution block | 1 | TBD | TBD | |
 | Wiring harness and cable routing | TBD | TBD | TBD | |
 | Heat shrink, assorted | TBD | TBD | TBD | used throughout, not only on the LED runs |
 
-Lever connectors are counted in [PRINTED_PARTS.md](PRINTED_PARTS.md), not here
-— see *Overlaps to resolve*. The diode and the pump leads land in them rather
+**The busbar is the Wago connectors**, not a separate part — the two 5-slot
+221s at the main electronics rear are the +12V and ground distribution point
+that every "busbar" in [POWER_SYSTEM.md](POWER_SYSTEM.md) refers to. All four
+Wagos are counted in [PRINTED_PARTS.md](PRINTED_PARTS.md), so there is no line
+for them here. The diode and the pump leads land in the 3-slot pair rather
 than being soldered to the pump terminals; see
 [deploy/README.md](deploy/README.md).
 
@@ -228,10 +230,13 @@ duplicate usually means two documents disagree about the design.
    machine, and *Lighting* had a third. There is one supply. Consolidated into
    *Power and electronics*.
 
-3. **Wago lever connectors.** The two 3-way connectors at the pump appeared
-   here and in PRINTED_PARTS.md, which prices four Wagos — 2 × 5-slot at the
-   electronics rear and 2 × 3-slot at the right gantry holder rear. The pair
-   here is that second pair. Counted in PRINTED_PARTS only.
+3. **Wago lever connectors, twice over.** The two 3-way connectors at the
+   pump were listed here and in PRINTED_PARTS.md — that is the 3-slot pair.
+   Then the "busbar / power distribution block" line turned out to be the
+   *other* pair, the 5-slot 221s at the electronics rear. Both are counted in
+   PRINTED_PARTS only, and POWER_SYSTEM.md no longer recommends a solder
+   busbar, which was a part this build never bought and the opposite of the
+   serviceable-joint rule everything else follows.
 
 
 ## Software stack
