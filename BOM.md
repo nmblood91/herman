@@ -10,6 +10,13 @@
 - NEMA 17 stepper motor
 - Belt tensioning hardware
 
+## Printed parts
+
+- Printed structural parts, their weights, heat-set inserts and screws are
+  tracked in **[PRINTED_PARTS.md](PRINTED_PARTS.md)** — gantry holders and
+  covers, the V-slot adapter, the electronics holder, the STEMMA QT sub hubs
+  and the water-tube cable chain
+
 ## Motion and control
 - BTT SKR Mini E3 V2 control board
 - TMC2209 stepper drivers
