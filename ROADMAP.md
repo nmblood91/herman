@@ -115,15 +115,19 @@ This belongs with the packaging work above rather than before it. Provisioning,
 the .deb and the factory image are one push: the image is where provisioning is
 baked in, and doing it first means doing it twice.
 
-**Supported hardware floor: Raspberry Pi 3 Model B+.** That is a deliberate
-constraint, and it settles a few things: 1 GB of RAM means the on-device frontend
-build still works, so prebuilt bundles are a reliability improvement rather than
-a hardware requirement; 64-bit Pi OS stays the only
-target, so a release artifact can be arm64-only; and the board outline, mounting
-holes and standard 15-pin CSI connector match the Pi 4, so one enclosure and one
-camera ribbon cover both. Anything smaller changes the mounting pattern and drops to
-512 MB, which would reopen the 32-bit question. [BOM.md](BOM.md) rules those out
-for now.
+**Supported hardware floor: Raspberry Pi 3 Model A+**, which is also the
+production target. The constraint that actually binds is ARMv8 and 512 MB: a
+64-bit Pi OS has to run, so a release artifact can be arm64-only, and the whole
+stack has to fit in half a gigabyte. Every Pi 3 clears the first. Only the A+
+is tight on the second, which is why it is the board that has to be proven.
+
+This used to name the 3 B+ as the floor, on the grounds of 1 GB of RAM, the
+85 x 56 mm outline and the standard 15-pin CSI connector. That was wrong twice
+over. The plain 3 B has the same 1 GB, the same Cortex-A53 and the same
+outline -- the B+ adds dual-band WiFi, Bluetooth 4.2 and gigabit Ethernet, and
+nothing here needs any of them. And a floor of 1 GB sat *above* the 512 MB
+board actually being shipped, which is backwards. See [BOM.md](BOM.md) for the
+boards being tested and in what order.
 
 **The intended production target is the Pi 3 Model A+**, chosen on cost. Most of
 the objections to it do not apply: same BCM2837B0 and same 1.4 GHz quad A53 as
@@ -143,7 +147,7 @@ details:
   configuration cannot be recovered in the field without pulling the SD card.
   Written up under *Getting onto the customer's WiFi* above, including why
   `herman.local` does not solve it.
-- **32-bit versus 64-bit reopens.** The 1 GB floor had settled this on arm64. At
+- **32-bit versus 64-bit reopens.** A 1 GB floor had settled this on arm64. At
   512 MB, armhf is meaningfully lighter, and a release artifact has to target
   one or build both. Decide before the packaging work, not after.
 

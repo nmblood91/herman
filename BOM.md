@@ -28,13 +28,31 @@
   (the SKR takes it), no Ethernet, and a smaller 65 × 56 mm board with its own
   mounting pattern. See the hardware notes in [ROADMAP.md](ROADMAP.md) for the
   two things still to validate before this is locked
-- **Development: Raspberry Pi 4 (1 GB) or Pi 3 Model B+.** A 3 B+ keeps the
-  85 × 56 mm outline and mounting holes of the Pi 4; a Pi 4 and a 3 B+ share
-  mounting holes but **not** port positions, since the Pi 4 has two micro-HDMI
-  jacks, USB-C power, and Ethernet and USB swapped
-- Not suitable: Pi Zero / Zero W and any ARMv6 Pi (no 64-bit, and NodeSource
-  ships no ARMv6 packages). A Zero 2 W runs but uses the narrow 22-pin CSI
-  connector, so the camera ribbon would differ
+- **Boards to test, highest to lowest.** Each step answers whether the stack
+  still fits as RAM and ports come off:
+
+  | Board | RAM | What it adds to the test |
+  |---|---|---|
+  | Pi 4 (1 GB) | 1 GB | development board; every measurement so far is from here |
+  | Pi 3 B | 1 GB | the 3 B+ without dual-band WiFi, BT 4.2 or gigabit Ethernet — none of which this uses |
+  | Pi 3 B+ | 1 GB | same 85 × 56 mm outline and mounting holes as the Pi 4 |
+  | Pi 3 A+ | 512 MB | the production target, and the only one that tests anything new |
+
+  The A+ is the one that matters: the only 512 MB board, the only one without
+  Ethernet, and the only one with a different mounting pattern. **If the
+  on-device frontend build fits on the A+, it fits on everything above it** —
+  so test that first rather than working down the list.
+
+  A Pi 4 and a 3 B/3 B+ share mounting holes but **not** port positions: the
+  Pi 4 has two micro-HDMI jacks, USB-C power, and Ethernet and USB swapped
+- **Deferred until after launch: Pi Zero 2 W.** On paper it works and it is
+  cheaper — the same Cortex-A53 and the same 512 MB as the A+, at 1 GHz rather
+  than 1.4. What defers it is the camera: it carries the narrow 22-pin CSI
+  connector instead of the standard 15-pin, so it needs a different ribbon and
+  a third mounting pattern. Not worth carrying that while the A+ is still
+  unproven. Revisit once the product has shipped
+- Not suitable at all: Pi Zero / Zero W and any ARMv6 Pi — no 64-bit, and
+  NodeSource ships no ARMv6 packages
 - Enclosure needs to carry both the A+ and a development board — different
   outlines and different port faces, so plan for two mounting patterns rather
   than one

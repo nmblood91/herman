@@ -113,9 +113,10 @@ Four tabs:
 The code is written to be easy to adapt to the actual hardware stack:
 
 - Klipper is the motion layer running on the BTT SKR Mini E3 V2
-- Raspberry Pi hosts the application and camera services, on 64-bit Pi OS. A
-  **Pi 3 Model B+ is the supported floor** — same board outline, mounting holes
-  and CSI connector as the Pi 4, and 1 GB of RAM. See [BOM.md](BOM.md)
+- Raspberry Pi hosts the application and camera services, on 64-bit Pi OS. The
+  **Pi 3 Model A+ is the floor** — 512 MB and ARMv8 is what the stack has to fit
+  in. Any Pi 3 will run it; a Pi 4 or a 3 B is the easier board to develop on.
+  See [BOM.md](BOM.md)
 - 4 capacitive moisture sensors are mapped to unique addresses and read through a passive I2C hub
 - optical / camera monitoring can be integrated later into the same service layer
 
