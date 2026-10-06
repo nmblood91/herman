@@ -54,11 +54,16 @@ class Settings(BaseSettings):
     moisture_raw_dry: int = 320
     moisture_raw_wet: int = 1020
 
-    # Off by default. The pump is real, but an unattended pump is the one
-    # failure here that can drown a plant or empty the reservoir onto a dose
-    # that never arrives. Turn this on only after running the pump by hand and
-    # measuring pump_flow_ml_per_second against a real dose, since that figure
-    # is what converts a requested volume into a run time.
+    # Off by default, and only the starting value: the Settings tab owns this
+    # switch and persists any change to data/state.json, which wins over this
+    # on the next start.
+    #
+    # Off is the right default because an unattended pump is the one failure
+    # here that can drown a plant or empty the reservoir into a dose that never
+    # arrives. Turn it on only after running the pump by hand and measuring
+    # pump_flow_ml_per_second against a real dose, since that figure is what
+    # converts a requested volume into a run time -- get it wrong and every
+    # watering is scaled by the same factor while still reporting success.
     auto_watering_enabled: bool = False
     watering_cooldown_minutes: int = 30
 

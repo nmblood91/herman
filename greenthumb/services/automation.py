@@ -97,6 +97,12 @@ class GreenThumbAutomation:
         self._pump_timer: threading.Timer | None = None
         self._pump_lock_held = False
 
+        # The master switch for unattended watering. Seeded from the
+        # environment, then owned by the UI and persisted like every other
+        # user choice: editing .env and restarting the service is not
+        # something the person who owns a planter should have to do.
+        self.auto_watering_enabled = settings.auto_watering_enabled
+
         self.quiet_hours_enabled = settings.quiet_hours_enabled
         self.quiet_hours_start = time.fromisoformat(settings.quiet_hours_start)
         self.quiet_hours_stop = time.fromisoformat(settings.quiet_hours_stop)
@@ -166,6 +172,10 @@ class GreenThumbAutomation:
                     setattr(plant, field_name, time.fromisoformat(text))
                 except ValueError:
                     logger.warning("Ignoring bad %s %r", field_name, text)
+
+        watering = stored.get("watering")
+        if isinstance(watering, dict) and isinstance(watering.get("auto_enabled"), bool):
+            self.auto_watering_enabled = watering["auto_enabled"]
 
         quiet = stored.get("quiet")
         if isinstance(quiet, dict):
@@ -244,6 +254,7 @@ class GreenThumbAutomation:
             # getattr throughout: a controller that does not expose one of
             # these simply has it left out of the snapshot, rather than a
             # settings save failing because of an LED attribute.
+            "watering": {"auto_enabled": self.auto_watering_enabled},
             "quiet": {
                 "enabled": self.quiet_hours_enabled,
                 "start": self.quiet_hours_start.isoformat(timespec="minutes"),
@@ -351,7 +362,7 @@ class GreenThumbAutomation:
         try:
             with self._exclusive("Control loop tick"):
                 self._poll_sensors()
-                if settings.auto_watering_enabled:
+                if self.auto_watering_enabled:
                     held = self.watering_suppressed()
                     if held:
                         # Debug rather than info: this fires every minute for
@@ -486,7 +497,7 @@ class GreenThumbAutomation:
         if held:
             return state("info", f"Automatic watering is paused: {held}.")
 
-        if not settings.auto_watering_enabled:
+        if not self.auto_watering_enabled:
             return state("info", "Watching only. Automatic watering is switched off.")
 
         # 5. Working, but not yet able to act.
@@ -512,6 +523,30 @@ class GreenThumbAutomation:
             return state("ok", f"{', '.join(thirsty)} due a drink shortly.")
         count = len(self.plants)
         return state("ok", f"All {count} plants are happy.")
+
+    # --- automatic watering ----------------------------------------------
+
+    def set_auto_watering(self, enabled: bool) -> dict[str, object]:
+        """Turn unattended watering on or off.
+
+        Distinct from quiet hours and snooze, which only pause it. This decides
+        whether the loop waters at all, and system_status() words the two
+        differently for that reason: "switched off" is a standing choice,
+        "paused" resolves itself.
+        """
+        self.auto_watering_enabled = bool(enabled)
+        self._persist()
+        logger.info(
+            "Automatic watering %s",
+            "enabled" if self.auto_watering_enabled else "disabled",
+        )
+        return self.watering_status()
+
+    def watering_status(self) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "auto_watering_enabled": self.auto_watering_enabled,
+        }
 
     # --- quiet hours and snooze ------------------------------------------
 
@@ -793,6 +828,7 @@ class GreenThumbAutomation:
             "plants": [status.__dict__ for status in plant_status],
             # So the UI can say why nothing is watering rather than leaving it
             # looking broken.
+            "watering": self.watering_status(),
             "quiet": self.quiet_status(),
             # What the status bar shows. Computed rather than echoed from the
             # log, so it says what is true now instead of what was last written.

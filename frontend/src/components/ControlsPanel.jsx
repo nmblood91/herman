@@ -37,7 +37,7 @@ const parseHexColor = (hex) => {
 export function ControlsPanel({
   plants,
   quiet,
-  onQuietChange,
+  onRefresh,
   gantryPosition,
   overview,
   onHome,
@@ -127,7 +127,7 @@ export function ControlsPanel({
         setQuietStatus(data.error || `Request failed (HTTP ${response.status})`)
         return
       }
-      onQuietChange?.()
+      onRefresh?.()
     } catch (error) {
       setQuietStatus(`Could not reach the controller: ${error.message}`)
     }

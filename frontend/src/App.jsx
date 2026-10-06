@@ -244,7 +244,7 @@ function App() {
           onMoveToPlant={moveToPlant}
           onWaterPlant={waterPlant}
           quiet={overview?.quiet}
-          onQuietChange={loadDashboard}
+          onRefresh={loadDashboard}
         />
       )}
 
@@ -268,7 +268,7 @@ function App() {
 
       {activeTab === 'settings' && (
         <>
-          <SettingsPanel overview={overview} onQuietChange={loadDashboard} />
+          <SettingsPanel overview={overview} onRefresh={loadDashboard} />
           <LogsPanel logs={logs} />
         </>
       )}

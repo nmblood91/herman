@@ -136,10 +136,12 @@ assert state["level"] == "info" and "paused" in state["message"], state
 print("ok: a snooze reads as paused rather than broken")
 
 auto.cancel_snooze()
-settings.auto_watering_enabled = False
+# Through the setter, not the settings object: that is now only the starting
+# value, and the live switch is instance state the UI owns.
+auto.set_auto_watering(False)
 state = auto.system_status()
 assert state["level"] == "info" and "Watching only" in state["message"], state
 print("ok: automatic watering switched off says so plainly")
-settings.auto_watering_enabled = True
+auto.set_auto_watering(True)
 
 print("\nall status checks passed")

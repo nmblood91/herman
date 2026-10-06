@@ -149,6 +149,21 @@ def set_system_timezone(payload: dict[str, str] = Body(default_factory=dict)) ->
     return result
 
 
+@app.get(f"{settings.api_prefix}/watering/auto")
+def get_auto_watering() -> dict[str, object]:
+    return automation.watering_status()
+
+
+@app.post(f"{settings.api_prefix}/watering/auto")
+def set_auto_watering(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Turn unattended watering on or off."""
+    result = automation.set_auto_watering(bool(payload.get("enabled", False)))
+    log_event(
+        f"Automatic watering turned {'on' if result['auto_watering_enabled'] else 'off'}"
+    )
+    return result
+
+
 @app.get(f"{settings.api_prefix}/quiet")
 def get_quiet() -> dict[str, object]:
     return automation.quiet_status()

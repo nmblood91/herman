@@ -3,7 +3,7 @@ import { API_BASE } from '../api'
 
 const DEFAULT_COLOR_ORDERS = ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']
 
-export function SettingsPanel({ overview, onQuietChange }) {
+export function SettingsPanel({ overview, onRefresh }) {
   const lighting = overview?.lighting
   const colorOrderOptions = lighting?.color_order_options ?? DEFAULT_COLOR_ORDERS
   const chipOptions = lighting?.chip_options ?? []
@@ -11,6 +11,11 @@ export function SettingsPanel({ overview, onQuietChange }) {
   const [chip, setChip] = useState('WS2811')
   const [colorOrder, setColorOrder] = useState('GRB')
   const [status, setStatus] = useState('')
+
+  const watering = overview?.watering
+  const [autoOn, setAutoOn] = useState(false)
+  const [autoMsg, setAutoMsg] = useState('')
+  const [savingAuto, setSavingAuto] = useState(false)
 
   const quiet = overview?.quiet
   const [quietOn, setQuietOn] = useState(false)
@@ -94,6 +99,7 @@ export function SettingsPanel({ overview, onQuietChange }) {
   if (overview !== syncedOverview) {
     setSyncedOverview(overview)
     setChip(lighting?.chip ?? chip)
+    setAutoOn(watering?.auto_watering_enabled ?? autoOn)
     setQuietOn(quiet?.quiet_hours_enabled ?? quietOn)
     setQuietStart(quiet?.quiet_hours_start ?? quietStart)
     setQuietStop(quiet?.quiet_hours_stop ?? quietStop)
@@ -144,6 +150,37 @@ export function SettingsPanel({ overview, onQuietChange }) {
     }
   }, [])
 
+  // Saves on toggle rather than behind the Save button: it is one boolean
+  // with nothing to coordinate, and the status bar answers immediately once
+  // the dashboard reloads. Optimistic, so the box follows the finger, and it
+  // goes back if the planter refuses.
+  const saveAutoWatering = async (enabled) => {
+    const previous = autoOn
+    setAutoOn(enabled)
+    setAutoMsg('')
+    setSavingAuto(true)
+    try {
+      const response = await fetch(`${API_BASE}/watering/auto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setAutoOn(previous)
+        setAutoMsg(data.error || `Could not save (HTTP ${response.status})`)
+        return
+      }
+      setAutoOn(data.auto_watering_enabled)
+      onRefresh?.()
+    } catch (error) {
+      setAutoOn(previous)
+      setAutoMsg(`Could not save: ${error.message}`)
+    } finally {
+      setSavingAuto(false)
+    }
+  }
+
   const saveQuiet = async () => {
     setQuietMsg('')
     try {
@@ -158,7 +195,7 @@ export function SettingsPanel({ overview, onQuietChange }) {
         return
       }
       setQuietMsg('Saved.')
-      onQuietChange?.()
+      onRefresh?.()
     } catch (error) {
       setQuietMsg(`Save failed: ${error.message}`)
     }
@@ -169,6 +206,30 @@ export function SettingsPanel({ overview, onQuietChange }) {
       <h2>Settings</h2>
 
       <div className="general-settings-form">
+        <div className="field-row">
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={autoOn}
+              disabled={savingAuto}
+              onChange={(event) => saveAutoWatering(event.target.checked)}
+            />
+            Water plants automatically
+          </label>
+          <p className="field-hint">
+            Lets the planter water on its own whenever a plant sits below its
+            moisture target. Switched off it still reads the sensors and keeps
+            the history — watering only happens when you press a button.
+          </p>
+          <p className="field-hint">
+            Before turning this on, measure the pump's flow rate and set it in{' '}
+            <code>PUMP_FLOW_ML_PER_SECOND</code>. A dose is a run time worked
+            out from that number, so if it is wrong every automatic watering is
+            wrong by the same factor and still reports success.
+          </p>
+          {autoMsg && <p className="field-hint warning">{autoMsg}</p>}
+        </div>
+
         <div className="field-row">
           <label>
             LED strip type

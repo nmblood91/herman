@@ -195,7 +195,11 @@ and `spidev`, so they run on a development machine with no hardware attached.
 | Water level sensor | Real — non-contact sensor on the outlet tube, via Klipper; verifies a dose rather than gating it |
 | Camera | Not built — the UI controls for it are inert |
 
-Automatic watering is disabled by default (`auto_watering_enabled` in
-`greenthumb/config.py`). Enable it only after testing the pump by hand and
-measuring `pump_flow_ml_per_second` against a real dose, since that figure
-converts a requested volume into a pump run time.
+Automatic watering is disabled by default. Turn it on with **Water plants
+automatically** in the Settings tab; the choice persists across restarts.
+`AUTO_WATERING_ENABLED` only sets the value a planter starts life with, and a
+saved choice overrides it.
+
+Enable it only after testing the pump by hand and measuring
+`pump_flow_ml_per_second` against a real dose, since that figure converts a
+requested volume into a pump run time.
