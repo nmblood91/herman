@@ -8,11 +8,11 @@ whether a part is worth redesigning. Inserts and screws are here because they
 are the parts that get ordered in the wrong size, and because a part that has
 already been printed cannot be re-tapped for a different insert.
 
-**One planter is 1,171 g of printed parts**, excluding the cable chain and the
-camera mount. At typical PETG pricing that is roughly $25–30 of filament per
-unit, which is enough to be worth watching — the two heaviest parts alone, the
-main electronics rear at 270 g and the right gantry holder rear at 205 g, are
-40% of it.
+**One planter is 1,424 g of printed parts**, everything but the camera mount.
+At typical PETG pricing that is roughly $30–35 of filament per unit, which is
+enough to be worth watching — three parts are 44% of it: the main electronics
+rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
+150 g, which is 50 links of 3 g rather than one big part.
 
 ## Conventions
 
@@ -42,17 +42,20 @@ main electronics rear at 270 g and the right gantry holder rear at 205 g, are
 | Left gantry holder, rear | 1 | 71 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 0 |
 | Left gantry holder, front | 1 | 45 g | 2 × M4 (long) | 0 | 0 | 2 | 0 | 0 |
 | Right gantry holder, rear | 1 | 205 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 2 × 3-slot |
-| Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3 (length TBD) | 2 | 1 | 0 | 0 |
+| Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3 (pump), 2 × M3 (motor) | 2 | 1 | 0 | 0 |
 | Left gantry cover | 1 | 10 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
 | Right gantry cover | 1 | 35 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
-| Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short) | 4 × M5×16 | 0 | 0 | 4 × M5×12 | 0 |
+| Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short), 6 × M3 (long) | 4 × M5×16 | 0 | 0 | 4 × M5×12 | 0 |
+| Gantry face top | 1 | 50 g | 0 | 4 × M3 | 0 | 0 | 0 | 0 |
+| Gantry face bottom (nozzle holder) | 1 | 50 g | 0 | 2 × M3 | 0 | 0 | 0 | 0 |
 | Main electronics, rear | 1 | 270 g | 4 × M4 (long) | 4 × M4×16 | 12 | 0 | 0 | 2 × 5-slot |
 | Main electronics, front | 1 | 120 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Left STEMMA QT sub hub, rear | 1 | 85 g | 2 × M4 (long) | 2 × M4×16 | 4 | 0 | 0 | 0 |
 | Left STEMMA QT sub hub, front | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Right STEMMA QT sub hub, rear | 1 | 85 g | 2 × M4 (long) | 2 × M4×16 | 4 | 0 | 0 | 0 |
 | Right STEMMA QT sub hub, front | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
-| Cable chain for water tube | TBD links | TBD per link | 0 | 0 | 2 | 0 | 0 | 0 |
+| Cable chain for water tube | 50 links | 150 g | 0 | 0 | 0 | 0 | 0 | 0 |
+| Cable chain anchor | 1 | 3 g | 0 | 0 | 2 | 0 | 0 | 0 |
 | Camera module mount | 1 | — | — | — | — | — | — | — |
 
 ## Fastener totals
@@ -63,23 +66,32 @@ by hand, so re-total it if the table changes.
 | Fastener | Total | Goes into |
 |---|---|---|
 | M4 heat-set insert (long) | 21 | gantry holders 13, electronics rear 4, sub hubs 4 |
-| M3 heat-set insert (long) | 2 | right gantry holder front |
+| M3 heat-set insert (long) | 8 | V-slot adapter 6, right gantry holder front 2 |
 | M5 heat-set insert (short) | 4 | V-slot adapter |
 | M4×16 socket cap | 18 | M4 inserts — gantry holders 10, electronics rear 4, sub hubs 4 |
 | M5×16 socket cap | 10 | 2 into the VITTSJÖ frame, one per rear holder · 8 into T-nuts in the V-slot rail, 4 from the adapter and 2 from each cover |
-| M3 socket cap, length TBD | 2 | the 2 M3 inserts in the right gantry holder front |
+| M3 socket cap, length TBD | 10 | 6 into the adapter's M3 inserts, from the two gantry faces · 4 at the right gantry holder front, mounting the motor and the pump |
 | M5×12 flat head | 4 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
-| #4, length TBD | 24 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain 2 |
+| #4 × 3/8" | 24 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain anchor 2 |
 | M5 shoulder bolt with pulley | 3 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
 | Wago 5-slot | 2 | main electronics rear |
 | Wago 3-slot | 2 | right gantry holder rear |
 
-**27 heat-set inserts, 61 fasteners and 4 Wago connectors per planter.**
+**33 heat-set inserts, 69 fasteners and 4 Wago connectors per planter.**
 
-The accounting balances, which is the check worth re-running after any edit:
-every one of the 21 M4 inserts has a fastener in it — 18 M4×16 plus the 3
-shoulder bolts — and all 10 M5×16 have a destination. A mismatch here means
-either a fastener is missing from the table or a part has a boss nothing uses.
+Worth re-running after any edit, because it has caught two errors already:
+
+- **M4 balances.** 21 inserts against 18 M4×16 plus 3 shoulder bolts.
+- **M5 balances.** The adapter's 4 inserts take the 4 M5×12 flat heads; all
+  10 M5×16 go elsewhere — 2 into the VITTSJÖ frame, 8 into rail T-nuts.
+- **M3 does not, by design.** 8 inserts against 10 screws. The two gantry
+  faces account for 6 exactly, into the adapter. The other 4 are at the right
+  gantry holder front, where only 2 inserts sit — the motor and the pump are
+  tapped themselves, so those screws land in hardware rather than plastic.
+  Confirm that is what the extra 2 are doing.
+
+A mismatch anywhere else means a fastener is missing from the table, or a
+part has a boss nothing uses.
 
 A note on the shoulder bolts, because the naming invites a mistake: an M5
 shoulder bolt is 5 mm at the shoulder and **M4 at the thread**, so all three go
@@ -89,13 +101,13 @@ into M4 inserts. They are not M5 fasteners and do not belong in that line.
 
 Every fastener is now placed. What is left is dimensions and one weight.
 
-1. **Two lengths are missing.** The 24 `#4` screws and the 2 × M3 in the right
-   gantry holder front have counts but no length, so those two lines cannot be
-   ordered against.
+1. **The M3 screw lengths are missing.** All 10 of them — 6 into the adapter
+   from the gantry faces, 4 at the right gantry holder front. Counts are
+   known, so this is the one line that cannot be ordered against. The `#4`
+   are 3/8", and every other fastener is dimensioned.
 
-2. **The cable chain has neither a link count nor a per-link weight**, which
-   is the only gap in the 1,171 g figure. Everything else in the build is
-   weighed.
+2. **Confirm the 2 extra M3 at the right gantry holder front** go into the
+   motor and pump's own tapped holes rather than needing inserts.
 
 Insert dimensions are deliberately left as `long` and `short`. The inserts are
 sold as a kit from the store rather than sourced by whoever assembles the unit,
@@ -125,6 +137,14 @@ Only the parts with a constraint worth recording.
   doing the idler job while the right drives. Worth a line in the assembly
   notes when those get written, because it is obvious while building and
   invisible six months later.
+
+- **The two gantry faces carry the business end.** Top and bottom at 50 g
+  each, both bolting into the V-slot adapter's six M3 inserts — four from the
+  top, two from the bottom — which is what those inserts are for. The bottom
+  face is the nozzle holder, so it is the part that decides where water
+  actually lands relative to the position the app reports. If it is ever
+  revised, the plant positions captured with the *use current position* button
+  are measured against the old geometry and need recapturing.
 
 - **Main electronics holder** (rear and front) has to take the BTT SKR Mini E3
   V2 and the Pi, and [BOM.md](BOM.md) calls for **two Pi mounting patterns**,
@@ -157,9 +177,12 @@ Only the parts with a constraint worth recording.
   carriage. The liquid sensor clamps to that tube's *falling* leg, after the
   high point and before the nozzle, so whatever the chain does to the tube's
   routing has to leave that stretch accessible and still falling. See
-  [HOW_WATERING_WORKS.md](HOW_WATERING_WORKS.md). Weight is per link rather
-  than per planter, so it needs a link count before it can join the total
-  above.
+  [HOW_WATERING_WORKS.md](HOW_WATERING_WORKS.md). Fifty links at 3 g, which
+  makes it the third-heaviest item in the build at 150 g — more than either
+  gantry cover and more than both sub hub fronts together. It is also the one
+  part whose weight scales with the rail: a longer rail is more links, so this
+  figure moves if the 890 mm travel ever changes. The anchor is separate and
+  takes the two `#4`.
 
 ## Still to come
 
