@@ -12,22 +12,25 @@ cannot be subtotalled yet.
 
 | Section | Priced so far | Lines still to price |
 |---|---|---|
-| Core structure | $130.00 | 5 — mounting hardware, belt, drive pulley, NEMA 17, tensioner |
+| Core structure | $140.00 | 4 — mounting hardware, belt, drive pulley, tensioner |
 | Printed parts — filament | ~$30–36 | complete |
 | Printed parts — fasteners and inserts | $21.95 | complete |
 | Motion and control | $43.00 | 1 — wiring harness and connectors |
 | Compute and monitoring | $40.00 | complete for the base build |
-| Sensing | — | 5 — sensors, three hubs, cables |
-| Watering system | $30.00 | 5 — tubing, nozzle, fittings, level sensor, intake weight |
-| Lighting | — | 4 — strip, hook-up wire, diffuser, connectors |
-| Power and electronics | $10.00 | 10 — supply, fuses and holders, diode, shifter, busbar, harness, heat shrink |
-| **Running total** | **~$305–311** | **30 lines outstanding** |
+| Sensing | $48.00 | 3 — three hubs, two inter-hub cables |
+| Watering system | $35.00 | 2 — intake weight, level sensor |
+| Lighting | $10.00 | 3 — hook-up wire, diffuser, connectors |
+| Power and electronics | $20.00 | 9 — fuses and holders, diode, shifter, busbar, harness, heat shrink |
+| **Running total** | **~$388–394** | **22 lines outstanding** |
 
-That running figure is a floor, not an estimate: it is only the lines with a
-real price against them. The 12 V supply, the stepper, all four sensors, the
-LED strip and the entire water path are still unpriced, so the finished number
-will be well above it. The reservoir is bring-your-own and carries no cost
-here.
+Still a floor rather than an estimate, but a much closer one: the expensive
+items are all in now. What is left is small hardware — fuses, a diode, a
+level shifter, a busbar, connectors and wire — plus the three hubs and the
+liquid level sensor. None of that is likely to move the total by more than
+$30 or so, which puts a finished prototype somewhere near **$420**.
+
+Two lines carry no cost on purpose. The reservoir is bring-your-own, and
+there is no bought nozzle — the tube is held by a printed part.
 
 Read *Overlaps to resolve* below before adding anything up — three items were
 listed in two places each, and a naive total counts them twice.
@@ -41,7 +44,7 @@ listed in two places each, and a naive total counts them twice.
 | Mounting hardware, rear uprights and rail | TBD | TBD | TBD | |
 | GT2 belt | TBD | TBD | TBD | length needed: roughly twice the rail plus wrap |
 | GT2 drive pulley | 1 | TBD | TBD | motor end; the three idler wheels are priced in PRINTED_PARTS.md |
-| NEMA 17 stepper motor | 1 | TBD | TBD | right-hand gantry holder |
+| NEMA 17 stepper motor | 1 | $10.00 | $10.00 | right-hand gantry holder |
 | Belt tensioning hardware | TBD | TBD | TBD | |
 
 ## Printed parts
@@ -127,11 +130,10 @@ and the development boards. Live streaming is out of scope, see
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| Capacitive soil moisture sensor (Adafruit STEMMA) | 4 | TBD | TBD | one per plant |
+| Capacitive soil moisture sensor (Adafruit STEMMA) + cable | 4 | $12.00 | $48.00 | one per plant; price includes the sensor's own STEMMA QT cable |
 | STEMMA QT 5-port passive hub | 3 | TBD | TBD | one master to the Pi, plus a left and a right sub hub |
-| STEMMA QT cable, 300 mm | 1 | TBD | TBD | left sub hub to main |
-| STEMMA QT cable, 400 mm | 1 | TBD | TBD | right sub hub to main |
-| STEMMA QT cable, sensor runs | 4 | TBD | TBD | lengths TBD |
+| STEMMA QT cable, 300 mm | 1 | TBD | TBD | left sub hub to master |
+| STEMMA QT cable, 400 mm | 1 | TBD | TBD | right sub hub to master |
 
 **Three hubs, confirmed against the build.** A master hub wired back to the
 Pi, and a left and a right sub hub feeding two sensors each, with measured
@@ -147,10 +149,13 @@ are solder pads on the sensors rather than a purchased part.
 | 12 V peristaltic pump | 1 | $30.00 | $30.00 | not tapped — mounts on M3 inserts |
 | Reservoir | 1 | BYO | — | top-loaded; a Nalgene works |
 | Intake weight | 1 | TBD | TBD | only if dipping a tube from the top |
-| Tubing | TBD | TBD | TBD | sized to the level sensor's 0–13 mm range |
-| Water delivery nozzle | 1 | TBD | TBD | mounts on the lower gantry face |
-| Hose fittings | TBD | TBD | TBD | **no anti-drip fitting on the falling leg** |
+| Tubing and barb fittings | 1 set | $5.00 | $5.00 | sized to the level sensor's 0–13 mm range. **No anti-drip fitting on the falling leg** |
 | Non-contact liquid level sensor | 1 | TBD | TBD | CQRobot CQRSENYW001 or similar |
+
+**There is no bought nozzle.** The tube dribbles straight out, held by the
+lower gantry face — which PRINTED_PARTS.md already calls the nozzle holder and
+already weighs at 50 g. So the delivery end costs nothing beyond the tube, and
+it is a printed part rather than a purchased one.
 
 The reservoir is whatever you have to hand. With a top-loaded tank, feed the
 tube through a hole in the lid rather than over the rim — the rim crossing is
@@ -171,7 +176,7 @@ and what goes wrong if it is inverted.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| Addressable LED strip, WS2811 12 V | 1 | TBD | TBD | 3 LEDs per pixel — see note |
+| Addressable LED strip, WS2811 12 V | 1 | $10.00 | $10.00 | 3 LEDs per pixel — see note |
 | Hook-up wire, LED runs | TBD | TBD | TBD | power and data out to the strip |
 | Diffuser or housing | TBD | TBD | TBD | if needed |
 | Connectors | TBD | TBD | TBD | |
@@ -188,7 +193,7 @@ line is in *Power and electronics*.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| 12 V power supply, 5 A min (7 A recommended) | 1 | TBD | TBD | the only supply in the build |
+| 12 V power supply, 5 A min (7 A recommended) | 1 | $10.00 | $10.00 | the only supply in the build |
 | DC-DC converter, 12 V to 5 V @ 3 A | 1 | $10.00 | $10.00 | Yipin hexa; this is what powers the Pi |
 | Fuse, 5 A fast-blow | 1 | TBD | TBD | charger output into the busbar |
 | Fuse, 1 A fast-blow | 1 | TBD | TBD | SKR HE0 to pump positive |
