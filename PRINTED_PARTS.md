@@ -42,7 +42,7 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 | Left gantry holder, rear | 1 | 71 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 0 |
 | Left gantry holder, front | 1 | 45 g | 2 × M4 (long) | 0 | 0 | 2 | 0 | 0 |
 | Right gantry holder, rear | 1 | 205 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 2 × 3-slot |
-| Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3 (pump), 2 × M3 (motor) | 2 | 1 | 0 | 0 |
+| Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3 (pump, into inserts), 4 × M3 (motor, into motor) | 2 | 1 | 0 | 0 |
 | Left gantry cover | 1 | 10 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
 | Right gantry cover | 1 | 35 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
 | Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short), 6 × M3 (long) | 4 × M5×16 | 0 | 0 | 4 × M5×12 | 0 |
@@ -70,28 +70,29 @@ by hand, so re-total it if the table changes.
 | M5 heat-set insert (short) | 4 | V-slot adapter |
 | M4×16 socket cap | 18 | M4 inserts — gantry holders 10, electronics rear 4, sub hubs 4 |
 | M5×16 socket cap | 10 | 2 into the VITTSJÖ frame, one per rear holder · 8 into T-nuts in the V-slot rail, 4 from the adapter and 2 from each cover |
-| M3 socket cap, length TBD | 10 | 6 into the adapter's M3 inserts, from the two gantry faces · 4 at the right gantry holder front, mounting the motor and the pump |
+| M3 socket cap, length TBD | 12 | 6 into the adapter's M3 inserts, from the two gantry faces · 2 into the right gantry holder front's inserts, holding the pump · 4 into the motor's own tapped holes |
 | M5×12 flat head | 4 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
 | #4 × 3/8" | 24 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain anchor 2 |
 | M5 shoulder bolt with pulley | 3 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
 | Wago 5-slot | 2 | main electronics rear |
 | Wago 3-slot | 2 | right gantry holder rear |
 
-**33 heat-set inserts, 69 fasteners and 4 Wago connectors per planter.**
+**33 heat-set inserts, 71 fasteners and 4 Wago connectors per planter.**
 
 Worth re-running after any edit, because it has caught two errors already:
 
 - **M4 balances.** 21 inserts against 18 M4×16 plus 3 shoulder bolts.
 - **M5 balances.** The adapter's 4 inserts take the 4 M5×12 flat heads; all
   10 M5×16 go elsewhere — 2 into the VITTSJÖ frame, 8 into rail T-nuts.
-- **M3 does not, by design.** 8 inserts against 10 screws. The two gantry
-  faces account for 6 exactly, into the adapter. The other 4 are at the right
-  gantry holder front, where only 2 inserts sit — the motor and the pump are
-  tapped themselves, so those screws land in hardware rather than plastic.
-  Confirm that is what the extra 2 are doing.
+- **M3 balances.** 8 inserts against 12 screws, and the 4 over are
+  deliberate: the motor is tapped, so its four screws go straight into it.
+  The pump is not, which is exactly why the right gantry holder front carries
+  two M3 inserts. The gantry faces take the adapter's other six.
 
-A mismatch anywhere else means a fastener is missing from the table, or a
-part has a boss nothing uses.
+Every thread is accounted for. A mismatch means a fastener is missing from
+the table, or a part has a boss nothing uses — and note that a screw going
+into tapped hardware is not a mismatch: the motor here, and the eight M5×16
+in rail T-nuts.
 
 A note on the shoulder bolts, because the naming invites a mistake: an M5
 shoulder bolt is 5 mm at the shoulder and **M4 at the thread**, so all three go
@@ -99,15 +100,12 @@ into M4 inserts. They are not M5 fasteners and do not belong in that line.
 
 ## Open items
 
-Every fastener is now placed. What is left is dimensions and one weight.
+Every fastener is placed and every part but the camera mount is weighed.
 
-1. **The M3 screw lengths are missing.** All 10 of them — 6 into the adapter
-   from the gantry faces, 4 at the right gantry holder front. Counts are
-   known, so this is the one line that cannot be ordered against. The `#4`
-   are 3/8", and every other fastener is dimensioned.
-
-2. **Confirm the 2 extra M3 at the right gantry holder front** go into the
-   motor and pump's own tapped holes rather than needing inserts.
+**The M3 screw lengths are missing** — all 12 of them, and they may not be
+one length: 6 into the adapter from the gantry faces, 2 holding the pump, 4
+into the motor. That is the only line that cannot be ordered against. The
+`#4` are 3/8" and every other fastener is dimensioned.
 
 Insert dimensions are deliberately left as `long` and `short`. The inserts are
 sold as a kit from the store rather than sourced by whoever assembles the unit,
@@ -179,10 +177,8 @@ Only the parts with a constraint worth recording.
   routing has to leave that stretch accessible and still falling. See
   [HOW_WATERING_WORKS.md](HOW_WATERING_WORKS.md). Fifty links at 3 g, which
   makes it the third-heaviest item in the build at 150 g — more than either
-  gantry cover and more than both sub hub fronts together. It is also the one
-  part whose weight scales with the rail: a longer rail is more links, so this
-  figure moves if the 890 mm travel ever changes. The anchor is separate and
-  takes the two `#4`.
+  gantry cover and more than both sub hub fronts together. The anchor is a
+  separate part and takes the two `#4`.
 
 ## Still to come
 
