@@ -176,11 +176,20 @@ the LED strip, and even 22 AWG over its 750 mm run loses 119 mV — 1% of 12 V,
 invisible on a light. At 18 AWG it is 47 mV. The pump is further down still at
 6 mV.
 
-What does matter is that a wire has to survive its fuse. A conductor bundled
-inside an enclosure carries far less than the same wire in free air, and on
-those conservative figures 18 AWG is good for 2.3 A and 14 AWG for 5.9 A. So
-the LED strip's 2 A fuse wants 18 AWG, and anything sitting behind the 5 A
-main fuse wants 14 AWG.
+What does matter is that a wire has to survive its own fuse. A fuse carries
+its rating indefinitely — that is what the rating means — so the wire behind
+it has to be comfortable at that current forever, not just at the load's
+normal draw.
+
+Get that backwards and **the wire becomes the fuse**. Put 24 AWG, good for
+about 0.58 A bundled, on the pump's 1 A circuit: a fault could sit at 0.9 A
+indefinitely, under the fuse rating the whole time, and the wire cooks inside
+the harness with nothing to stop it.
+
+Bundled inside an enclosure a conductor carries far less than the same wire in
+free air, and those are the figures to use here: 20 AWG is good for 1.5 A,
+18 AWG for 2.3 A, 14 AWG for 5.9 A. So the LED strip's 2 A fuse wants 18 AWG,
+and anything sitting behind the 5 A main fuse wants 14 AWG.
 
 **That includes the SKR and DC-DC feeds**, which look like light loads and are
 not separately fused — a fault on either draws until the 5 A main blows, so
