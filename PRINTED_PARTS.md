@@ -73,20 +73,22 @@ by hand, so re-total it if the table changes.
 | M3 socket cap, length TBD | 12 | $0.05 | $0.60 | 6 into the adapter's M3 inserts, from the two gantry faces · 2 into the right gantry holder front's inserts, holding the pump · 4 into the motor's own tapped holes |
 | M5×12 flat head | 4 | $0.40 | $1.60 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
 | #4 × 3/8" | 24 | $0.08 | $1.92 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain anchor 2 |
-| M5 shoulder bolt with pulley | 3 | $0.50 | $1.50 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
+| M5 shoulder bolt with pulley | 3 | $2.00 | $6.00 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
 | Wago 5-slot | 2 | $0.50 | $1.00 | main electronics rear |
 | Wago 3-slot | 2 | $0.30 | $0.60 | right gantry holder rear |
-| **Total** | **108** | | **$17.45** | |
+| **Total** | **108** | | **$21.95** | |
 
 **33 heat-set inserts, 71 fasteners and 4 Wago connectors per planter —
-$17.45 of hardware.**
+$21.95 of hardware.**
 
-The inserts are $8.17 of that, nearly half the cost from under a third of
-the pieces, which is what a $0.25 part does next to a $0.05 one. Worth knowing
-before redesigning a part to add two more bosses.
+Two lines carry most of it. The three shoulder bolts with their idler wheels
+are $6.00, which is 27% of the hardware cost from under 3% of the pieces, and
+the heat-set inserts are $8.17 for another 37%. Between them, 36 pieces out of
+108 are two-thirds of the spend — worth knowing before a redesign adds a boss
+or a fourth idler.
 
 Against the filament: 1,424 g is roughly $30–36 at typical PETG pricing, so
-**$48–54 of raw material per planter** for everything printed and everything
+**$52–58 of raw material per planter** for everything printed and everything
 holding it together.
 
 **The thread-by-thread check**, worth re-running after any edit because it

@@ -2,11 +2,11 @@
 
 ## Overview
 
-Herman uses four Adafruit STEMMA soil moisture sensors connected via an I2C hub to the Raspberry Pi. Each sensor reads capacitive moisture and temperature for one plant.
+Herman uses four Adafruit STEMMA soil moisture sensors, reached through three passive STEMMA QT hubs, on the Raspberry Pi's I2C bus 1. Each sensor reads capacitive moisture and temperature for one plant.
 
-## I2C Hub Connection to Raspberry Pi
+## Master Hub Connection to Raspberry Pi
 
-The I2C hub connects to the Raspberry Pi's I2C Bus 1 using four wires:
+The master hub connects to the Raspberry Pi's I2C Bus 1 using four wires:
 
 | Wire Color | Function | Raspberry Pi Pin |
 |-----------|----------|------------------|
@@ -30,9 +30,26 @@ Configure sensor addresses using the A0 and A1 address pads on each sensor accor
 
 ## Sensor Hub Layout
 
-The 5-port STEMMA QT passive hub distributes I2C signals to:
-- 1 port: back to Raspberry Pi
-- 4 ports: to each plant's soil moisture sensor
+Three 5-port passive hubs, not one. A master beside the Pi and a sub hub at
+each end of the rail, which is what keeps the sensor runs short enough to be
+sensible rather than trailing four long cables back to a single point.
+
+| Hub | Ports used | To |
+|---|---|---|
+| Master | 3 of 5 | the Pi · the left sub hub (300 mm) · the right sub hub (400 mm) |
+| Left sub | 3 of 5 | master · two soil sensors |
+| Right sub | 3 of 5 | master · two soil sensors |
+
+The hubs are passive, so this is still electrically **one** bus. Which sub hub
+a sensor hangs off changes nothing about its address — that is set by the A0
+and A1 pads on the sensor itself, and a sensor keeps its address wherever it
+is plugged in.
+
+What the chain does change is total capacitance, which is the sum of every
+cable on the bus rather than the longest single run. That is why the clock is
+slowed to 50 kHz and why the I2C runs are routed away from the motor, pump and
+LED wiring. See [deploy/README.md](deploy/README.md) for the measurements and
+the failure mode.
 
 ## Configuration
 

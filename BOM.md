@@ -14,7 +14,7 @@ cannot be subtotalled yet.
 |---|---|
 | Core structure | TBD |
 | Printed parts — filament | ~$30–36 |
-| Printed parts — fasteners and inserts | $17.45 |
+| Printed parts — fasteners and inserts | $21.95 |
 | Motion and control | TBD |
 | Compute and monitoring | TBD |
 | Sensing | TBD |
@@ -38,14 +38,14 @@ and a naive total counts them twice.
 | 2020 aluminium extrusion rail, 1000 mm | 1 | TBD | TBD | 890 mm usable travel |
 | Mounting hardware, rear uprights and rail | TBD | TBD | TBD | |
 | GT2 belt | TBD | TBD | TBD | length needed: roughly twice the rail plus wrap |
-| GT2 drive pulley | 1 | TBD | TBD | motor end; idlers ride the shoulder bolts |
+| GT2 drive pulley | 1 | TBD | TBD | motor end; the three idler wheels are priced in PRINTED_PARTS.md |
 | NEMA 17 stepper motor | 1 | TBD | TBD | right-hand gantry holder |
 | Belt tensioning hardware | TBD | TBD | TBD | |
 
 ## Printed parts
 
 Weights, heat-set inserts, screws and their costs are tracked in
-**[PRINTED_PARTS.md](PRINTED_PARTS.md)** — 18 parts at 1,424 g, plus $17.45 of
+**[PRINTED_PARTS.md](PRINTED_PARTS.md)** — 18 parts at 1,424 g, plus $21.95 of
 fasteners across 108 pieces. Covers the gantry holders and covers, the V-slot
 adapter, the two gantry faces, the electronics holder, the STEMMA QT sub hubs
 and the water-tube cable chain.
@@ -124,16 +124,14 @@ and the development boards. Live streaming is out of scope, see
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | Capacitive soil moisture sensor (Adafruit STEMMA) | 4 | TBD | TBD | one per plant |
-| STEMMA QT 5-port passive hub | 3 | TBD | TBD | main plus left and right sub hubs — see note |
+| STEMMA QT 5-port passive hub | 3 | TBD | TBD | one master to the Pi, plus a left and a right sub hub |
 | STEMMA QT cable, 300 mm | 1 | TBD | TBD | left sub hub to main |
 | STEMMA QT cable, 400 mm | 1 | TBD | TBD | right sub hub to main |
 | STEMMA QT cable, sensor runs | 4 | TBD | TBD | lengths TBD |
 
-**The hub count needs confirming.** [SENSOR_WIRING.md](SENSOR_WIRING.md) still
-describes a single 5-port hub — one port to the Pi, four to the sensors —
-which predates the sub hubs. The build has a main hub plus a left and a right,
-with measured 300 mm and 400 mm runs back to main, so three is the working
-number and that document is stale on topology.
+**Three hubs, confirmed against the build.** A master hub wired back to the
+Pi, and a left and a right sub hub feeding two sensors each, with measured
+300 mm and 400 mm runs from the subs to master.
 
 Three sensor address pads (A0/A1) give the sensors unique I2C addresses; those
 are solder pads on the sensors rather than a purchased part.
@@ -225,9 +223,6 @@ duplicate usually means two documents disagree about the design.
    electronics rear and 2 × 3-slot at the right gantry holder rear. The pair
    here is that second pair. Counted in PRINTED_PARTS only.
 
-Also unresolved: whether the three **idler pulleys** are included in the $0.50
-"M5 shoulder bolt with pulley" line in PRINTED_PARTS.md, or need their own
-line here.
 
 ## Software stack
 
