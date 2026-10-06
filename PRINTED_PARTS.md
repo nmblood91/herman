@@ -37,7 +37,7 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 
 ## Parts
 
-| Part | Qty | Weight | Heat-set inserts | Socket cap | #4 | M5 shoulder + pulley | Flat head | Wago |
+| Part | Qty | Weight | Heat-set inserts | Socket cap | #4 | M5 shoulder bolt | Flat head | Wago |
 |---|---|---|---|---|---|---|---|---|
 | Left gantry holder, rear | 1 | 71 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 0 |
 | Left gantry holder, front | 1 | 45 g | 2 × M4 (long) | 0 | 0 | 2 | 0 | 0 |
@@ -73,22 +73,24 @@ by hand, so re-total it if the table changes.
 | M3 socket cap, length TBD | 12 | $0.05 | $0.60 | 6 into the adapter's M3 inserts, from the two gantry faces · 2 into the right gantry holder front's inserts, holding the pump · 4 into the motor's own tapped holes |
 | M5×12 flat head | 4 | $0.40 | $1.60 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
 | #4 × 3/8" | 24 | $0.08 | $1.92 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain anchor 2 |
-| M5 shoulder bolt with pulley | 3 | $2.00 | $6.00 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
+| M5 shoulder bolt | 3 | $1.00 | $3.00 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
 | Wago 5-slot | 2 | $0.50 | $1.00 | main electronics rear |
 | Wago 3-slot | 2 | $0.30 | $0.60 | right gantry holder rear |
 | **Total** | **108** | | **$21.95** | |
 
 **33 heat-set inserts, 71 fasteners and 4 Wago connectors per planter —
-$21.95 of hardware.**
+$18.95 of hardware.**
 
-Two lines carry most of it. The three shoulder bolts with their idler wheels
-are $6.00, which is 27% of the hardware cost from under 3% of the pieces, and
-the heat-set inserts are $8.17 for another 37%. Between them, 36 pieces out of
-108 are two-thirds of the spend — worth knowing before a redesign adds a boss
-or a fourth idler.
+The heat-set inserts are $8.17 of that: 43% of the cost from 31% of the
+pieces, and the single biggest line at $5.25 for the M4s alone. That is what
+a $0.25 part does sitting next to a $0.05 screw, and it is worth knowing
+before a redesign adds two more bosses to something.
+
+The idler wheels the shoulder bolts carry are not counted here — they are a
+drive component and sit in [BOM.md](BOM.md) under core structure.
 
 Against the filament: 1,424 g is roughly $30–36 at typical PETG pricing, so
-**$52–58 of raw material per planter** for everything printed and everything
+**$49–55 of raw material per planter** for everything printed and everything
 holding it together.
 
 **The thread-by-thread check**, worth re-running after any edit:
@@ -142,9 +144,10 @@ Only the parts with a constraint worth recording.
   plastic needed to mount it. Roughly 200 g of extra material is the cost of
   putting the motor, the endstop and the pump on one end.
 
-- **The pulley count runs the other way.** Two M5 shoulder bolts with pulleys
-  on the left holder front against one on the right, which is the left side
-  doing the idler job while the right drives. Worth a line in the assembly
+- **The pulley count runs the other way.** Two shoulder bolts on the left
+  holder front against one on the right, which is the left side doing the
+  idler job while the right drives. The bolts are counted above; the wheels
+  that ride on them are in [BOM.md](BOM.md). Worth a line in the assembly
   notes when those get written, because it is obvious while building and
   invisible six months later.
 

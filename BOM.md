@@ -12,21 +12,21 @@ cannot be subtotalled yet.
 
 | Section | Priced so far | Lines still to price |
 |---|---|---|
-| Core structure | $144.00 | 3 — mounting hardware, drive pulley, tensioner |
+| Core structure | $152.00 | 2 — drive pulley, tensioner |
 | Printed parts — filament | ~$30–36 | complete |
-| Printed parts — fasteners and inserts | $21.95 | complete |
-| Motion and control | $43.00 | 1 — wiring harness and connectors |
+| Printed parts — fasteners and inserts | $18.95 | complete |
+| Motion and control | $43.00 | 1 — wiring harness |
 | Compute and monitoring | $40.00 | complete for the base build |
-| Sensing | $48.00 | 3 — three hubs, two inter-hub cables |
+| Sensing | $63.00 | complete |
 | Watering system | $35.00 | 2 — intake weight, level sensor |
-| Lighting | $10.00 | 3 — hook-up wire, diffuser, connectors |
-| Power and electronics | $27.00 | 9 — fuses and holders, shifter, wire in three gauges, heat shrink |
-| **Running total** | **~$399–405** | **21 lines outstanding** |
+| Lighting | $10.00 | 2 — hook-up wire, connectors |
+| Power and electronics | $27.00 | 9 — fuses, fuse holders, level shifter, wire in three gauges, heat shrink |
+| **Running total** | **~$419–425** | **17 lines outstanding** |
 
-Close to final now. What is left is small hardware — three fuses and their
-holders, a level shifter, wire and heat shrink — plus the three hubs, the
-liquid level sensor, the drive pulley and the belt tensioner. None of that is
-likely to add more than $25, which puts a finished prototype around **$425**.
+Close to final. What is left is three fuses and their holders, a level
+shifter, wire and heat shrink, plus the drive pulley, the belt tensioner, the
+intake weight and the liquid level sensor. Call it another $25, which puts a
+finished prototype around **$445**.
 
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
 there is no bought nozzle — the tube is held by a printed part.
@@ -37,16 +37,17 @@ there is no bought nozzle — the tube is held by a printed part.
 |---|---|---|---|---|
 | IKEA VITTSJÖ frame | 1 | $80.00 | $80.00 | as-is; includes both shelves |
 | 2020 aluminium extrusion rail, 1000 mm | 1 | $50.00 | $50.00 | VBX.com; comes with the gantry plate. 890 mm usable travel |
-| Mounting hardware, rear uprights and rail | TBD | TBD | TBD | |
+| T nuts | 4 | $0.50 | $2.00 | to secure rail |
 | GT2 belt | 1 | $4.00 | $4.00 | roughly twice the rail plus pulley wrap, so about 2.1 m |
-| GT2 drive pulley | 1 | TBD | TBD | motor end; the three idler wheels are priced in PRINTED_PARTS.md |
+| GT2 drive pulley | 1 | TBD | TBD | motor end |
+| GT2 idler pulley | 3 | $2.00 | $6.00 | ride on the shoulder bolts in the gantry holder fronts |
 | NEMA 17 stepper motor | 1 | $10.00 | $10.00 | right-hand gantry holder |
-| Belt tensioning hardware | TBD | TBD | TBD | |
+| Belt tensioning hardware | TBD | TBD | TBD |  |
 
 ## Printed parts
 
 Weights, heat-set inserts, screws and their costs are tracked in
-**[PRINTED_PARTS.md](PRINTED_PARTS.md)** — 18 parts at 1,424 g, plus $21.95 of
+**[PRINTED_PARTS.md](PRINTED_PARTS.md)** — 18 parts at 1,424 g, plus $18.95 of
 fasteners across 108 pieces. Covers the gantry holders and covers, the V-slot
 adapter, the two gantry faces, the electronics holder, the STEMMA QT sub hubs
 and the water-tube cable chain.
@@ -56,7 +57,7 @@ and the water-tube cable chain.
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | BTT SKR Mini E3 V2 control board | 1 | $40.00 | $40.00 | TMC2209 drivers are **embedded**, not a separate purchase |
-| Wiring harness and JST/XH connectors | TBD | TBD | TBD | |
+| Wiring harness and JST/XH connectors | TBD | TBD | TBD |  |
 | Mechanical limit switch, X homing | 1 | $3.00 | $3.00 | wired normally-closed |
 
 The limit switch is wired normally-closed. Printer endstop modules are usually
@@ -71,7 +72,7 @@ being duplicated here; there is one 12 V supply for the whole machine.
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | Raspberry Pi 3 Model A+ | 1 | $30.00 | $30.00 | production target; allow +$20 for a larger board or a price rise |
-| MicroSD card | 1 | $10.00 | $10.00 | |
+| MicroSD card | 1 | $10.00 | $10.00 |  |
 | Pi Camera v2 or compatible CSI camera | 1 | TBD | TBD | **paid add-on, not base build** |
 
 **Base subtotal $40.00**, the camera excluded as an add-on. The 12 V to 5 V
@@ -127,9 +128,9 @@ and the development boards. Live streaming is out of scope, see
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | Capacitive soil moisture sensor (Adafruit STEMMA) + cable | 4 | $12.00 | $48.00 | one per plant; price includes the sensor's own STEMMA QT cable |
-| STEMMA QT 5-port passive hub | 3 | TBD | TBD | one master to the Pi, plus a left and a right sub hub |
-| STEMMA QT cable, 300 mm | 1 | TBD | TBD | left sub hub to master |
-| STEMMA QT cable, 400 mm | 1 | TBD | TBD | right sub hub to master |
+| STEMMA QT 5-port passive hub | 3 | $3.00 | $9.00 | one master to the Pi, plus a left and a right sub hub |
+| STEMMA QT cable, 300 mm | 1 | $3.00 | $3.00 | left sub hub to master |
+| STEMMA QT cable, 400 mm | 1 | $3.00 | $3.00 | right sub hub to master |
 
 **Three hubs, confirmed against the build.** A master hub wired back to the
 Pi, and a left and a right sub hub feeding two sensors each, with measured
@@ -174,7 +175,7 @@ and what goes wrong if it is inverted.
 |---|---|---|---|---|
 | Addressable LED strip, WS2811 12 V | 1 | $10.00 | $10.00 | 3 LEDs per pixel — see note |
 | Hook-up wire, LED runs | TBD | TBD | TBD | power and data out to the strip |
-| Connectors | TBD | TBD | TBD | |
+| Connectors | TBD | TBD | TBD |  |
 
 WS2811 is the default and drives three LEDs per pixel, so `LED_COUNT` is a
 third of the LEDs you can count on the strip. WS2815 and GS8208 are also
