@@ -39,9 +39,9 @@ main electronics rear at 270 g and the right gantry holder rear at 205 g, are
 
 | Part | Qty | Weight | Heat-set inserts | Socket cap | #4 | M5 shoulder + pulley | Flat head | Wago |
 |---|---|---|---|---|---|---|---|---|
-| Left gantry holder, rear | 1 | 71 g | 5 × M4 (long) | 4 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 0 |
+| Left gantry holder, rear | 1 | 71 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 0 |
 | Left gantry holder, front | 1 | 45 g | 2 × M4 (long) | 0 | 0 | 2 | 0 | 0 |
-| Right gantry holder, rear | 1 | 205 g | 5 × M4 (long) | 4 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 2 × 3-slot |
+| Right gantry holder, rear | 1 | 205 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 2 × 3-slot |
 | Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3 (length TBD) | 2 | 1 | 0 | 0 |
 | Left gantry cover | 1 | 10 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
 | Right gantry cover | 1 | 35 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
@@ -65,8 +65,8 @@ by hand, so re-total it if the table changes.
 | M4 heat-set insert (long) | 21 | gantry holders 13, electronics rear 4, sub hubs 4 |
 | M3 heat-set insert (long) | 2 | right gantry holder front |
 | M5 heat-set insert (short) | 4 | V-slot adapter |
-| M4×16 socket cap | 16 | M4 inserts — gantry holders 8, electronics rear 4, sub hubs 4 |
-| M5×16 socket cap | 10 | 2 into the VITTSJÖ frame, one per rear holder · 4 into the V-slot rail · 4 on the gantry covers, destination not yet stated |
+| M4×16 socket cap | 18 | M4 inserts — gantry holders 10, electronics rear 4, sub hubs 4 |
+| M5×16 socket cap | 10 | 2 into the VITTSJÖ frame, one per rear holder · 8 into T-nuts in the V-slot rail, 4 from the adapter and 2 from each cover |
 | M3 socket cap, length TBD | 2 | the 2 M3 inserts in the right gantry holder front |
 | M5×12 flat head | 4 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
 | #4, length TBD | 24 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain 2 |
@@ -74,7 +74,12 @@ by hand, so re-total it if the table changes.
 | Wago 5-slot | 2 | main electronics rear |
 | Wago 3-slot | 2 | right gantry holder rear |
 
-**27 heat-set inserts, 59 fasteners and 4 Wago connectors per planter.**
+**27 heat-set inserts, 61 fasteners and 4 Wago connectors per planter.**
+
+The accounting balances, which is the check worth re-running after any edit:
+every one of the 21 M4 inserts has a fastener in it — 18 M4×16 plus the 3
+shoulder bolts — and all 10 M5×16 have a destination. A mismatch here means
+either a fastener is missing from the table or a part has a boss nothing uses.
 
 A note on the shoulder bolts, because the naming invites a mistake: an M5
 shoulder bolt is 5 mm at the shoulder and **M4 at the thread**, so all three go
@@ -82,20 +87,15 @@ into M4 inserts. They are not M5 fasteners and do not belong in that line.
 
 ## Open items
 
-Two things left, both small.
+Every fastener is now placed. What is left is dimensions and one weight.
 
-1. **Two M4 inserts have no fastener recorded.** 21 M4 inserts against 16
-   M4×16 screws and 3 shoulder bolts, leaving one spare in the left rear
-   holder and one in the right rear holder. Both fronts are now fully
-   accounted for. Likely the mating piece's screw, which was never written
-   down — worth confirming it is that rather than two unused bosses.
+1. **Two lengths are missing.** The 24 `#4` screws and the 2 × M3 in the right
+   gantry holder front have counts but no length, so those two lines cannot be
+   ordered against.
 
-2. **The four M5×16 on the gantry covers have no stated destination.** Ten in
-   total: two into the VITTSJÖ frame, one from each rear holder, and four into
-   the V-slot rail. That leaves two per cover. No printed part has an M5
-   insert except the V-slot adapter, and its four are spoken for, so these are
-   landing in something that is not a printed part. Say what and the fastener
-   table is closed.
+2. **The cable chain has neither a link count nor a per-link weight**, which
+   is the only gap in the 1,171 g figure. Everything else in the build is
+   weighed.
 
 Insert dimensions are deliberately left as `long` and `short`. The inserts are
 sold as a kit from the store rather than sourced by whoever assembles the unit,
@@ -149,8 +149,9 @@ Only the parts with a constraint worth recording.
   socket cap stands proud enough to foul the rail as the carriage travels.
   That is a constraint on any future revision of this part, not a parts-bin
   substitution: swapping them back for socket caps would bind the gantry. The
-  separate four M5×16 fasten the adapter to the V-slot rail itself and go into
-  no printed insert.
+  separate four M5×16 fasten the adapter to the rail through T-nuts, as do the
+  two on each cover — eight of the ten M5×16 land in the extrusion rather than
+  in anything printed.
 
 - **Cable chain for water tube** — carries the outlet tube to the moving
   carriage. The liquid sensor clamps to that tube's *falling* leg, after the
