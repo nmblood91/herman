@@ -191,6 +191,16 @@ free air, and those are the figures to use here: 20 AWG is good for 1.5 A,
 18 AWG for 2.3 A, 14 AWG for 5.9 A. So the LED strip's 2 A fuse wants 18 AWG,
 and anything sitting behind the 5 A main fuse wants 14 AWG.
 
+**Mixing gauges along one run is fine** — a fuse holder's heavy pigtail
+spliced into lighter wire, say — as long as every segment clears the fuse on
+its own. The practical form of the rule is that **the thinnest segment sets
+the largest fuse allowed**, so check the skinny end rather than the heavy one.
+Starting a circuit in 14 AWG does nothing for a thin stretch further along.
+
+Watch the splice itself while you are at it. A loose lever joint or a cold
+crimp is a resistance heater in series with the load, and no fuse will ever
+notice it.
+
 **That includes the SKR and DC-DC feeds**, which look like light loads and are
 not separately fused — a fault on either draws until the 5 A main blows, so
 they are sized for 5 A rather than for the 0.6 A and 0.25 A they actually
