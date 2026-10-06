@@ -121,13 +121,7 @@ production target. The constraint that actually binds is ARMv8 and 512 MB: a
 stack has to fit in half a gigabyte. Every Pi 3 clears the first. Only the A+
 is tight on the second, which is why it is the board that has to be proven.
 
-This used to name the 3 B+ as the floor, on the grounds of 1 GB of RAM, the
-85 x 56 mm outline and the standard 15-pin CSI connector. That was wrong twice
-over. The plain 3 B has the same 1 GB, the same Cortex-A53 and the same
-outline -- the B+ adds dual-band WiFi, Bluetooth 4.2 and gigabit Ethernet, and
-nothing here needs any of them. And a floor of 1 GB sat *above* the 512 MB
-board actually being shipped, which is backwards. See [BOM.md](BOM.md) for the
-boards being tested and in what order.
+See [BOM.md](BOM.md) for the boards being tested and in what order.
 
 **The intended production target is the Pi 3 Model A+**, chosen on cost. Most of
 the objections to it do not apply: same BCM2837B0 and same 1.4 GHz quad A53 as

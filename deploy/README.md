@@ -176,10 +176,11 @@ re-run the install script or build it directly:
 cd /opt/greenthumb/frontend && npm run build
 ```
 
-Build output used to be committed, which meant every install rewrote tracked
-files and left the checkout permanently dirty — and then the next `git pull`
-aborted with "local changes would be overwritten by merge". If you hit that on an
-older checkout, see **Recovering a diverged checkout** below.
+`dist/` is gitignored and has to stay that way. Committed build output means
+every install rewrites tracked files and leaves the checkout permanently dirty,
+and the next `git pull` aborts with "local changes would be overwritten by
+merge". If a checkout is already in that state, see **Recovering a diverged
+checkout** below.
 
 Taken together, the above is why **`git pull` is a developer workflow, not an
 update mechanism** — too much of an update lives outside what a pull applies. A
@@ -715,6 +716,9 @@ non-zero when any populated address exceeds 1%, so it can gate a scripted check.
 
 Vertical order matters more than anything else about the water path. Top to
 bottom: **nozzle, pump, reservoir.**
+
+"Nozzle" here is the open end of the outlet tube, held over the pot by the
+lower gantry face. There is no fitting to buy — the tube just dribbles.
 
 ```
    HIGH POINT  ──────── top of the outlet run

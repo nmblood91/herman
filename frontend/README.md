@@ -18,7 +18,7 @@ Four tabs, one component each unless noted:
 | Controls | `ControlsPanel.jsx` — gantry homing and jogging, move-to-plant, water-a-plant, lighting, pump |
 | Plants | `PlantsPanel.jsx` — per-plant current moisture, plus an expandable settings form for name, light window, target, dose volume and rail position |
 | Sensors | `HistoryPanel.jsx` + `Chart.jsx` for the chart, `CalibrationPanel.jsx` for per-sensor calibration |
-| Settings | `SettingsPanel.jsx` — LED strip type and colour order, planter clock; `LogsPanel.jsx` renders below it |
+| Settings | `SettingsPanel.jsx` — automatic watering, quiet hours, LED strip type and colour order, planter clock; `LogsPanel.jsx` renders below it |
 
 ## Local development
 
@@ -29,7 +29,7 @@ npm run dev
 
 `vite.config.js` proxies `/api` to `http://localhost:8000`, so run the backend on
 the same machine. To develop against the Pi instead, point that proxy target at
-`http://greenthumb.local:8000`.
+`http://herman.local:8000`.
 
 ## Build output is not committed
 
@@ -38,9 +38,9 @@ the same machine. To develop against the Pi instead, point that proxy target at
 [deploy/pi/install-green-thumb.sh](../deploy/pi/install-green-thumb.sh) builds it
 during the install.
 
-It used to be committed, which meant every install on the Pi rewrote tracked
-files and left the checkout dirty, so the next `git pull` refused to merge. Build
-output belongs to the machine that serves it.
+Keep it that way. Committed build output means every install on the Pi
+rewrites tracked files and leaves the checkout dirty, so the next `git pull`
+refuses to merge. Build output belongs to the machine that serves it.
 
 **So a frontend change needs a build on the Pi, not just a `git pull`** — re-run
 the install script, or `cd /opt/greenthumb/frontend && npm run build`.

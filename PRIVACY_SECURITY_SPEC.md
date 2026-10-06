@@ -51,6 +51,11 @@ The following rules are mandatory for all future implementation work:
 - Default credentials must be changed during setup.
 - Session handling must be secure and minimal.
 
+**Not yet implemented.** The API currently has no authentication: anything on
+the LAN can reach every endpoint. Closing that is tied to the phone-app
+pairing work, where proximity over BLE is what issues the token — see
+[ROADMAP.md](ROADMAP.md).
+
 ## Camera privacy policy
 
 The camera is a sensitive component because it is inside a home environment.

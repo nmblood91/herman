@@ -76,6 +76,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/water/{plant_id}` | move to a plant and dose it |
 | `/gantry/home`, `/gantry/move` | homing and jogging the one axis |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
+| `/watering/auto` | the master switch for unattended watering |
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
 | `/lights/...` | mode, brightness, colour, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
@@ -83,8 +84,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/version` | what is running, and whether the checkout has moved on without it |
 
 **The full, current list is generated from the routes themselves** at
-<http://herman.local:8000/docs> — interactive, and it cannot go stale the
-way a hand-written list here did.
+<http://herman.local:8000/docs> — interactive, and it cannot go stale.
 
 Note the port. Nginx serves the web UI on 80 but proxies only `/api/` and
 `/health`, so `/docs` is reachable only on the API's own port.
@@ -106,19 +106,19 @@ Four tabs:
 | **Controls** | Home and jog the gantry, move to a plant, water a plant, lighting, run the pump |
 | **Plants** | Each plant's current moisture, and its name, light window, moisture target, dose volume and rail position |
 | **Sensors** | Moisture and temperature history, and per-sensor calibration |
-| **Settings** | LED strip type and colour order, the planter's clock, and the log |
+| **Settings** | Automatic watering, quiet hours, LED strip type and colour order, the planter's clock, and the log |
 
 ## Hardware assumptions
 
 The code is written to be easy to adapt to the actual hardware stack:
 
 - Klipper is the motion layer running on the BTT SKR Mini E3 V2
-- Raspberry Pi hosts the application and camera services, on 64-bit Pi OS. The
+- Raspberry Pi hosts the application, on 64-bit Pi OS. The
   **Pi 3 Model A+ is the floor** — 512 MB and ARMv8 is what the stack has to fit
   in. Any Pi 3 will run it; a Pi 4 or a 3 B is the easier board to develop on.
   See [BOM.md](BOM.md)
 - 4 capacitive moisture sensors are mapped to unique addresses and read through a passive I2C hub
-- optical / camera monitoring can be integrated later into the same service layer
+- the camera add-on adds timelapse capture to the same service layer
 
 ## Production / commercialization roadmap
 
@@ -134,7 +134,7 @@ This repository is set up to become a real product in stages:
 
 3. Automation rules
    - scheduling, threshold-based irrigation, seasonal growth tuning
-   - alerting for low moisture, pump errors, camera anomalies
+   - alerting for low moisture and pump errors
 
 4. Commercial productization
    - configuration profiles per plant of different species
@@ -168,7 +168,7 @@ only the user-editable fields are stored.
 ## History
 
 Every reading is written to SQLite (`data/greenthumb.db`) once a minute, along
-with each watering. The **History** tab charts moisture or temperature per plant
+with each watering. The **Sensors** tab charts moisture or temperature per plant
 over 6 hours to 90 days, with dashed marks where waterings happened — which is
 what makes it possible to tell whether a moisture target and dose are actually
 right for a plant, rather than guessing.
@@ -194,7 +194,7 @@ and `spidev`, so they run on a development machine with no hardware attached.
 | Pump | Real — Klipper `output_pin` on the SKR's HE0 MOSFET |
 | LEDs | Real — WS2811 (default), WS2815 or GS8208 over SPI, 12V only, strip type selectable in Settings |
 | Water level sensor | Real — non-contact sensor on the outlet tube, via Klipper; verifies a dose rather than gating it |
-| Camera | Not built — the UI controls for it are inert |
+| Camera | Not built — an optional paid add-on, scoped to timelapse |
 
 Automatic watering is disabled by default. Turn it on with **Water plants
 automatically** in the Settings tab; the choice persists across restarts.

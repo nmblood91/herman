@@ -91,8 +91,7 @@ Against the filament: 1,424 g is roughly $30–36 at typical PETG pricing, so
 **$52–58 of raw material per planter** for everything printed and everything
 holding it together.
 
-**The thread-by-thread check**, worth re-running after any edit because it
-has caught two errors already:
+**The thread-by-thread check**, worth re-running after any edit:
 
 - **M4 balances.** 21 inserts against 18 M4×16 plus 3 shoulder bolts.
 - **M5 balances.** The adapter's 4 inserts take the 4 M5×12 flat heads; all
@@ -136,8 +135,8 @@ Only the parts with a constraint worth recording.
   both live in the right-hand holder — and so does the pump. The left holder
   carries two idler pulleys on shoulder bolts and nothing else.
 
-  The weights corroborate it, though not the way they first appear to. They are
-  printed plastic only, so none of that hardware is on the scale; the right
+  The weights corroborate it, but read them carefully: they are printed
+  plastic only, so none of that hardware is on the scale. The right
   side is heavier at all three parts — 205 g against 71 g at the rear, 85 g
   against 45 g at the front, 35 g against 10 g on the cover — because of the
   plastic needed to mount it. Roughly 200 g of extra material is the cost of

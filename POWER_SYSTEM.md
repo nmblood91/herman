@@ -152,9 +152,8 @@ reason the pump leads land in Wagos rather than on the pump terminals: the
 joints have to open for service without a soldering iron.
 
 - Wire gauge: **14 AWG** for the 12V runs here, all of which are short
-- A 221-412/413/415 accepts 24–12 AWG. The older advice to step up to 10 AWG
-  past two metres does not apply — **10 AWG will not fit a 221**, and a run
-  that genuinely needed it would want the larger 221-6xx family instead
+- A 221-412/413/415 accepts 24–12 AWG, so **10 AWG will not fit one**. A run
+  long enough to want it would need the larger 221-6xx family
 - Priced in [PRINTED_PARTS.md](PRINTED_PARTS.md), which is where the Wagos
   are counted
 

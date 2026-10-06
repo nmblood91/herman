@@ -32,9 +32,6 @@ $30 or so, which puts a finished prototype somewhere near **$420**.
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
 there is no bought nozzle — the tube is held by a printed part.
 
-Read *Overlaps to resolve* below before adding anything up — three items were
-listed in two places each, and a naive total counts them twice.
-
 ## Core structure
 
 | Item | Qty | Unit | Line total | Notes |
@@ -214,31 +211,6 @@ than being soldered to the pump terminals; see
 
 **See [POWER_SYSTEM.md](POWER_SYSTEM.md) for full electrical specifications.**
 
-## Overlaps to resolve
-
-Three things were listed twice before this costing pass, and each would have
-been counted twice in a total. Recorded rather than quietly deleted, because a
-duplicate usually means two documents disagree about the design.
-
-1. **TMC2209 drivers.** Listed as a line item alongside the SKR Mini E3 V2.
-   They are embedded on that board and cannot be bought or replaced
-   separately, as [COMMERCIAL_STRATEGY.md](COMMERCIAL_STRATEGY.md) already
-   says. Now a note on the board line rather than a line of its own.
-
-2. **Power supply.** *Motion and control* had "power supply for motion
-   system", *Power and electronics* specifies a 12 V 5 A supply for the whole
-   machine, and *Lighting* had a third. There is one supply. Consolidated into
-   *Power and electronics*.
-
-3. **Wago lever connectors, twice over.** The two 3-way connectors at the
-   pump were listed here and in PRINTED_PARTS.md — that is the 3-slot pair.
-   Then the "busbar / power distribution block" line turned out to be the
-   *other* pair, the 5-slot 221s at the electronics rear. Both are counted in
-   PRINTED_PARTS only, and POWER_SYSTEM.md no longer recommends a solder
-   busbar, which was a part this build never bought and the opposite of the
-   serviceable-joint rule everything else follows.
-
-
 ## Software stack
 
 - Klipper on Raspberry Pi
@@ -249,9 +221,10 @@ duplicate usually means two documents disagree about the design.
 ## UI
 
 - Local web app served from the Pi, reached at `http://herman.local` on the
-  same network. No smartphone app and no cloud account — see
-  [PRIVACY_SECURITY_SPEC.md](PRIVACY_SECURITY_SPEC.md) for why local-only is
-  deliberate
+  same network. No cloud account, by design — see
+  [PRIVACY_SECURITY_SPEC.md](PRIVACY_SECURITY_SPEC.md). There is no phone app
+  yet; the one sketched in [ROADMAP.md](ROADMAP.md) is LAN-only too, and
+  exists mainly to handle first-run WiFi setup
 - A per-species plant profile library is a roadmap item, not a current part;
   plant definitions live in `greenthumb/plants.py` and only the user-editable
   fields persist

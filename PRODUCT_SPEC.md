@@ -17,7 +17,7 @@ A 4-plant smart indoor planter system using:
 - homing against a mechanical endstop at the motor end of the rail
 - four capacitive soil moisture sensors
 - I2C address configuration to prevent collisions
-- per-plant watering nozzle and peristaltic pump
+- peristaltic pump feeding a tube carried on the gantry, which dribbles into whichever plant the carriage is parked over
 - addressable LED strip for plant lighting and ambient modes
 - Raspberry Pi as host controller
 - Pi camera for monitoring and timelapse, as an optional paid add-on
@@ -47,7 +47,7 @@ A 4-plant smart indoor planter system using:
 
 ### Monitoring
 - capture status data from sensors and system health checks
-- capture camera images and time-lapse content
+- capture camera images and time-lapse content, on units with the camera add-on
 - show plant condition trends over time
 
 ## Non-functional goals
@@ -65,7 +65,7 @@ A 4-plant smart indoor planter system using:
 - no technical knowledge required for basic operation
 - simple one-tap watering or scheduling
 - clear status display for each plant
-- visual plant health insight from camera and moisture history
+- visual plant health insight from moisture history, and from the camera where fitted
 
 ## Constraints
 
