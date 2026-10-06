@@ -12,7 +12,7 @@ cannot be subtotalled yet.
 
 | Section | Priced so far | Lines still to price |
 |---|---|---|
-| Core structure | $140.00 | 4 — mounting hardware, belt, drive pulley, tensioner |
+| Core structure | $144.00 | 3 — mounting hardware, drive pulley, tensioner |
 | Printed parts — filament | ~$30–36 | complete |
 | Printed parts — fasteners and inserts | $21.95 | complete |
 | Motion and control | $43.00 | 1 — wiring harness and connectors |
@@ -20,14 +20,13 @@ cannot be subtotalled yet.
 | Sensing | $48.00 | 3 — three hubs, two inter-hub cables |
 | Watering system | $35.00 | 2 — intake weight, level sensor |
 | Lighting | $10.00 | 3 — hook-up wire, diffuser, connectors |
-| Power and electronics | $20.00 | 10 — fuses and holders, diode, shifter, wire in three gauges, heat shrink |
-| **Running total** | **~$388–394** | **23 lines outstanding** |
+| Power and electronics | $27.00 | 9 — fuses and holders, shifter, wire in three gauges, heat shrink |
+| **Running total** | **~$399–405** | **21 lines outstanding** |
 
-Still a floor rather than an estimate, but a much closer one: the expensive
-items are all in now. What is left is small hardware — fuses, a diode, a
-level shifter, connectors and wire — plus the three hubs and the liquid level
-sensor. None of that is likely to move the total by more than
-$30 or so, which puts a finished prototype somewhere near **$420**.
+Close to final now. What is left is small hardware — three fuses and their
+holders, a level shifter, wire and heat shrink — plus the three hubs, the
+liquid level sensor, the drive pulley and the belt tensioner. None of that is
+likely to add more than $25, which puts a finished prototype around **$425**.
 
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
 there is no bought nozzle — the tube is held by a printed part.
@@ -39,7 +38,7 @@ there is no bought nozzle — the tube is held by a printed part.
 | IKEA VITTSJÖ frame | 1 | $80.00 | $80.00 | as-is; includes both shelves |
 | 2020 aluminium extrusion rail, 1000 mm | 1 | $50.00 | $50.00 | VBX.com; comes with the gantry plate. 890 mm usable travel |
 | Mounting hardware, rear uprights and rail | TBD | TBD | TBD | |
-| GT2 belt | TBD | TBD | TBD | length needed: roughly twice the rail plus wrap |
+| GT2 belt | 1 | $4.00 | $4.00 | roughly twice the rail plus pulley wrap, so about 2.1 m |
 | GT2 drive pulley | 1 | TBD | TBD | motor end; the three idler wheels are priced in PRINTED_PARTS.md |
 | NEMA 17 stepper motor | 1 | $10.00 | $10.00 | right-hand gantry holder |
 | Belt tensioning hardware | TBD | TBD | TBD | |
@@ -195,7 +194,7 @@ line is in *Power and electronics*.
 | Fuse, 1 A fast-blow | 1 | TBD | TBD | SKR HE0 to pump positive |
 | Fuse, 2 A fast-blow | 1 | TBD | TBD | busbar to strip +12 V |
 | Inline fuse holder, 16 AWG leads | 3 | TBD | TBD | one per fuse above |
-| 1N5822 flyback diode, 3 A Schottky | 1 | 2 | TBD | **required**, see [POWER_SYSTEM.md](POWER_SYSTEM.md) |
+| 1N5822 flyback diode, 3 A Schottky | 1 | $2.00 | $2.00 | **required**, see [POWER_SYSTEM.md](POWER_SYSTEM.md) |
 | 74AHCT125 level shifter | 1 | TBD | TBD | LED data line |
 | Wire, 14 AWG | TBD | TBD | TBD | charger to busbar, busbar to SKR and DC-DC |
 | Wire, 18 AWG | TBD | TBD | TBD | LED strip and pump runs |
