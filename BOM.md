@@ -10,32 +10,34 @@ cannot be subtotalled yet.
 
 ## Cost summary
 
-| Section | Subtotal |
-|---|---|
-| Core structure | TBD |
-| Printed parts — filament | ~$30–36 |
-| Printed parts — fasteners and inserts | $21.95 |
-| Motion and control | TBD |
-| Compute and monitoring | TBD |
-| Sensing | TBD |
-| Watering system | TBD |
-| Lighting | TBD |
-| Power and electronics | TBD |
-| **Total** | **TBD** |
+| Section | Priced so far | Lines still to price |
+|---|---|---|
+| Core structure | $130.00 | 5 — mounting hardware, belt, drive pulley, NEMA 17, tensioner |
+| Printed parts — filament | ~$30–36 | complete |
+| Printed parts — fasteners and inserts | $21.95 | complete |
+| Motion and control | $43.00 | 1 — wiring harness and connectors |
+| Compute and monitoring | $40.00 | complete for the base build |
+| Sensing | — | 5 — sensors, three hubs, cables |
+| Watering system | $30.00 | 5 — tubing, nozzle, fittings, level sensor, intake weight |
+| Lighting | — | 4 — strip, hook-up wire, diffuser, connectors |
+| Power and electronics | $10.00 | 10 — supply, fuses and holders, diode, shifter, busbar, harness, heat shrink |
+| **Running total** | **~$305–311** | **30 lines outstanding** |
 
-Only the printed-parts lines are real so far, and they are the two the weight
-and fastener tables were built to produce. Read *Overlaps to resolve* below
-before adding anything up — three items currently appear in two places each,
-and a naive total counts them twice.
+That running figure is a floor, not an estimate: it is only the lines with a
+real price against them. The 12 V supply, the stepper, all four sensors, the
+LED strip and the entire water path are still unpriced, so the finished number
+will be well above it. The reservoir is bring-your-own and carries no cost
+here.
+
+Read *Overlaps to resolve* below before adding anything up — three items were
+listed in two places each, and a naive total counts them twice.
 
 ## Core structure
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| IKEA VITTSJÖ frame | 1 | TBD | TBD | modified |
-| Black-brown melamine lower shelf | 1 | TBD | TBD | confirm whether stock with the frame |
-| Glass upper shelf | 1 | TBD | TBD | confirm whether stock with the frame |
-| 2020 aluminium extrusion rail, 1000 mm | 1 | TBD | TBD | 890 mm usable travel |
+| IKEA VITTSJÖ frame | 1 | $80.00 | $80.00 | as-is; includes both shelves |
+| 2020 aluminium extrusion rail, 1000 mm | 1 | $50.00 | $50.00 | VBX.com; comes with the gantry plate. 890 mm usable travel |
 | Mounting hardware, rear uprights and rail | TBD | TBD | TBD | |
 | GT2 belt | TBD | TBD | TBD | length needed: roughly twice the rail plus wrap |
 | GT2 drive pulley | 1 | TBD | TBD | motor end; the three idler wheels are priced in PRINTED_PARTS.md |
@@ -54,9 +56,9 @@ and the water-tube cable chain.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| BTT SKR Mini E3 V2 control board | 1 | TBD | TBD | TMC2209 drivers are **embedded**, not a separate purchase |
+| BTT SKR Mini E3 V2 control board | 1 | $40.00 | $40.00 | TMC2209 drivers are **embedded**, not a separate purchase |
 | Wiring harness and JST/XH connectors | TBD | TBD | TBD | |
-| Mechanical limit switch, X homing | 1 | TBD | TBD | wired normally-closed |
+| Mechanical limit switch, X homing | 1 | $3.00 | $3.00 | wired normally-closed |
 
 The limit switch is wired normally-closed. Printer endstop modules are usually
 sold 3-pin; one wire comes off — see [deploy/README.md](deploy/README.md) for
@@ -69,11 +71,13 @@ being duplicated here; there is one 12 V supply for the whole machine.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| Raspberry Pi 3 Model A+ | 1 | TBD | TBD | production target |
-| MicroSD card | 1 | TBD | TBD | |
-| USB power and breakout hardware | TBD | TBD | TBD | |
-| Pi cooling | TBD | TBD | TBD | if required |
+| Raspberry Pi 3 Model A+ | 1 | $30.00 | $30.00 | production target; allow +$20 for a larger board or a price rise |
+| MicroSD card | 1 | $10.00 | $10.00 | |
 | Pi Camera v2 or compatible CSI camera | 1 | TBD | TBD | **paid add-on, not base build** |
+
+**Base subtotal $40.00**, the camera excluded as an add-on. The 12 V to 5 V
+step-down that feeds the Pi is priced under *Power and electronics* with the
+rest of the supply chain, so it is not counted twice here.
 
 **Production target: Raspberry Pi 3 Model A+.** Chosen on cost. Same BCM2837B0
 and 1.4 GHz quad A53 as the 3 B+, dual-band WiFi, the standard 15-pin CSI
@@ -140,20 +144,19 @@ are solder pads on the sensors rather than a purchased part.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| 12 V peristaltic pump | 1 | TBD | TBD | not tapped — mounts on M3 inserts |
-| Reservoir | 1 | TBD | TBD | bulkhead outlet preferred |
+| 12 V peristaltic pump | 1 | $30.00 | $30.00 | not tapped — mounts on M3 inserts |
+| Reservoir | 1 | BYO | — | top-loaded; a Nalgene works |
 | Intake weight | 1 | TBD | TBD | only if dipping a tube from the top |
 | Tubing | TBD | TBD | TBD | sized to the level sensor's 0–13 mm range |
 | Water delivery nozzle | 1 | TBD | TBD | mounts on the lower gantry face |
 | Hose fittings | TBD | TBD | TBD | **no anti-drip fitting on the falling leg** |
 | Non-contact liquid level sensor | 1 | TBD | TBD | CQRobot CQRSENYW001 or similar |
-| Flow sensor | 1 | TBD | TBD | optional, diagnostics only |
 
-A **bottom or side bulkhead outlet** is the tidier reservoir option — the tube
-leaves at the lowest point and stays wet. A plain tank you dip a tube into from
-the top pumps identically; feed it through a hole in the lid rather than over
-the rim, since the rim crossing is a high spot in a suction line. The intake
-weight stops a dipped tube floating up and sucking air as the tank drains.
+The reservoir is whatever you have to hand. With a top-loaded tank, feed the
+tube through a hole in the lid rather than over the rim — the rim crossing is
+a high spot in a suction line. The intake weight is what stops that tube
+floating up and sucking air as the tank drains, so it is not optional on a
+dipped setup.
 
 **No anti-drip fitting on the outlet's falling leg.** The delivery check
 depends on that section draining back between doses, which is exactly what an
@@ -169,8 +172,9 @@ and what goes wrong if it is inverted.
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | Addressable LED strip, WS2811 12 V | 1 | TBD | TBD | 3 LEDs per pixel — see note |
+| Hook-up wire, LED runs | TBD | TBD | TBD | power and data out to the strip |
 | Diffuser or housing | TBD | TBD | TBD | if needed |
-| Wiring and connectors | TBD | TBD | TBD | |
+| Connectors | TBD | TBD | TBD | |
 
 WS2811 is the default and drives three LEDs per pixel, so `LED_COUNT` is a
 third of the LEDs you can count on the strip. WS2815 and GS8208 are also
@@ -185,7 +189,7 @@ line is in *Power and electronics*.
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | 12 V power supply, 5 A min (7 A recommended) | 1 | TBD | TBD | the only supply in the build |
-| DC-DC converter, 12 V to 5 V @ 3 A | 1 | TBD | TBD | |
+| DC-DC converter, 12 V to 5 V @ 3 A | 1 | $10.00 | $10.00 | Yipin hexa; this is what powers the Pi |
 | Fuse, 5 A fast-blow | 1 | TBD | TBD | charger output into the busbar |
 | Fuse, 1 A fast-blow | 1 | TBD | TBD | SKR HE0 to pump positive |
 | Fuse, 2 A fast-blow | 1 | TBD | TBD | busbar to strip +12 V |
@@ -194,6 +198,7 @@ line is in *Power and electronics*.
 | 74AHCT125 level shifter | 1 | TBD | TBD | LED data line |
 | Busbar / power distribution block | 1 | TBD | TBD | |
 | Wiring harness and cable routing | TBD | TBD | TBD | |
+| Heat shrink, assorted | TBD | TBD | TBD | used throughout, not only on the LED runs |
 
 Lever connectors are counted in [PRINTED_PARTS.md](PRINTED_PARTS.md), not here
 — see *Overlaps to resolve*. The diode and the pump leads land in them rather
