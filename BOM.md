@@ -20,8 +20,8 @@ cannot be subtotalled yet.
 | Sensing | $48.00 | 3 — three hubs, two inter-hub cables |
 | Watering system | $35.00 | 2 — intake weight, level sensor |
 | Lighting | $10.00 | 3 — hook-up wire, diffuser, connectors |
-| Power and electronics | $20.00 | 8 — fuses and holders, diode, shifter, harness, heat shrink |
-| **Running total** | **~$388–394** | **21 lines outstanding** |
+| Power and electronics | $20.00 | 10 — fuses and holders, diode, shifter, wire in three gauges, heat shrink |
+| **Running total** | **~$388–394** | **23 lines outstanding** |
 
 Still a floor rather than an estimate, but a much closer one: the expensive
 items are all in now. What is left is small hardware — fuses, a diode, a
@@ -175,7 +175,6 @@ and what goes wrong if it is inverted.
 |---|---|---|---|---|
 | Addressable LED strip, WS2811 12 V | 1 | $10.00 | $10.00 | 3 LEDs per pixel — see note |
 | Hook-up wire, LED runs | TBD | TBD | TBD | power and data out to the strip |
-| Diffuser or housing | TBD | TBD | TBD | if needed |
 | Connectors | TBD | TBD | TBD | |
 
 WS2811 is the default and drives three LEDs per pixel, so `LED_COUNT` is a
@@ -198,7 +197,9 @@ line is in *Power and electronics*.
 | Inline fuse holder, 16 AWG leads | 3 | TBD | TBD | one per fuse above |
 | 1N5822 flyback diode, 3 A Schottky | 1 | 2 | TBD | **required**, see [POWER_SYSTEM.md](POWER_SYSTEM.md) |
 | 74AHCT125 level shifter | 1 | TBD | TBD | LED data line |
-| Wiring harness and cable routing | TBD | TBD | TBD | |
+| Wire, 14 AWG | TBD | TBD | TBD | charger to busbar, busbar to SKR and DC-DC |
+| Wire, 18 AWG | TBD | TBD | TBD | LED strip and pump runs |
+| Wire, 22 AWG | TBD | TBD | TBD | LED data and the Pi ground reference |
 | Heat shrink, assorted | TBD | TBD | TBD | used throughout, not only on the LED runs |
 
 **The busbar is the Wago connectors**, not a separate part — the two 5-slot

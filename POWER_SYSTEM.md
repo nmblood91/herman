@@ -151,14 +151,50 @@ Lever connectors rather than a solder busbar or a screw block, for the same
 reason the pump leads land in Wagos rather than on the pump terminals: the
 joints have to open for service without a soldering iron.
 
-- Wire gauge: **14 AWG** for the 12V runs here, all of which are short
+- Gauge per run is in *Wire gauge* below
 - A 221-412/413/415 accepts 24–12 AWG, so **10 AWG will not fit one**. A run
   long enough to want it would need the larger 221-6xx family
 - Priced in [PRINTED_PARTS.md](PRINTED_PARTS.md), which is where the Wagos
   are counted
 
+### Wire gauge
+
+**Two spools cover the whole build: 14 AWG and 18 AWG.**
+
+| Run | Current | Fuse | Gauge |
+|---|---|---|---|
+| Charger → Wago busbar | 2.4 A peak | 5 A | **14 AWG** |
+| Wago → SKR | 0.6 A | (5 A main) | **14 AWG** |
+| Wago → DC-DC converter | 0.25 A | (5 A main) | **14 AWG** |
+| Wago → LED strip, ~750 mm | 1.5 A peak | 2 A | **18 AWG** |
+| HE0 → pump, ~500 mm | 0.3 A | 1 A | **18 AWG** (20 AWG is fine) |
+| LED data, Pi ground reference | signal | — | 22 AWG |
+
+**Gauge here is set by the fuse, not by the length.** Nothing in this machine
+is long enough or hungry enough for voltage drop to matter: the worst case is
+the LED strip, and even 22 AWG over its 750 mm run loses 119 mV — 1% of 12 V,
+invisible on a light. At 18 AWG it is 47 mV. The pump is further down still at
+6 mV.
+
+What does matter is that a wire has to survive its fuse. A conductor bundled
+inside an enclosure carries far less than the same wire in free air, and on
+those conservative figures 18 AWG is good for 2.3 A and 14 AWG for 5.9 A. So
+the LED strip's 2 A fuse wants 18 AWG, and anything sitting behind the 5 A
+main fuse wants 14 AWG.
+
+**That includes the SKR and DC-DC feeds**, which look like light loads and are
+not separately fused — a fault on either draws until the 5 A main blows, so
+they are sized for 5 A rather than for the 0.6 A and 0.25 A they actually
+carry. They are short runs, so this costs nothing but stiffness.
+
+The pump is the one place to use judgement at the connector end: 18 AWG is
+electrically right, but if the HE0 housing will not take an 18 AWG crimp
+cleanly, 20 AWG carries 1.5 A and the pump circuit is fused at 1 A.
+
 ### Fuse Holders
-- Inline fuse holders with **16 AWG or larger wire leads**
+- Inline fuse holders with **16 AWG or larger wire leads**. Their own pigtails
+  are short and in free air, so 16 AWG is fine even on the 5 A main — the
+  gauge table above applies to the runs, not to a 100 mm lead
 - Crimp, solder, or use lever connectors (Wago 221 or similar). What to avoid is
   the push-fit "stab-in" type, where the conductor is held only by a spring barb
   and cannot be inspected or re-seated — a lever connector is a different thing
@@ -166,7 +202,7 @@ joints have to open for service without a soldering iron.
 - Keep fuses accessible for quick replacement
 
 ### Pump Wiring
-- 14-16 AWG wire rated for 12V
+- 18 AWG, or 20 AWG if the HE0 crimp is tight — see *Wire gauge* above
 - Both pump leads land on the SKR's HE0 connector, not on the busbar — that is
   what lets Klipper switch it
 - The flyback diode and the pump leads meet at a pair of 3-way lever connectors
@@ -175,7 +211,8 @@ joints have to open for service without a soldering iron.
   openable — see [deploy/README.md](deploy/README.md)
 
 ### LED Strip Wiring
-- 18-20 AWG is ample for 1.5A over the length of the frame
+- 18 AWG — set by the 2 A fuse rather than by drop, which is 47 mV over a
+  750 mm run
 - Power the strip from the busbar through its own 2A fuse; **never from the Pi**
 - Tie the strip's ground to the busbar ground, and run a separate ground wire
   from a Pi GND pin to the busbar — the data line needs a shared reference or
