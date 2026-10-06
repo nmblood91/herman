@@ -63,23 +63,34 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 One planter, before spares. Totalled from the table above rather than counted
 by hand, so re-total it if the table changes.
 
-| Fastener | Total | Goes into |
-|---|---|---|
-| M4 heat-set insert (long) | 21 | gantry holders 13, electronics rear 4, sub hubs 4 |
-| M3 heat-set insert (long) | 8 | V-slot adapter 6, right gantry holder front 2 |
-| M5 heat-set insert (short) | 4 | V-slot adapter |
-| M4×16 socket cap | 18 | M4 inserts — gantry holders 10, electronics rear 4, sub hubs 4 |
-| M5×16 socket cap | 10 | 2 into the VITTSJÖ frame, one per rear holder · 8 into T-nuts in the V-slot rail, 4 from the adapter and 2 from each cover |
-| M3 socket cap, length TBD | 12 | 6 into the adapter's M3 inserts, from the two gantry faces · 2 into the right gantry holder front's inserts, holding the pump · 4 into the motor's own tapped holes |
-| M5×12 flat head | 4 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
-| #4 × 3/8" | 24 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain anchor 2 |
-| M5 shoulder bolt with pulley | 3 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
-| Wago 5-slot | 2 | main electronics rear |
-| Wago 3-slot | 2 | right gantry holder rear |
+| Fastener | Qty | Unit | Line total | Goes into |
+|---|---|---|---|---|
+| M4 heat-set insert (long) | 21 | $0.25 | $5.25 | gantry holders 13, electronics rear 4, sub hubs 4 |
+| M3 heat-set insert (long) | 8 | $0.24 | $1.92 | V-slot adapter 6, right gantry holder front 2 |
+| M5 heat-set insert (short) | 4 | $0.25 | $1.00 | V-slot adapter |
+| M4×16 socket cap | 18 | $0.07 | $1.26 | M4 inserts — gantry holders 10, electronics rear 4, sub hubs 4 |
+| M5×16 socket cap | 10 | $0.08 | $0.80 | 2 into the VITTSJÖ frame, one per rear holder · 8 into T-nuts in the V-slot rail, 4 from the adapter and 2 from each cover |
+| M3 socket cap, length TBD | 12 | $0.05 | $0.60 | 6 into the adapter's M3 inserts, from the two gantry faces · 2 into the right gantry holder front's inserts, holding the pump · 4 into the motor's own tapped holes |
+| M5×12 flat head | 4 | $0.40 | $1.60 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
+| #4 × 3/8" | 24 | $0.08 | $1.92 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain anchor 2 |
+| M5 shoulder bolt with pulley | 3 | $0.50 | $1.50 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
+| Wago 5-slot | 2 | $0.50 | $1.00 | main electronics rear |
+| Wago 3-slot | 2 | $0.30 | $0.60 | right gantry holder rear |
+| **Total** | **108** | | **$17.45** | |
 
-**33 heat-set inserts, 71 fasteners and 4 Wago connectors per planter.**
+**33 heat-set inserts, 71 fasteners and 4 Wago connectors per planter —
+$17.45 of hardware.**
 
-Worth re-running after any edit, because it has caught two errors already:
+The inserts are $8.17 of that, nearly half the cost from under a third of
+the pieces, which is what a $0.25 part does next to a $0.05 one. Worth knowing
+before redesigning a part to add two more bosses.
+
+Against the filament: 1,424 g is roughly $30–36 at typical PETG pricing, so
+**$48–54 of raw material per planter** for everything printed and everything
+holding it together.
+
+**The thread-by-thread check**, worth re-running after any edit because it
+has caught two errors already:
 
 - **M4 balances.** 21 inserts against 18 M4×16 plus 3 shoulder bolts.
 - **M5 balances.** The adapter's 4 inserts take the 4 M5×12 flat heads; all
