@@ -13,7 +13,7 @@ RESPONSE_MARGIN_SECONDS = 30.0
 
 
 class PumpController:
-    """Drives the pump through Klipper's output_pin on the HE0 MOSFET."""
+    """Drives the pump through Klipper's output_pin on the HB MOSFET."""
 
     def __init__(
         self,

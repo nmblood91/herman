@@ -32,11 +32,11 @@ Herman uses a 12V primary bus with a DC-DC converter for 5V logic. All component
     ├─→ [2A Inline Fuse Holder] ─→ LED strip +12V
     └─→ BTT SKR Mini E3 V2 (main power input)
              │
-             └─→ HE0 connector ─→ [1A Inline Fuse Holder] ─→ 12V Peristaltic Pump
+             └─→ HB connector ─→ [1A Inline Fuse Holder] ─→ 12V Peristaltic Pump
 ```
 
 **The pump hangs off the SKR, not off the busbar**, so Klipper can switch it.
-HE0's mosfet switches the pump's *return* path to ground; the connector's
+HB's mosfet switches the pump's *return* path to ground; the connector's
 12/24V pin is the board's own input rail and is live whenever the board is.
 See [deploy/README.md](deploy/README.md) for the connector-level wiring.
 
@@ -49,24 +49,24 @@ See [deploy/README.md](deploy/README.md) for the connector-level wiring.
 - **Purpose:** Protects entire system from shorts in busbar or downstream
 
 ### Pump Circuit Protection
-- **Location:** SKR HE0 "12/24V" pin → the `+` junction block, upstream of where
+- **Location:** SKR HB "12/24V" pin → the `+` junction block, upstream of where
   the diode and the pump lead branch off
 - **Type:** Fast-blow glass fuse
 - **Rating:** 1A
 - **Purpose:** Protects the pump circuit, and is the only thing standing between
-  a reversed flyback diode and the HE0 mosfet
+  a reversed flyback diode and the HB mosfet
 
 **Why it sits on the pump's positive lead.** The pump's current path is
-SKR VIN → HE0 12/24V pin → pump (+) → motor → pump (−) → PC8 → mosfet → ground.
+SKR VIN → HB 12/24V pin → pump (+) → motor → pump (−) → PC9 → mosfet → ground.
 Only a fuse somewhere in that loop protects anything. A fuse on a *second* wire
-run from the busbar to the HE0 12/24V pin protects nothing, because that pin is
+run from the busbar to the HB 12/24V pin protects nothing, because that pin is
 already the same node as the busbar — it is the board's own input rail brought
 out to the connector.
 
 **Why upstream of the junction, not on the pump branch.** The `+` block joins
 three conductors: the feed, the diode cathode, and the pump lead. Fused upstream,
 the fuse is in series with every path through that node. Fused on the pump branch
-instead, a reversed diode shorts `12V → diode → PC8 → mosfet → GND` without ever
+instead, a reversed diode shorts `12V → diode → PC9 → mosfet → GND` without ever
 crossing it, leaving only the 5A main fuse — which the mosfet does not survive
 waiting for. See [deploy/README.md](deploy/README.md).
 
@@ -167,7 +167,7 @@ joints have to open for service without a soldering iron.
 | Wago → SKR | 0.6 A | (5 A main) | **14 AWG** |
 | Wago → DC-DC converter | 0.25 A | (5 A main) | **14 AWG** |
 | Wago → LED strip, ~750 mm | 1.5 A peak | 2 A | **18 AWG** |
-| E0 → pump, ~500 mm | 0.3 A | 1 A | **18 AWG** |
+| HB → pump, ~500 mm | 0.3 A | 1 A | **18 AWG** |
 | LED data, Pi ground reference | signal | — | 22 AWG |
 
 **Gauge here is set by the fuse, not by the length.** Nothing in this machine
@@ -218,8 +218,8 @@ carry. They are short runs, so this costs nothing but stiffness.
 - Keep fuses accessible for quick replacement
 
 ### Pump Wiring
-- 18 AWG, straight into the E0 screw terminal — see *Wire gauge* above
-- Both pump leads land on the SKR's HE0 connector, not on the busbar — that is
+- 18 AWG, straight into the HB screw terminal — see *Wire gauge* above
+- Both pump leads land on the SKR's HB connector, not on the busbar — that is
   what lets Klipper switch it
 - The flyback diode and the pump leads meet at a pair of 3-way lever connectors
   beside the pump, rather than being soldered to the pump terminals. The diode
@@ -238,7 +238,7 @@ carry. They are short runs, so this costs nothing but stiffness.
 
 1. **Always fuse the main charger output** — protects against internal shorts
 2. **Use fast-blow fuses** — electronics need quick response; slow-blow is for motors
-3. **Flyback diode across the pump terminals** — Required, not optional. HE0's
+3. **Flyback diode across the pump terminals** — Required, not optional. HB's
    mosfet expects a resistive heater; an inductive motor kicks the switched
    terminal above +12V at turn-off and can destroy it. Striped end to pump
    positive. Wiring and part number in [deploy/README.md](deploy/README.md)

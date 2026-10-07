@@ -161,12 +161,20 @@ path: ~/printer_data/gcodes
 [display_status]
 [respond]
 
-# Pump on the HE0 MOSFET, switching whatever the board is fed (12V here).
-# Deliberately not a [heater_generic]: that requires a temperature sensor, and
-# verify_heater would fault mid-dose when commanded heat produces no rise.
+# Pump on the HB (bed) MOSFET, switching whatever the board is fed (12V here).
+#
+# The bed output rather than HE0, though either would work electrically: both
+# are low-side MOSFETs with the board's VIN rail on the other pin. HB wins on
+# wiring -- a screw terminal taking 18 AWG directly, and a MOSFET sized for a
+# 10A bed heater, so a 0.3A pump never troubles it. HE0 is left free as the
+# spare switched output.
+#
+# Deliberately not a [heater_bed] or [heater_generic]: both require a
+# temperature sensor, and verify_heater would fault mid-dose when commanded
+# heat produces no rise.
 # shutdown_value stops the pump if Klipper errors out partway through watering.
 [output_pin pump]
-pin: PC8
+pin: PC9
 value: 0
 shutdown_value: 0
 

@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     klipper_host: str = "/run/klipper/uds"
     moisture_sensor_addresses: str = "54,55,56,57"
     # Name of the [output_pin] section in printer.cfg, not a GPIO number: the
-    # pump hangs off the SKR's HE0 MOSFET and is switched by Klipper.
+    # pump hangs off the SKR's HB MOSFET and is switched by Klipper.
     pump_pin_name: str = "pump"
     # 100 mL/min rated, and that rating assumes no head pressure. Real delivery
     # through lift and tubing runs lower, so measure against a real dose: this

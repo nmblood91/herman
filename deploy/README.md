@@ -450,8 +450,8 @@ own pinout for the Mini E3 V2.0:
 |---|---|---|---|
 | Corner | POWER | 12/24V, GND | power **in** |
 | 2nd | +POWER- | VIN, GND | power **in**, parallel with the corner |
-| 3rd | - HB + | PC9, 12/24V | heated bed output — **spare** |
-| 4th | - E0 + | PC8, 12/24V | hotend output — **the pump** |
+| 3rd | - HB + | PC9, 12/24V | bed output — **the pump** |
+| 4th | - E0 + | PC8, 12/24V | hotend output — **spare** |
 
 Two things to take from that table.
 
@@ -463,65 +463,66 @@ E0 by mistake is the one genuinely damaging error here — the board appears to
 power up while the supply's return sits on a MOSFET drain instead of ground.
 
 **The silkscreen marks polarity**, so there is no guessing at the terminal:
-`- E0 +` means the left screw is PC8 and the right is 12/24V. Pump positive
+`- HB +` means the left screw is PC9 and the right is 12/24V. Pump positive
 goes to the `+` screw through the fuse; pump negative goes to `-`.
 
 ### Spare switched outputs
 
-Three MOSFET outputs go unused, all low-side like E0 and all usable the same
+Three MOSFET outputs go unused, all low-side like HB and all usable the same
 way with an `[output_pin]` section:
 
 | Output | Pin | Connector |
 |---|---|---|
-| HB (bed) | PC9 | screw terminal, sized for a 10 A+ bed |
+| E0 (hotend) | PC8 | screw terminal |
 | FAN0 | PC6 | 2-pin header |
 | FAN1 | PC7 | 2-pin header |
 
-HB is the one to reach for if anything else ever needs switching — a second
-pump, a solenoid, a box fan — because it takes real wire without a crimp. Z-STOP
-(PC2) is also free as a spare input.
+E0 is the one to reach for if anything else ever needs switching — a second
+pump, a solenoid, a box fan — because like HB it takes real wire without a
+crimp. Z-STOP (PC2) is also free as a spare input.
 
 ## Wiring the Pump to SKR Board
 
-The peristaltic pump is controlled via the SKR's **E0 connector** on the
+The peristaltic pump is controlled via the SKR's **HB (bed) connector** on the
 bottom edge of the board, which is how Klipper can switch it on and off. It is
-a screw terminal, so 18 AWG lands in it directly.
+a screw terminal, so 18 AWG lands in it directly, and its MOSFET is sized for
+a 10 A+ bed heater — so a 0.3 A pump never troubles it.
 
-**HE0 switches the ground side, not the positive side.** The mosfet sits between
-PC8 and ground. The connector's other pin is the board's own 12V input rail
+**HB switches the ground side, not the positive side.** The mosfet sits between
+PC9 and ground. The connector's other pin is the board's own 12V input rail
 brought out, so it is live whenever the SKR is powered — but the pump does not
-run, because its return path through PC8 stays open until Klipper closes the
+run, because its return path through PC9 stays open until Klipper closes the
 mosfet.
 
 That is worth being clear about, because it decides where the fuse goes. The
 pump's current path is:
 
 ```
-SKR VIN → HE0 12/24V pin → pump (+) → motor → pump (−) → PC8 → mosfet → GND
+SKR VIN → HB 12/24V pin → pump (+) → motor → pump (−) → PC9 → mosfet → GND
 ```
 
 A fuse protects the pump only if it sits somewhere in *that* loop.
 
-**Wiring — both pump leads land on HE0:**
+**Wiring — both pump leads land on HB:**
 ```
-HE0 "12/24V" ──[1A Pump Fuse]──→ Pump (+)
-HE0 "PC8"    ──────────────────→ Pump (−)
+HB "12/24V" ──[1A Pump Fuse]──→ Pump (+)
+HB "PC9"    ──────────────────→ Pump (−)
 ```
 
 **Connection summary:**
-- HE0 12/24V pin → 1A fuse → pump positive
-- Pump negative → HE0 PC8 pin
+- HB 12/24V pin → 1A fuse → pump positive
+- Pump negative → HB PC9 pin
 - Nothing from the pump goes to the busbar — the SKR's own power feed supplies it
-- If your HE0 connector has a third GND pin, it is unused here; the mosfet
-  already grounds the pump through PC8
+- If your HB connector has a third GND pin, it is unused here; the mosfet
+  already grounds the pump through PC9
 
-Pump (+) could equally be taken from the busbar, since the HE0 12/24V pin is
+Pump (+) could equally be taken from the busbar, since the HB 12/24V pin is
 electrically the same node. Keeping the pair together at the connector just
 means one plug to pull and one fuse unambiguously in series with the motor.
 
 ### Flyback diode (required)
 
-HE0's mosfet is designed for a heater cartridge, which is purely resistive. A
+HB's mosfet is designed for a heater cartridge, which is purely resistive. A
 pump is an inductive motor: when the mosfet switches off, the collapsing field
 drives the negative terminal above +12V, and that spike can destroy the mosfet.
 A flyback diode gives the current a loop through the motor winding instead.
@@ -530,7 +531,7 @@ Fit it **across the pump's own two terminals**, in parallel with the motor — n
 inline with a wire, and not at the board end.
 
 ```
-  HE0 "12/24V"
+  HB "12/24V"
        │
   [1A Pump Fuse]        in series, at the board end
        │
@@ -544,15 +545,15 @@ inline with a wire, and not at the board end.
        │              │
        ├──────────────┘
        │
-  HE0 "PC8"  ──→ mosfet ──→ GND
+  HB "PC9"  ──→ mosfet ──→ GND
 ```
 
 **Striped end (cathode) to the positive terminal.** Orientation is not optional.
-Reversed, the diode is forward-biased from +12V toward PC8, which is a dead
+Reversed, the diode is forward-biased from +12V toward PC9, which is a dead
 short through the mosfet.
 
 It does not short at power-up, though, and that is worth being precise about:
-the diode's path to ground runs through PC8, and the mosfet holds that open
+the diode's path to ground runs through PC9, and the mosfet holds that open
 until Klipper switches it. **A reversed diode draws nothing until the first time
 the pump is commanded on**, and blows the 1A fuse then. So a clean power-up is
 not evidence the diode is the right way round — check continuity before
@@ -568,7 +569,7 @@ the pump's positive lead. A fuse upstream of that branch point is in series with
 every path through it. A fuse on the pump branch alone protects only the pump,
 and leaves two faults uncovered:
 
-- **A reversed diode.** Its fault path is `12V → diode → PC8 → mosfet → GND`,
+- **A reversed diode.** Its fault path is `12V → diode → PC9 → mosfet → GND`,
   which never passes through a fuse sitting on the pump branch. That short is
   then held back only by the 5A main fuse, and the mosfet fails long before a 5A
   fast-blow responds. The component the diode protects is destroyed by the diode.
@@ -593,7 +594,7 @@ joint you cannot check. All three slots of a lever connector are one node
 internally, so each block becomes a junction of three conductors:
 
 ```
-  SKR HE0 "12/24V" ──[1A fast-blow]──┐
+  SKR HB "12/24V" ──[1A fast-blow]──┐
                                      │
                           ┌──────────┴──────────┐
                           │  "+" BLOCK (3-way)  │   fused feed · cathode · pump+
@@ -603,10 +604,10 @@ internally, so each block becomes a junction of three conductors:
                                ▲  1N5822
                                │
                           ┌────┴─────────────────┐
-                          │  "−" BLOCK (3-way)   │   PC8 · anode · pump−
+                          │  "−" BLOCK (3-way)   │   PC9 · anode · pump−
                           └────┬──────────┬──────┘
                                │          └──────────→ Pump (−)
-  SKR HE0 "PC8" ───────────────┘
+  SKR HB "PC9" ───────────────┘
 ```
 
 That puts the diode in parallel with the motor, cathode to positive, downstream
@@ -615,8 +616,8 @@ of the fuse — the topology the diagram above describes. Four things to respect
 - **Keep the block-to-pump leads short**, under about 10 cm, with the two leads
   running together. Wire between the diode and the winding is unprotected
   inductance, which is the whole thing the diode exists to absorb.
-- **The "+" block is live whenever the SKR is powered.** HE0's 12/24V pin is the
-  board's input rail, not a switched output — the pump is off because PC8 is
+- **The "+" block is live whenever the SKR is powered.** HB's 12/24V pin is the
+  board's input rail, not a switched output — the pump is off because PC9 is
   open, not because the positive side is dead. Power the board down before
   opening the block, and do not assume an idle pump means a safe node.
 - **Seat the diode leads fully.** They are stiff 0.9 mm solid wire, within a
@@ -638,7 +639,7 @@ The pump is declared in `printer.cfg` as an `[output_pin]`, not a heater:
 
 ```
 [output_pin pump]
-pin: PC8
+pin: PC9
 value: 0
 shutdown_value: 0
 ```
@@ -980,7 +981,7 @@ Dress the wiring as **two groups that do not run alongside each other**:
   POWER / MOTION  (may share one bundle)      SIGNAL  (separate runs)
   ────────────────────────────────────        ──────────────────────────
   stepper motor leads                         I2C soil sensor tree
-  pump power (HE0 pair)                       LED data line to GPIO10
+  pump power (HB pair)                       LED data line to GPIO10
   X endstop pair (X-STOP)                     camera ribbon
 ```
 
