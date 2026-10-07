@@ -443,8 +443,13 @@ full traverse of the rail after every home, so raise the feedrate in
 
 ## The SKR's power connector edge
 
-Four blocks along the bottom edge, and three of them look alike. From BTT's
-own pinout for the Mini E3 V2.0:
+![BTT SKR Mini E3 V2.0 pinout](images/skr-mini-e3-v2-pinout.png)
+
+*BigTreeTech's own pinout for the Mini E3 V2.0, kept here so the board can be
+read without going hunting. Every pin this project uses is on it, and the
+tables below are taken from it rather than from memory.*
+
+Four blocks along the bottom edge, and three of them look alike:
 
 | Block | Silkscreen | Pins | What it is |
 |---|---|---|---|
