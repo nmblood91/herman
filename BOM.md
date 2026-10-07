@@ -12,21 +12,22 @@ cannot be subtotalled yet.
 
 | Section | Priced so far | Lines still to price |
 |---|---|---|
-| Core structure | $152.00 | 2 — drive pulley, tensioner |
+| Core structure | $156.00 | complete |
 | Printed parts — filament | ~$30–36 | complete |
 | Printed parts — fasteners and inserts | $18.95 | complete |
 | Motion and control | $43.00 | 1 — wiring harness |
 | Compute and monitoring | $40.00 | complete for the base build |
-| Sensing | $63.00 | complete |
+| Sensing | $69.00 | complete |
 | Watering system | $35.00 | 2 — intake weight, level sensor |
 | Lighting | $10.00 | 2 — hook-up wire, connectors |
-| Power and electronics | $27.00 | 9 — fuses, fuse holders, level shifter, wire in three gauges, heat shrink |
-| **Running total** | **~$419–425** | **17 lines outstanding** |
+| Power and electronics | $27.00 | 9 — fuses, fuse holders, level shifter, wire, heat shrink |
+| **Running total** | **~$429–435** | **15 lines outstanding** |
 
-Close to final. What is left is three fuses and their holders, a level
-shifter, wire and heat shrink, plus the drive pulley, the belt tensioner, the
-intake weight and the liquid level sensor. Call it another $25, which puts a
-finished prototype around **$445**.
+Close to final. The frame, motion, compute and sensing are all fully costed.
+What is left is small electrical hardware — three fuses and their holders, the
+level shifter, wire, connectors and heat shrink — plus the intake weight and
+the liquid level sensor. Call it another $25, which puts a finished prototype
+around **$455**.
 
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
 there is no bought nozzle — the tube is held by a printed part.
@@ -39,7 +40,7 @@ there is no bought nozzle — the tube is held by a printed part.
 | 2020 aluminium extrusion rail, 1000 mm | 1 | $50.00 | $50.00 | VBX.com; comes with the gantry plate. 890 mm usable travel |
 | T nuts | 4 | $0.50 | $2.00 | to secure rail |
 | GT2 belt | 1 | $4.00 | $4.00 | roughly twice the rail plus pulley wrap, so about 2.1 m |
-| GT2 drive pulley | 1 | $2.00  | $2.00  | motor end |
+| GT2 drive pulley | 1 | $2.00 | $2.00 | motor end |
 | GT2 idler pulley | 3 | $2.00 | $6.00 | ride on the shoulder bolts in the gantry holder fronts |
 | NEMA 17 stepper motor | 1 | $10.00 | $10.00 | right-hand gantry holder |
 | Belt tensioner block | 1 | $2.00 | $2.00 |  |
@@ -128,13 +129,17 @@ and the development boards. Live streaming is out of scope, see
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | Capacitive soil moisture sensor (Adafruit STEMMA) + cable | 4 | $12.00 | $48.00 | one per plant; price includes the sensor's own STEMMA QT cable |
-| STEMMA QT 5-port passive hub | 3 | $3.00 | $9.00 | one master to the Pi, plus a left and a right sub hub |
+| STEMMA QT 5-port passive hub | 4 | $3.00 | $12.00 | two sub hubs and a master on the front rail, plus a junction hub at the Pi |
 | STEMMA QT cable, 300 mm | 1 | $3.00 | $3.00 | left sub hub to master |
-| STEMMA QT cable, 400 mm | 1 | $3.00 | $3.00 | right sub hub to master |
+| STEMMA QT cable, 400 mm | 2 | $3.00 | $6.00 | right sub hub to master, and master to the back hub |
 
-**Three hubs, confirmed against the build.** A master hub wired back to the
-Pi, and a left and a right sub hub feeding two sensors each, with measured
-300 mm and 400 mm runs from the subs to master.
+**Four hubs.** The fan-out lives on the front rail with the plants — a left
+and a right sub hub feeding two sensors each, into a front master — and a
+fourth on the back rail joins that to the Pi. The back one is a junction
+rather than a fan-out, which is cheaper than sourcing a single cable long
+enough to span the whole path. Moving the bus off the back rail also takes it
+away from the stepper, the pump and the LED data line; see
+[SENSOR_WIRING.md](SENSOR_WIRING.md).
 
 Three sensor address pads (A0/A1) give the sensors unique I2C addresses; those
 are solder pads on the sensors rather than a purchased part.

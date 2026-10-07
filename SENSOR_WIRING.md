@@ -30,15 +30,27 @@ Configure sensor addresses using the A0 and A1 address pads on each sensor accor
 
 ## Sensor Hub Layout
 
-Three 5-port passive hubs, not one. A master beside the Pi and a sub hub at
-each end of the rail, which is what keeps the sensor runs short enough to be
-sensible rather than trailing four long cables back to a single point.
+Four 5-port passive hubs. The three that do the fan-out live on the **front**
+rail with the plants; the fourth sits on the back rail where the Pi is, and
+joins the two.
 
-| Hub | Ports used | To |
-|---|---|---|
-| Master | 3 of 5 | the Pi · the left sub hub (300 mm) · the right sub hub (400 mm) |
-| Left sub | 3 of 5 | master · two soil sensors |
-| Right sub | 3 of 5 | master · two soil sensors |
+| Hub | Where | Ports used | To |
+|---|---|---|---|
+| Left sub | front | 3 of 5 | front master · two soil sensors |
+| Right sub | front | 3 of 5 | front master · two soil sensors |
+| Front master | front | 3 of 5 | both sub hubs (300 mm and 400 mm) · the back hub (400 mm) |
+| Back hub | back | 2 of 5 | the front master · the Pi (100 mm) |
+
+**The back hub is a junction, not a fan-out** — two ports used, and nothing
+else hangs off it. It is there because the Pi cable lands on the back rail and
+joining two stock cables end to end is easier than sourcing one long enough to
+span the whole path. Worth knowing before anyone decides it looks redundant
+and removes it: the replacement is a single cable longer than any in the kit.
+
+Putting the sensor bus on the front rail is not only about clutter. The back
+rail carries the stepper, the LED data line and the pump, and running I2C
+alongside an 800 kHz LED data line causes more trouble than cable capacitance
+ever will.
 
 The hubs are passive, so this is still electrically **one** bus. Which sub hub
 a sensor hangs off changes nothing about its address — that is set by the A0

@@ -45,7 +45,7 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 | Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3 (pump, into inserts), 4 × M3 (motor, into motor) | 2 | 1 | 0 | 0 |
 | Left gantry cover | 1 | 10 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
 | Right gantry cover | 1 | 35 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
-| Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short), 6 × M3 (long) | 4 × M5×16 | 0 | 0 | 4 × M5×12 | 0 |
+| Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short), 1 x M4(short) 6 × M3 (long) | 4 × M5×16 1 x M4x? | 0 | 0 | 4 × M5×10 | 0 |
 | Gantry face top | 1 | 50 g | 0 | 4 × M3 | 0 | 0 | 0 | 0 |
 | Gantry face bottom (nozzle holder) | 1 | 50 g | 0 | 2 × M3 | 0 | 0 | 0 | 0 |
 | Main electronics, rear | 1 | 270 g | 4 × M4 (long) | 4 × M4×16 | 12 | 0 | 0 | 2 × 5-slot |

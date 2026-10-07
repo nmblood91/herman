@@ -640,32 +640,37 @@ which the Pi's pins are not tolerant of.
 
 ### Cable length and bus capacitance
 
-The soil sensors hang off a hub tree rather than home runs back to the Pi. As
-built:
+The soil sensors hang off a hub tree rather than home runs back to the Pi. The
+fan-out is on the front rail with the plants; a fourth hub on the back rail
+joins it to the Pi:
 
 | Run | Length |
 |---|---|
 | 4 × sensor drops into the two sub-hubs | 150 mm each |
-| Left sub-hub → master hub | 300 mm |
-| Right sub-hub → master hub | 400 mm |
-| Master hub → Pi | 100 mm |
-| **Total** | **≈ 1.4 m** |
+| Left sub-hub → front master | 300 mm |
+| Right sub-hub → front master | 400 mm |
+| Front master → back hub | 400 mm |
+| Back hub → Pi | 100 mm |
+| **Total** | **≈ 1.8 m** |
 
 The two sub-hub runs do not have to match — they are separate branches, and only
 the total matters. The right side needed 400 mm to reach; the left came in at
-300 mm.
+300 mm. The sensor drops are the figures from the back-rail layout and should
+shrink now the hubs sit nearer the pots; re-measure them and redo the sum.
 
 **Total bus capacitance is what matters, not the longest run**, and it is the sum
-of every branch. I2C allows 400 pF; at roughly 60 pF/m that 1.4 m contributes
-about 85 pF, plus ~10 pF per sensor pin and a little for the three hub boards.
-Call it 135 pF, so about a third of budget. The tree also uses *less* cable than
+of every branch. I2C allows 400 pF; at roughly 60 pF/m that 1.8 m contributes
+about 108 pF, plus ~10 pF per sensor pin and a little for the four hub boards.
+Call it 163 pF, so about 40% of budget. The tree also uses *less* cable than
 home running each sensor would.
 
 If your runs differ, redo that sum rather than comparing against the total here —
 the figure that matters is the sum of every branch, not the longest one.
 
-**Measured, as a baseline.** A 120 s soak on this layout at 50 kHz, with the
-harness open and nothing else in the loom:
+**Measured, as a baseline.** A 120 s soak at 50 kHz with the harness open and
+nothing else in the loom. Taken on the earlier three-hub layout with everything
+on the back rail, so it is the number the front-rail tree has to match rather
+than a measurement of it:
 
 ```
 addr     reads  errors    rate  raw min/mean/max       verdict
@@ -676,7 +681,9 @@ addr     reads  errors    rate  raw min/mean/max       verdict
 ```
 
 1896 reads, no errors, and a raw spread of only 6-13 counts per address — so the
-bus is quiet, not merely working. Worth keeping as the reference point: once the
+bus was quiet, not merely working. Re-soak after moving the hubs and keep that
+result as the new baseline; matching this means the extra hub and the extra
+400 mm cost nothing. Worth keeping as the reference point: once the
 LED data line and stepper leads are in the loom, a soak that degrades against
 this is a routing problem rather than a cable-length or pull-up problem, which
 narrows the search considerably.
