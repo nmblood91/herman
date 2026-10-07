@@ -167,7 +167,7 @@ joints have to open for service without a soldering iron.
 | Wago → SKR | 0.6 A | (5 A main) | **14 AWG** |
 | Wago → DC-DC converter | 0.25 A | (5 A main) | **14 AWG** |
 | Wago → LED strip, ~750 mm | 1.5 A peak | 2 A | **18 AWG** |
-| HE0 → pump, ~500 mm | 0.3 A | 1 A | **18 AWG** (20 AWG is fine) |
+| E0 → pump, ~500 mm | 0.3 A | 1 A | **18 AWG** |
 | LED data, Pi ground reference | signal | — | 22 AWG |
 
 **Gauge here is set by the fuse, not by the length.** Nothing in this machine
@@ -206,9 +206,6 @@ not separately fused — a fault on either draws until the 5 A main blows, so
 they are sized for 5 A rather than for the 0.6 A and 0.25 A they actually
 carry. They are short runs, so this costs nothing but stiffness.
 
-The pump is the one place to use judgement at the connector end: 18 AWG is
-electrically right, but if the HE0 housing will not take an 18 AWG crimp
-cleanly, 20 AWG carries 1.5 A and the pump circuit is fused at 1 A.
 
 ### Fuse Holders
 - Inline fuse holders with **16 AWG or larger wire leads**. Their own pigtails
@@ -221,7 +218,7 @@ cleanly, 20 AWG carries 1.5 A and the pump circuit is fused at 1 A.
 - Keep fuses accessible for quick replacement
 
 ### Pump Wiring
-- 18 AWG, or 20 AWG if the HE0 crimp is tight — see *Wire gauge* above
+- 18 AWG, straight into the E0 screw terminal — see *Wire gauge* above
 - Both pump leads land on the SKR's HE0 connector, not on the busbar — that is
   what lets Klipper switch it
 - The flyback diode and the pump leads meet at a pair of 3-way lever connectors
