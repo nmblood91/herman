@@ -42,9 +42,10 @@ to the Pi.
 | Junction | at the electronics box | 2 of 5 | the front master · the Pi |
 
 **The hubs hang rather than lie flat.** Turned ninety degrees so they sit over
-the plants, each sub hub ends up more or less above the two pots it serves,
-which turns the sensor drops into short vertical runs instead of diagonals
-across the shelf.
+the plants, each sub hub ends up more or less above the two pots it serves.
+The sensor cable is a stock 150 mm either way, so what this buys is not less
+cable but a shorter path with slack in it — which means the probe can go where
+it should sit in the pot rather than wherever the cable happened to reach.
 
 Two things to check once they are hanging, both consequences of putting a
 bare board above a pot that gets watered:

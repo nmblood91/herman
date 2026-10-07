@@ -655,10 +655,12 @@ electronics box joins it to the Pi:
 
 The two sub-hub runs do not have to match — they are separate branches, and only
 the total matters. The right side needed 400 mm to reach; the left came in at
-300 mm. The sensor drops are the figures from the back-rail layout. With the hubs
-turned ninety degrees to hang over the plants, each sub hub sits roughly above
-the pots it serves and the drops become short vertical runs — re-measure them
-and redo the sum, which should come out under the 1.8 m above.
+300 mm.
+
+The sensor drops stay at 150 mm wherever the hubs are: that is the cable the
+sensor comes with, so hanging the hubs closer buys a tidier route and freer
+probe placement rather than less cable. The 1.8 m total and the capacitance
+below are the real figures, not a stage on the way to something shorter.
 
 **Total bus capacitance is what matters, not the longest run**, and it is the sum
 of every branch. I2C allows 400 pF; at roughly 60 pF/m that 1.8 m contributes
