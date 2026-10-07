@@ -441,10 +441,51 @@ full traverse of the rail after every home, so raise the feedrate in
 `position_endstop` sitting at the top of the range, but then a later edit to
 `position_max` could silently reverse which way the carriage homes.
 
+## The SKR's power connector edge
+
+Four blocks along the bottom edge, and three of them look alike. From BTT's
+own pinout for the Mini E3 V2.0:
+
+| Block | Silkscreen | Pins | What it is |
+|---|---|---|---|
+| Corner | POWER | 12/24V, GND | power **in** |
+| 2nd | +POWER- | VIN, GND | power **in**, parallel with the corner |
+| 3rd | - HB + | PC9, 12/24V | heated bed output — **spare** |
+| 4th | - E0 + | PC8, 12/24V | hotend output — **the pump** |
+
+Two things to take from that table.
+
+**The `+` on every block is the same node.** It is the board's VIN rail
+brought out, live whenever the SKR is powered. Only the `-` differs: on POWER
+it is ground, and on HB and E0 it is that output's MOSFET drain. This is why
+the pump fuse goes in the positive leg, and why putting the supply into HB or
+E0 by mistake is the one genuinely damaging error here — the board appears to
+power up while the supply's return sits on a MOSFET drain instead of ground.
+
+**The silkscreen marks polarity**, so there is no guessing at the terminal:
+`- E0 +` means the left screw is PC8 and the right is 12/24V. Pump positive
+goes to the `+` screw through the fuse; pump negative goes to `-`.
+
+### Spare switched outputs
+
+Three MOSFET outputs go unused, all low-side like E0 and all usable the same
+way with an `[output_pin]` section:
+
+| Output | Pin | Connector |
+|---|---|---|
+| HB (bed) | PC9 | screw terminal, sized for a 10 A+ bed |
+| FAN0 | PC6 | 2-pin header |
+| FAN1 | PC7 | 2-pin header |
+
+HB is the one to reach for if anything else ever needs switching — a second
+pump, a solenoid, a box fan — because it takes real wire without a crimp. Z-STOP
+(PC2) is also free as a spare input.
+
 ## Wiring the Pump to SKR Board
 
-The peristaltic pump is controlled via the SKR's **HE0 (heater) connector** on
-the bottom edge of the board, which is how Klipper can switch it on and off.
+The peristaltic pump is controlled via the SKR's **E0 connector** on the
+bottom edge of the board, which is how Klipper can switch it on and off. It is
+a screw terminal, so 18 AWG lands in it directly.
 
 **HE0 switches the ground side, not the positive side.** The mosfet sits between
 PC8 and ground. The connector's other pin is the board's own 12V input rail

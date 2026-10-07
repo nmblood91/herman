@@ -50,9 +50,9 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 | Gantry face bottom (nozzle holder) | 1 | 50 g | 0 | 2 × M3 | 0 | 0 | 0 | 0 |
 | Main electronics, rear | 1 | 270 g | 4 × M4 (long) | 4 × M4×16 | 12 | 0 | 0 | 2 × 5-slot |
 | Main electronics, front | 1 | 120 g | 0 | 0 | 0 | 0 | 0 | 0 |
-| Left STEMMA QT sub hub, rear | 1 | 85 g | 2 × M4 (long) | 2 × M4×16 | 4 | 0 | 0 | 0 |
+| Left STEMMA QT sub hub, rear | 1 | 85 g | 4 × M4 (long) | 4 × M4×16 | 4 | 0 | 0 | 0 |
 | Left STEMMA QT sub hub, front | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
-| Right STEMMA QT sub hub, rear | 1 | 85 g | 2 × M4 (long) | 2 × M4×16 | 4 | 0 | 0 | 0 |
+| Right STEMMA QT sub hub, rear | 1 | 85 g | 4 × M4 (long) | 4 × M4×16 | 4 | 0 | 0 | 0 |
 | Right STEMMA QT sub hub, front | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Cable chain for water tube | 50 links | 150 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Cable chain anchor | 1 | 3 g | 0 | 0 | 2 | 0 | 0 | 0 |
