@@ -15,10 +15,10 @@ Four tabs, one component each unless noted:
 
 | Tab | Components |
 |---|---|
-| Controls | `ControlsPanel.jsx` — gantry homing and jogging, move-to-plant, water-a-plant, lighting, pump |
+| Controls | `ControlsPanel.jsx` — gantry homing and jogging, dances, move-to-plant, water-a-plant, lighting, pump |
 | Plants | `PlantsPanel.jsx` — per-plant current moisture, plus an expandable settings form for name, light window, target, dose volume and rail position |
 | Sensors | `HistoryPanel.jsx` + `Chart.jsx` for the chart, `CalibrationPanel.jsx` for per-sensor calibration |
-| Settings | `SettingsPanel.jsx` — automatic watering, quiet hours, LED strip type and colour order, planter clock; `LogsPanel.jsx` renders below it |
+| Settings | `SettingsPanel.jsx` — automatic watering, idle motion, quiet hours, LED strip type and colour order, planter clock; `LogsPanel.jsx` renders below it |
 
 ## Local development
 

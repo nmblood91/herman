@@ -114,7 +114,9 @@ the warning.
 ## Quiet hours, and the snooze
 
 The pump and the carriage are the only loud parts of this machine, and it lives
-in a room people sit in. So automatic watering can be held back two ways:
+in a room people sit in. So anything the planter does on its own — watering,
+and the periodic re-home described under *Idle motion* — can be held back two
+ways:
 
 - **Quiet hours** — a nightly window, set in Settings. A window that ends before
   it starts runs through midnight, so 21:00 to 08:00 means overnight.
@@ -123,9 +125,9 @@ in a room people sit in. So automatic watering can be held back two ways:
 
 Two things worth knowing about both:
 
-**Watering you ask for yourself is never blocked.** Pressing Water on a plant
-runs it immediately, quiet hours or not. You are standing there; you already
-know the noise is coming.
+**Anything you ask for yourself is never blocked.** Pressing Water on a plant,
+or running a routine, happens immediately, quiet hours or not. You are standing
+there; you already know the noise is coming.
 
 **A thirsty plant is deferred, not skipped.** The check runs every minute
 regardless, so a pot that crosses its threshold at midnight is watered on the
@@ -137,6 +139,39 @@ A snooze is stored as a moment in time rather than a countdown, so it survives
 a restart with the right amount left — and one that expired while the planter
 was powered off is simply gone, rather than resuming for its remaining hours
 at some arbitrary later date.
+
+## Idle motion
+
+Every hour by default, the planter homes the arm and runs a short routine —
+*Stretch*, *Wave*, *Shuffle* or *Patrol*, cycling through them. Both halves of
+that are switchable in Settings.
+
+**The re-home is the part that earns it.** The motor is open-loop: nothing
+tells the planter where the carriage actually is, only where it has been told
+to go. A belt that slips a tooth, or a carriage nudged while you are watering
+a plant by hand, leaves every saved position quietly wrong — and it stays
+wrong until the next home, which otherwise might be the next reboot. Hourly
+caps that at an hour.
+
+The routine on the end is there because a machine that only moves to water
+looks broken the rest of the time, and because it makes the re-home visible
+rather than something that happens behind you.
+
+Rules it follows:
+
+- **Held during quiet hours and a snooze**, same as watering. The arm is the
+  other noisy part, and unlike watering, a routine has nowhere urgent to be.
+- **Never delays anything real.** It takes the hardware only if nothing else
+  wants it, and gives up rather than queueing if a watering cycle or a manual
+  pump run is in progress.
+- **Always parks at 0**, the same place homing leaves it.
+- **Routines you start yourself always run**, quiet hours or not, and reset
+  the clock so an automatic one does not follow a minute later.
+
+Patrol is the odd one out: instead of a fixed pattern it visits each plant's
+saved position in turn, pausing at every pot. It is worth watching after
+changing a position, since it shows you where the planter thinks each plant
+is.
 
 ## The half-hour wait, and why it matters
 

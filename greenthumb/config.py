@@ -67,6 +67,14 @@ class Settings(BaseSettings):
     auto_watering_enabled: bool = False
     watering_cooldown_minutes: int = 30
 
+    # Idle motion: re-home and run a short routine on this interval. On by
+    # default -- the re-home is worth having whether or not anyone enjoys the
+    # dance, because an open-loop stepper has no other way to notice that the
+    # carriage is not where Klipper thinks it is. Starting values only; the
+    # Settings tab owns both and persists them.
+    idle_motion_enabled: bool = True
+    idle_motion_minutes: int = 60
+
     # Quiet hours. The pump and the gantry are the only loud parts of this
     # machine, and it lives in a room people sit in. Suppresses *automatic*
     # watering only: a dose you asked for by pressing a button still runs,

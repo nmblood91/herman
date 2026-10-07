@@ -17,6 +17,11 @@ export function SettingsPanel({ overview, onRefresh }) {
   const [autoMsg, setAutoMsg] = useState('')
   const [savingAuto, setSavingAuto] = useState(false)
 
+  const idle = overview?.idle_motion
+  const [idleOn, setIdleOn] = useState(true)
+  const [idleMinutes, setIdleMinutes] = useState(60)
+  const [idleMsg, setIdleMsg] = useState('')
+
   const quiet = overview?.quiet
   const [quietOn, setQuietOn] = useState(false)
   const [quietStart, setQuietStart] = useState('21:00')
@@ -100,6 +105,8 @@ export function SettingsPanel({ overview, onRefresh }) {
     setSyncedOverview(overview)
     setChip(lighting?.chip ?? chip)
     setAutoOn(watering?.auto_watering_enabled ?? autoOn)
+    setIdleOn(idle?.enabled ?? idleOn)
+    setIdleMinutes(idle?.minutes ?? idleMinutes)
     setQuietOn(quiet?.quiet_hours_enabled ?? quietOn)
     setQuietStart(quiet?.quiet_hours_start ?? quietStart)
     setQuietStop(quiet?.quiet_hours_stop ?? quietStop)
@@ -178,6 +185,28 @@ export function SettingsPanel({ overview, onRefresh }) {
       setAutoMsg(`Could not save: ${error.message}`)
     } finally {
       setSavingAuto(false)
+    }
+  }
+
+  // Behind a button rather than saving on each keystroke, like quiet hours:
+  // the interval is a typed number, and halfway through editing 90 it is 9.
+  const saveIdle = async () => {
+    setIdleMsg('')
+    try {
+      const response = await fetch(`${API_BASE}/dances/auto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: idleOn, minutes: Number(idleMinutes) }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setIdleMsg(data.error || `Save failed (HTTP ${response.status})`)
+        return
+      }
+      setIdleMsg('Saved.')
+      onRefresh?.()
+    } catch (error) {
+      setIdleMsg(`Save failed: ${error.message}`)
     }
   }
 
@@ -263,6 +292,43 @@ export function SettingsPanel({ overview, onRefresh }) {
             Choosing a strip type resets this to that chip's usual order, so set
             the type first.
           </p>
+        </div>
+
+        <div className="field-row">
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={idleOn}
+              onChange={(event) => setIdleOn(event.target.checked)}
+            />
+            Move about now and then
+          </label>
+          <div className="slider-row">
+            <label>
+              Every
+              <input
+                type="number"
+                min="5"
+                max="1440"
+                value={idleMinutes}
+                onChange={(event) => setIdleMinutes(event.target.value)}
+              />
+            </label>
+            <span>minutes</span>
+            <button type="button" onClick={saveIdle}>Save</button>
+          </div>
+          <p className="field-hint">
+            Re-homes the arm and runs a short routine on this interval, cycling
+            through them. The re-home is the useful half: nothing tells the
+            planter the arm has been nudged or that a belt slipped, so every
+            plant position stays slightly wrong until it homes again.
+          </p>
+          <p className="field-hint">
+            Held during quiet hours and a snooze, same as watering — the arm is
+            the other noisy part. Routines you start yourself always run.
+            {idle?.last_at ? ` Last moved ${idle.last_at}.` : ''}
+          </p>
+          {idleMsg && <p className="field-hint warning">{idleMsg}</p>}
         </div>
 
         <div className="field-row">

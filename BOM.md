@@ -39,10 +39,10 @@ there is no bought nozzle — the tube is held by a printed part.
 | 2020 aluminium extrusion rail, 1000 mm | 1 | $50.00 | $50.00 | VBX.com; comes with the gantry plate. 890 mm usable travel |
 | T nuts | 4 | $0.50 | $2.00 | to secure rail |
 | GT2 belt | 1 | $4.00 | $4.00 | roughly twice the rail plus pulley wrap, so about 2.1 m |
-| GT2 drive pulley | 1 | TBD | TBD | motor end |
+| GT2 drive pulley | 1 | $2.00  | $2.00  | motor end |
 | GT2 idler pulley | 3 | $2.00 | $6.00 | ride on the shoulder bolts in the gantry holder fronts |
 | NEMA 17 stepper motor | 1 | $10.00 | $10.00 | right-hand gantry holder |
-| Belt tensioning hardware | TBD | TBD | TBD |  |
+| Belt tensioner block | 1 | $2.00 | $2.00 |  |
 
 ## Printed parts
 

@@ -53,6 +53,9 @@ export function ControlsPanel({
   const [pumpStatus, setPumpStatus] = useState('')
   const [lightingError, setLightingError] = useState('')
   const [quietStatus, setQuietStatus] = useState('')
+  const [dances, setDances] = useState([])
+  const [dancing, setDancing] = useState('')
+  const [danceStatus, setDanceStatus] = useState('')
 
   // Follows the server during render rather than in an effect, so the controls
   // never paint one frame of stale values after a refresh.
@@ -160,6 +163,41 @@ export function ControlsPanel({
     }
   }
 
+  useEffect(() => {
+    let cancelled = false
+    async function loadDances() {
+      try {
+        const response = await fetch(`${API_BASE}/dances`)
+        if (!response.ok || cancelled) return
+        const data = await response.json()
+        setDances(data.dances || [])
+      } catch {
+        // No buttons rather than a broken panel.
+      }
+    }
+    loadDances()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const runDance = async (dance) => {
+    setDancing(dance.name)
+    setDanceStatus(`${dance.title}, about ${Math.round(dance.estimated_seconds)}s...`)
+    try {
+      const response = await fetch(`${API_BASE}/dances/run/${dance.name}`, { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+      setDanceStatus(
+        data.ok ? `${dance.title} done.` : data.error || `Failed (HTTP ${response.status})`,
+      )
+      onRefresh?.()
+    } catch (error) {
+      setDanceStatus(`Failed: ${error.message}`)
+    } finally {
+      setDancing('')
+    }
+  }
+
   return (
     <>
       <section className="panel-section">
@@ -179,6 +217,28 @@ export function ControlsPanel({
         <div className="motion-grid two-up">
           <button onClick={() => onMove(-50)}>Move Left 50 mm</button>
           <button onClick={() => onMove(50)}>Move Right 50 mm</button>
+        </div>
+
+        <div className="subsection">
+          <h3>Dances</h3>
+          <div className="plant-actions-grid">
+            {dances.map((dance) => (
+              <button
+                key={dance.name}
+                title={dance.description}
+                className={dancing === dance.name ? 'working' : undefined}
+                disabled={Boolean(dancing)}
+                onClick={() => runDance(dance)}
+              >
+                {dance.title}
+                <small> · {Math.round(dance.estimated_seconds)}s</small>
+              </button>
+            ))}
+          </div>
+          <p className="field-hint">
+            Homes first if the arm has lost its place, then runs the routine and
+            parks back at 0. {danceStatus}
+          </p>
         </div>
 
         <div className="subsection">

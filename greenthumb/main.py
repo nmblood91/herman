@@ -164,6 +164,38 @@ def set_auto_watering(payload: dict[str, object] = Body(default_factory=dict)) -
     return result
 
 
+@app.get(f"{settings.api_prefix}/dances")
+def list_dances() -> dict[str, object]:
+    return {**automation.idle_motion_status(), "dances": automation.dance_catalogue()}
+
+
+# /dances/run/{name} rather than /dances/{name}: the latter would be matched
+# by a POST to /dances/auto as well, and which one wins would depend on the
+# order they happen to be registered in.
+@app.post(f"{settings.api_prefix}/dances/run/{{name}}")
+def run_dance(name: str) -> dict[str, object]:
+    result = automation.run_dance(name)
+    if result.get("ok"):
+        log_event(f"Ran the {name} routine")
+    else:
+        log_event(f"Routine {name} did not run: {result.get('error')}", level=logging.WARNING)
+    return result
+
+
+@app.post(f"{settings.api_prefix}/dances/auto")
+def set_idle_motion(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Turn the periodic re-home and routine on or off, and set its interval."""
+    minutes = payload.get("minutes")
+    result = automation.set_idle_motion(
+        enabled=bool(payload.get("enabled", False)),
+        minutes=int(minutes) if minutes is not None else None,
+    )
+    log_event(
+        f"Idle motion {'on' if result['enabled'] else 'off'}, every {result['minutes']} min"
+    )
+    return result
+
+
 @app.get(f"{settings.api_prefix}/quiet")
 def get_quiet() -> dict[str, object]:
     return automation.quiet_status()

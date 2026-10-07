@@ -77,6 +77,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/gantry/home`, `/gantry/move` | homing and jogging the one axis |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
 | `/watering/auto` | the master switch for unattended watering |
+| `/dances`, `/dances/run/{name}`, `/dances/auto` | the routines, and the periodic re-home |
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
 | `/lights/...` | mode, brightness, colour, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
@@ -103,10 +104,10 @@ Four tabs:
 
 | Tab | What it does |
 |---|---|
-| **Controls** | Home and jog the gantry, move to a plant, water a plant, lighting, run the pump |
+| **Controls** | Home and jog the gantry, run a dance, move to a plant, water a plant, lighting, run the pump |
 | **Plants** | Each plant's current moisture, and its name, light window, moisture target, dose volume and rail position |
 | **Sensors** | Moisture and temperature history, and per-sensor calibration |
-| **Settings** | Automatic watering, quiet hours, LED strip type and colour order, the planter's clock, and the log |
+| **Settings** | Automatic watering, idle motion, quiet hours, LED strip type and colour order, the planter's clock, and the log |
 
 ## Hardware assumptions
 

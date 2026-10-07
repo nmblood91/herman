@@ -9,14 +9,14 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 
 from greenthumb.config import settings
-from greenthumb.hardware.klipper_client import KlipperClient
+from greenthumb.hardware.klipper_client import KlipperClient, MOTION_TIMEOUT
 from greenthumb.hardware.lighting import LedController
 from greenthumb.hardware.pump import PumpController
 from greenthumb.hardware.soil_sensors import SoilSensorHub, calibrate, unavailable_sample
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
 from greenthumb.plants import default_plants, label_for
-from greenthumb import state
+from greenthumb import dances, state
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,15 @@ class GreenThumbAutomation:
         # something the person who owns a planter should have to do.
         self.auto_watering_enabled = settings.auto_watering_enabled
 
+        # Idle motion: a periodic re-home plus a short routine. The re-home
+        # is the useful half -- steppers are open-loop, so a slipped belt or a
+        # nudged carriage leaves every plant position wrong until the next
+        # home, and doing it hourly caps how long that can go unnoticed.
+        self.idle_motion_enabled = settings.idle_motion_enabled
+        self.idle_motion_minutes = settings.idle_motion_minutes
+        self.idle_motion_next = 0
+        self._last_idle_motion: datetime | None = None
+
         self.quiet_hours_enabled = settings.quiet_hours_enabled
         self.quiet_hours_start = time.fromisoformat(settings.quiet_hours_start)
         self.quiet_hours_stop = time.fromisoformat(settings.quiet_hours_stop)
@@ -172,6 +181,19 @@ class GreenThumbAutomation:
                     setattr(plant, field_name, time.fromisoformat(text))
                 except ValueError:
                     logger.warning("Ignoring bad %s %r", field_name, text)
+
+        idle = stored.get("idle_motion")
+        if isinstance(idle, dict):
+            if isinstance(idle.get("enabled"), bool):
+                self.idle_motion_enabled = idle["enabled"]
+            minutes = idle.get("minutes")
+            if isinstance(minutes, int) and not isinstance(minutes, bool) and minutes > 0:
+                self.idle_motion_minutes = minutes
+            nxt = idle.get("next")
+            if isinstance(nxt, int) and not isinstance(nxt, bool):
+                # Keeps the rotation going across a restart instead of always
+                # opening with the same routine.
+                self.idle_motion_next = nxt % len(dances.DEFAULT_ORDER)
 
         watering = stored.get("watering")
         if isinstance(watering, dict) and isinstance(watering.get("auto_enabled"), bool):
@@ -255,6 +277,11 @@ class GreenThumbAutomation:
             # these simply has it left out of the snapshot, rather than a
             # settings save failing because of an LED attribute.
             "watering": {"auto_enabled": self.auto_watering_enabled},
+            "idle_motion": {
+                "enabled": self.idle_motion_enabled,
+                "minutes": self.idle_motion_minutes,
+                "next": self.idle_motion_next,
+            },
             "quiet": {
                 "enabled": self.quiet_hours_enabled,
                 "start": self.quiet_hours_start.isoformat(timespec="minutes"),
@@ -377,6 +404,11 @@ class GreenThumbAutomation:
             # A scheduler job that raises stops being rescheduled, which would
             # silently end all polling.
             logger.exception("Control loop tick failed")
+
+        # Outside the block above so it takes the lock on its own terms: a
+        # dance is the lowest-priority thing this machine does and should
+        # never be the reason a watering cycle was skipped.
+        self._maybe_idle_motion()
 
     def _apply_lighting(self) -> None:
         now = datetime.now().time()
@@ -829,6 +861,7 @@ class GreenThumbAutomation:
             # So the UI can say why nothing is watering rather than leaving it
             # looking broken.
             "watering": self.watering_status(),
+            "idle_motion": self.idle_motion_status(),
             "quiet": self.quiet_status(),
             # What the status bar shows. Computed rather than echoed from the
             # log, so it says what is true now instead of what was last written.
@@ -974,6 +1007,113 @@ class GreenThumbAutomation:
             "status": "ok",
             "brightness": result["brightness"],
         }
+
+    # --- idle motion ------------------------------------------------------
+
+    def run_dance(self, name: str, home_first: bool = False) -> dict[str, object]:
+        """Run one routine now. Not gated by quiet hours -- see _maybe_idle_motion."""
+        steps = dances.steps_for(
+            name, self.usable_travel_mm(), [plant.position_mm for plant in self.plants]
+        )
+        seconds = dances.estimated_seconds(steps)
+
+        with self._exclusive(f"Dance {name}"):
+            status = self.klipper.status()
+            if not status.get("ok"):
+                return {"ok": False, "error": status.get("error") or "Klipper is not responding"}
+
+            # An unhomed axis refuses every move, so there is no point
+            # starting. Homing anyway is also the honest thing for a routine
+            # whose job is partly to re-establish where the carriage is.
+            if home_first or not status.get("homed"):
+                homed = self.klipper.home_gantry()
+                if not homed.get("ok"):
+                    return {"ok": False, "error": f"Homing failed: {homed.get('error')}"}
+
+            # One script for the whole routine, at the motion timeout: the
+            # default five seconds is shorter than any of these take, and the
+            # socket does not answer until the last move lands.
+            result = self.klipper.send_gcode(
+                dances.gcode_for(steps), timeout=MOTION_TIMEOUT
+            )
+
+        if not result.get("ok"):
+            return {"ok": False, "error": result.get("error")}
+
+        # A routine you asked for also resets the clock, so pressing the
+        # button does not get followed by an automatic one a minute later.
+        self._last_idle_motion = datetime.now()
+        return {"ok": True, "dance": name, "seconds": seconds}
+
+    def _maybe_idle_motion(self) -> None:
+        """Called every tick. Runs at most one routine per interval."""
+        if not self.idle_motion_enabled:
+            return
+
+        now = datetime.now()
+        if self._last_idle_motion is None:
+            # Start the clock rather than dancing the instant the service
+            # comes up, which would make every restart twitch.
+            self._last_idle_motion = now
+            return
+        if now < self._last_idle_motion + timedelta(minutes=self.idle_motion_minutes):
+            return
+
+        held = self.watering_suppressed(now)
+        if held:
+            # Deliberately does not reset the clock: once the window closes the
+            # next tick runs the routine rather than waiting another hour.
+            logger.debug("Skipping idle motion, %s", held)
+            return
+
+        name = dances.DEFAULT_ORDER[self.idle_motion_next % len(dances.DEFAULT_ORDER)]
+        self._last_idle_motion = now
+        try:
+            result = self.run_dance(name, home_first=True)
+        except HardwareBusyError:
+            logger.debug("Skipping idle motion, hardware is busy")
+            return
+        except Exception:
+            logger.exception("Idle motion failed")
+            return
+
+        if result.get("ok"):
+            self.idle_motion_next = (self.idle_motion_next + 1) % len(dances.DEFAULT_ORDER)
+            logger.info("Homed and ran the %s routine", name)
+        else:
+            logger.warning("Idle motion did not run: %s", result.get("error"))
+        self._persist()
+
+    def set_idle_motion(self, enabled: bool, minutes: int | None = None) -> dict[str, object]:
+        if minutes is not None:
+            if not 5 <= int(minutes) <= 1440:
+                raise ValueError("Interval must be between 5 minutes and 24 hours")
+            self.idle_motion_minutes = int(minutes)
+        self.idle_motion_enabled = bool(enabled)
+        self._persist()
+        return self.idle_motion_status()
+
+    def idle_motion_status(self) -> dict[str, object]:
+        """Cheap enough for /overview -- asks Klipper nothing."""
+        return {
+            "status": "ok",
+            "enabled": self.idle_motion_enabled,
+            "minutes": self.idle_motion_minutes,
+            "next_dance": dances.DEFAULT_ORDER[
+                self.idle_motion_next % len(dances.DEFAULT_ORDER)
+            ],
+            "last_at": (
+                self._last_idle_motion.isoformat(timespec="minutes")
+                if self._last_idle_motion
+                else None
+            ),
+        }
+
+    def dance_catalogue(self) -> list[dict]:
+        """The routines, with durations. Asks Klipper for the rail length."""
+        return dances.catalogue(
+            self.usable_travel_mm(), [plant.position_mm for plant in self.plants]
+        )
 
     def home_gantry(self) -> dict[str, object]:
         with self._exclusive("Homing gantry"):
