@@ -30,27 +30,48 @@ Configure sensor addresses using the A0 and A1 address pads on each sensor accor
 
 ## Sensor Hub Layout
 
-Four 5-port passive hubs. The three that do the fan-out live on the **front**
-rail with the plants; the fourth sits on the back rail where the Pi is, and
-joins the two.
+Four 5-port passive hubs. The three that do the fan-out hang over the plants
+on the **front** rail; the fourth sits at the electronics box and joins them
+to the Pi.
 
 | Hub | Where | Ports used | To |
 |---|---|---|---|
-| Left sub | front | 3 of 5 | front master · two soil sensors |
-| Right sub | front | 3 of 5 | front master · two soil sensors |
-| Front master | front | 3 of 5 | both sub hubs (300 mm and 400 mm) · the back hub (400 mm) |
-| Back hub | back | 2 of 5 | the front master · the Pi (100 mm) |
+| Left sub | front, over the plants | 3 of 5 | front master · two soil sensors |
+| Right sub | front, over the plants | 3 of 5 | front master · two soil sensors |
+| Front master | front, over the plants | 3 of 5 | both sub hubs · the junction hub |
+| Junction | at the electronics box | 2 of 5 | the front master · the Pi |
 
-**The back hub is a junction, not a fan-out** — two ports used, and nothing
-else hangs off it. It is there because the Pi cable lands on the back rail and
-joining two stock cables end to end is easier than sourcing one long enough to
-span the whole path. Worth knowing before anyone decides it looks redundant
-and removes it: the replacement is a single cable longer than any in the kit.
+**The hubs hang rather than lie flat.** Turned ninety degrees so they sit over
+the plants, each sub hub ends up more or less above the two pots it serves,
+which turns the sensor drops into short vertical runs instead of diagonals
+across the shelf.
 
-Putting the sensor bus on the front rail is not only about clutter. The back
-rail carries the stepper, the LED data line and the pump, and running I2C
-alongside an 800 kHz LED data line causes more trouble than cable capacitance
-ever will.
+Two things to check once they are hanging, both consequences of putting a
+bare board above a pot that gets watered:
+
+- **Keep them out of the splash line.** The nozzle dribbles into the pot from
+  the travelling carriage, and these hubs are unsealed PCBs with open JST
+  sockets facing whichever way they are hung. Sitting over the rim or the gap
+  between pots keeps the drop just as short as sitting over the soil, without
+  putting the board under the water. Point the connectors sideways or down so
+  nothing can pool in them.
+- **Check carriage clearance across the full travel.** The gantry sweeps the
+  whole rail now that it re-homes and runs routines on its own, so anything
+  hanging into that path gets found eventually. Run a *Patrol* and watch it
+  rather than trusting a static measurement.
+
+**The junction hub is a junction, not a fan-out** — two ports used, and
+nothing else hangs off it. It is there because joining two stock cables end to
+end is easier than sourcing one long enough to span the whole path, and
+splicing STEMMA QT is not something to volunteer for. Worth knowing before
+anyone decides it looks redundant: the replacement is a single cable longer
+than any in the kit.
+
+**The bus never goes near the back rail.** That rail carries the stepper, the
+pump and the LED data line, and running I2C alongside an 800 kHz LED data line
+causes more trouble than cable capacitance ever will. The run from the front
+master crosses over the plants and enters the **front** face of the
+electronics box, so it never parallels any of it.
 
 The hubs are passive, so this is still electrically **one** bus. Which sub hub
 a sensor hangs off changes nothing about its address — that is set by the A0

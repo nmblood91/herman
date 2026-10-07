@@ -131,13 +131,13 @@ and the development boards. Live streaming is out of scope, see
 | Capacitive soil moisture sensor (Adafruit STEMMA) + cable | 4 | $12.00 | $48.00 | one per plant; price includes the sensor's own STEMMA QT cable |
 | STEMMA QT 5-port passive hub | 4 | $3.00 | $12.00 | two sub hubs and a master on the front rail, plus a junction hub at the Pi |
 | STEMMA QT cable, 300 mm | 1 | $3.00 | $3.00 | left sub hub to master |
-| STEMMA QT cable, 400 mm | 2 | $3.00 | $6.00 | right sub hub to master, and master to the back hub |
+| STEMMA QT cable, 400 mm | 2 | $3.00 | $6.00 | right sub hub to master, and master to the junction hub |
 
-**Four hubs.** The fan-out lives on the front rail with the plants — a left
+**Four hubs.** The fan-out hangs over the plants on the front rail — a left
 and a right sub hub feeding two sensors each, into a front master — and a
-fourth on the back rail joins that to the Pi. The back one is a junction
+fourth at the electronics box joins that to the Pi. The fourth is a junction
 rather than a fan-out, which is cheaper than sourcing a single cable long
-enough to span the whole path. Moving the bus off the back rail also takes it
+enough to span the whole path. Keeping the bus off the back rail also takes it
 away from the stepper, the pump and the LED data line; see
 [SENSOR_WIRING.md](SENSOR_WIRING.md).
 

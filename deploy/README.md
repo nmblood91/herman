@@ -641,22 +641,24 @@ which the Pi's pins are not tolerant of.
 ### Cable length and bus capacitance
 
 The soil sensors hang off a hub tree rather than home runs back to the Pi. The
-fan-out is on the front rail with the plants; a fourth hub on the back rail
-joins it to the Pi:
+fan-out hangs over the plants on the front rail; a fourth hub at the
+electronics box joins it to the Pi:
 
 | Run | Length |
 |---|---|
 | 4 × sensor drops into the two sub-hubs | 150 mm each |
 | Left sub-hub → front master | 300 mm |
 | Right sub-hub → front master | 400 mm |
-| Front master → back hub | 400 mm |
-| Back hub → Pi | 100 mm |
+| Front master → junction hub at the box | 400 mm |
+| Junction hub → Pi | 100 mm |
 | **Total** | **≈ 1.8 m** |
 
 The two sub-hub runs do not have to match — they are separate branches, and only
 the total matters. The right side needed 400 mm to reach; the left came in at
-300 mm. The sensor drops are the figures from the back-rail layout and should
-shrink now the hubs sit nearer the pots; re-measure them and redo the sum.
+300 mm. The sensor drops are the figures from the back-rail layout. With the hubs
+turned ninety degrees to hang over the plants, each sub hub sits roughly above
+the pots it serves and the drops become short vertical runs — re-measure them
+and redo the sum, which should come out under the 1.8 m above.
 
 **Total bus capacitance is what matters, not the longest run**, and it is the sum
 of every branch. I2C allows 400 pF; at roughly 60 pF/m that 1.8 m contributes
