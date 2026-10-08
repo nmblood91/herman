@@ -243,6 +243,65 @@ distribution collapsed into a single PCB. That is where the cost actually
 falls, and it is a five-figure tooling decision rather than a parts
 substitution. Not near.
 
+### If the camera comes back, USB is the way
+
+The CSI camera was dropped because the frame has nowhere to put it, not because
+the camera was wrong. Coverage is `2 · standoff · tan(HFOV/2)`, so framing
+890 mm of rail needs:
+
+| Horizontal FOV | Standoff |
+|---|---|
+| 120° — Camera Module 3 Wide, the widest CSI option | **260 mm** |
+| 130° | 200 mm |
+| 143° | 120 mm |
+| 170°+ fisheye | effectively none |
+
+This frame does not give 260 mm. **That ceiling is a Raspberry Pi catalogue
+limit rather than a physical one** — 120° is the widest CSI lens they sell, and
+UVC modules go far wider for less money. So the interesting alternatives are
+all USB.
+
+**Read the FOV spec carefully.** Listings almost always quote *diagonal* FOV,
+and a rail cares about horizontal. On a 4:3 sensor a "140°" part is roughly
+130° horizontal, which buys 200 mm rather than the 162 mm the headline number
+implies. Check for `140°D` before believing it.
+
+**Two form factors worth considering:**
+
+- **A wide UVC module**, around $25 for a 140° 720p board, or less for a 180°
+  fisheye. Past about 170° the standoff question disappears entirely and the
+  camera can sit almost against the glass. Heavy barrel distortion, which is
+  acceptable for looking at plants and not for measuring them.
+- **A USB endoscope on the gantry.** Worth taking seriously because it removes
+  the objection that made a gantry mount unattractive: a CSI ribbon flexing
+  through the cable chain on every move will eventually crack, whereas an
+  endoscope cable is thin and flexible by design and the chain already carries
+  the water tube. The camera then travels to each plant and framing stops
+  mattering at all — and close-ups of individual plants are more useful than
+  one distorted wide shot.
+
+**The blocker is the USB port, not the camera.** The A+ has a single USB-A and
+the SKR owns it, Klipper talking to the board over USB serial. A hub works but
+consumes the only recovery port. The clean fix is moving Klipper onto the Pi's
+GPIO UART against the SKR's TFT header, which frees USB altogether — filed
+above as a serviceability option, and load-bearing if a USB camera ever ships.
+The development Pi 4 has four ports, so a camera can be proven out before that
+is solved.
+
+**Insist on hardware MJPEG.** A UVC camera that compresses on-board means the
+host only copies frames, which is *lighter* than the CSI path and its libcamera
+ISP plus JPEG encode — worth having on a 512 MB board. Cheap endoscopes often
+emit raw YUV only, pushing compression onto the CPU and capping out around
+640x480. Confirm with `v4l2-ctl --list-formats-ext` before buying.
+
+**What this costs in software.** `greenthumb/hardware/camera.py` shells out to
+`rpicam-vid`, which is libcamera and **cannot see a UVC device at all** — those
+are V4L2 on `/dev/video*`. Capture would move to ffmpeg or V4L2 directly.
+Everything else in that module survives untouched: the single shared capture,
+the viewer reference counting, the JPEG frame splitting, the multipart
+generator and the tests. Only `_capture_command` and the binary detection
+change, which is the reason the capture command was made injectable.
+
 Prerequisites whenever this starts: there is no CI yet, and the two version
 strings (`pyproject.toml`, `frontend/package.json`) are unmanaged — a release
 artifact needs one source of truth for version.
