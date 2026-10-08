@@ -299,10 +299,16 @@ That leaves two honest options, and the second is better:
 - **A powered USB hub.** Works, and makes the hub a single point of failure in
   front of both the motion board and the camera, on the port that is also the
   recovery path.
-- **The camera unit carries a different board.** A 3 B+ or a Pi 4 has four
-  ports and no contention. Since the camera is an add-on rather than base
-  equipment, the board is allowed to differ by tier — which keeps a peripheral
-  from dictating the base unit's compute. This is the one to take.
+- **The camera unit carries a Pi 4.** Since the camera is an add-on rather
+  than base equipment, the board is allowed to differ by tier — which keeps a
+  peripheral from dictating the base unit's compute. This is the one to take.
+
+  **Specifically a Pi 4, not a 3 B+**, for a reason beyond price. Every USB
+  port on a Pi 3 shares a single USB 2.0 link to the SoC through the same hub
+  chip that carries Ethernet, so roughly 300 Mbps aggregate is split between a
+  camera and the motion board. The Pi 4 puts USB 3.0 on its own PCIe-attached
+  controller with Ethernet separate, so a camera and the SKR do not contend at
+  all. For this use the Pi 4 is both cheaper and architecturally right.
 
 The development Pi 4 has four ports, so a camera can be proven out without
 deciding any of this.

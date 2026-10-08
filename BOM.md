@@ -110,6 +110,19 @@ test that first rather than working down the list.
 A Pi 4 and a 3 B/3 B+ share mounting holes but **not** port positions: the
 Pi 4 has two micro-HDMI jacks, USB-C power, and Ethernet and USB swapped.
 
+**Do not buy a 3 B+ for this ladder.** It is discontinued at most channels and
+now lists around $49, against $35 for a Pi 4 with the same 1 GB — the gap runs
+to 2x in some regions. It also tests nothing the 3 B does not: the row above
+already covers that outline and mounting pattern, and the features the B+ adds
+over the B are ones this project does not use.
+
+**In the Pi line, older does not mean cheaper.** Price tracks production
+volume, not age. A board past its ramp gets scarcer rather than cheaper, and
+remaining stock is priced as legacy. The A+ is inexpensive because it is still
+in volume production at $30 until 2030, not because it is old — which is also
+why that production date is the fact worth tracking rather than the spec
+sheet.
+
 **The A+ is in production until at least January 2030**, per Raspberry Pi's
 own obsolescence statement. Worth having written down, because several retailer
 listings still show the older January 2026 date, and that would mean the board
