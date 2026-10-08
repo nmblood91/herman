@@ -180,6 +180,69 @@ safe for the life of the product rather than a bet. See [BOM.md](BOM.md) for why
 the Pi Zero 2 W is not the saving it looks like, and for where the cost
 actually sits.
 
+### Why a Pi at all, and what leaving would cost
+
+Asked properly: not "a cheaper Pi" but "anything other than a Pi". The answer
+is no, and the binding constraint is not CPU. A Pi is the cheapest thing that
+is simultaneously a Linux computer and a microcontroller-grade I/O device, with
+first-class Klipper support and a published availability date. Every
+alternative gives up one of those four.
+
+What the host actually has to provide:
+
+1. **Linux and Python 3.11.** The Klipper host is not optional - Klipper is
+   split host/MCU by design, and the SKR is only the MCU. Add FastAPI,
+   APScheduler and SQLite.
+2. **Hardware I2C with a settable slow clock.** 50 kHz, set by
+   `dtparam=i2c_arm_baudrate` on a Pi. Driven by bus capacitance, not by the
+   sensors - see [SENSOR_WIRING.md](../SENSOR_WIRING.md).
+3. **Hardware SPI that can hit two specific rates**, roughly 2.4 MHz and
+   3.2 MHz. This is the constraint nobody expects and it is written up in
+   `greenthumb/hardware/led_strip.py`; the short version is that the LED
+   waveform is built out of SPI bits, so the achievable clock decides whether
+   the strip works, and the two supported chip families need rates in windows
+   that barely touch.
+4. **WiFi**, there being no Ethernet in the chassis plan.
+5. **A USB host port** for the SKR serial link, or GPIO UART instead.
+
+Requirement 3 is the one that eliminates whole categories, because `spidev`
+silently substitutes the nearest rate its driver supports. A host that cannot
+land in those windows fails as "the strip looks wrong", with nothing in the
+code detecting it.
+
+**Other ARM SBCs** - Orange Pi Zero 2W, Radxa Zero 3W, NanoPi - are the only
+genuine like-for-like. Klipper on Armbian is well-trodden, so that is not the
+blocker it is assumed to be. But they run $20-35, which is not cheaper than a
+$30 A+, and every Pi-specific line in `deploy/pi/install-green-thumb.sh`
+becomes per-vendor device-tree work: `raspi-config nonint do_i2c`,
+`/boot/firmware/config.txt`, the I2C baudrate parameter, the module loads. Then
+the SPI windows need re-verifying on unfamiliar silicon. More work, no saving,
+community OS images, and no availability guarantee.
+
+**An x86 thin client or mini PC** - Wyse 3040, HP t620, a used NUC - is $20-40,
+far more capable, has first-class Debian and better longevity than any SBC.
+It has no GPIO, no I2C and no SPI, and USB bridges do not rescue it: a USB-SPI
+adapter adds millisecond jitter to a protocol needing microsecond precision and
+continuous streaming. The LED strip alone disqualifies this category.
+
+**A microcontroller with no Linux at all**, an ESP32-S3 at $5-8, is the real
+cost floor. It also means dropping Klipper, and with half a megabyte of RAM
+there is no SQLite, no Python and no nginx - so `services/automation.py`,
+`history.py`, `dances.py`, the calibration and quiet-hours logic and the whole
+API go with it. That is not a substitute for the Pi, it is a different product
+that happens to water plants. Roughly $25 saved against rewriting the repo.
+
+**Moving the host off the planter** is worth naming because it is tempting:
+nothing says the Linux machine has to be inside the furniture. USB past about
+three metres is unreliable, and it makes every unit depend on a household
+server. Reasonable on a bench, fatal for something sold.
+
+**At volume the answer is none of the above.** The saving is not a cheaper
+host, it is one board instead of four - SKR, Pi, DC-DC converter and the Wago
+distribution collapsed into a single PCB. That is where the cost actually
+falls, and it is a five-figure tooling decision rather than a parts
+substitution. Not near.
+
 Prerequisites whenever this starts: there is no CI yet, and the two version
 strings (`pyproject.toml`, `frontend/package.json`) are unmanaged — a release
 artifact needs one source of truth for version.

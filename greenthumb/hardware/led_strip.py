@@ -36,6 +36,27 @@ CHIPS = {
     "WS2811": ChipSpec(3_200_000, 4, 0b1000, 0b1100, "RGB", "12V, three LEDs per pixel"),
 }
 
+# These rates are a hardware requirement on the host, not a preference, and it
+# is the tightest constraint this project puts on the board.
+#
+# Because the waveform is made of SPI bits, the achievable clock decides whether
+# the high times land inside the chip's tolerance. Both families allow +/-150ns:
+#
+#   chip       zero      one       bit period gives     working window
+#   WS2811     1 bit     2 bits    312ns at 3.2MHz      ~2.7 - 4.4 MHz
+#   WS2815 /
+#   GS8208     1 bit     2 bits    417ns at 2.4MHz      ~2.2 - 2.7 MHz
+#
+# The windows barely touch, so a host cannot serve both from one rate -- and the
+# strip type is selectable at runtime from Settings, so it has to reach both.
+# That is two specific clocks, which is a good deal more than "has SPI".
+#
+# The failure mode is quiet. spidev treats max_speed_hz as a ceiling and
+# substitutes the nearest rate its driver can produce, reporting nothing, so a
+# host that cannot land in these windows shows up as a strip with wrong or
+# flickering colours rather than as an error. Anyone porting this to a board
+# that is not a Pi should scope the line before believing the colours.
+
 # WS2811 is what this build ships with. Note it drives three LEDs per pixel,
 # so led_count is a third of the LEDs you can count on the strip.
 DEFAULT_CHIP = "WS2811"
