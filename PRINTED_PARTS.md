@@ -8,8 +8,8 @@ whether a part is worth redesigning. Inserts and screws are here because they
 are the parts that get ordered in the wrong size, and because a part that has
 already been printed cannot be re-tapped for a different insert.
 
-**One planter is 1,424 g of printed parts**, everything but the camera mount.
-At typical PETG pricing that is roughly $30–35 of filament per unit, which is
+**One planter is 1,434 g of printed parts**, everything but the camera mount.
+At typical PETG pricing that is roughly $30–36 of filament per unit, which is
 enough to be worth watching — three parts are 44% of it: the main electronics
 rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 150 g, which is 50 links of 3 g rather than one big part.
@@ -65,38 +65,43 @@ by hand, so re-total it if the table changes.
 
 | Fastener | Qty | Unit | Line total | Goes into |
 |---|---|---|---|---|
-| M4 heat-set insert (long) | 21 | $0.25 | $5.25 | gantry holders 13, electronics rear 4, sub hubs 4 |
+| M4 heat-set insert (long) | 25 | $0.25 | $6.25 | gantry holders 13, electronics rear 4, sub hubs 8 |
+| M4 heat-set insert (short) | 1 | $0.25 | $0.25 | V-slot adapter |
 | M3 heat-set insert (long) | 8 | $0.24 | $1.92 | V-slot adapter 6, right gantry holder front 2 |
 | M5 heat-set insert (short) | 4 | $0.25 | $1.00 | V-slot adapter |
-| M4×16 socket cap | 18 | $0.07 | $1.26 | M4 inserts — gantry holders 10, electronics rear 4, sub hubs 4 |
+| M4×16 socket cap | 22 | $0.07 | $1.54 | M4 inserts — gantry holders 10, electronics rear 4, sub hubs 8 |
+| M4×12 socket cap | 1 | $0.07 | $0.07 | the V-slot adapter's single M4 insert |
 | M5×16 socket cap | 10 | $0.08 | $0.80 | 2 into the VITTSJÖ frame, one per rear holder · 8 into T-nuts in the V-slot rail, 4 from the adapter and 2 from each cover |
-| M3 socket cap, length TBD | 12 | $0.05 | $0.60 | 6 into the adapter's M3 inserts, from the two gantry faces · 2 into the right gantry holder front's inserts, holding the pump · 4 into the motor's own tapped holes |
-| M5×12 flat head | 4 | $0.40 | $1.60 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
+| M3×10 socket cap | 6 | $0.05 | $0.30 | 2 into the right gantry holder front's inserts, holding the pump · 4 into the motor's own tapped holes |
+| M3 socket cap, length TBD | 6 | $0.05 | $0.30 | the adapter's six M3 inserts, from the two gantry faces — 4 from the top, 2 from the bottom |
+| M5×10 flat head | 4 | $0.40 | $1.60 | the V-slot adapter's 4 M5 inserts — flat, not socket, see below |
 | #4 × 3/8" | 24 | $0.08 | $1.92 | electronics rear 12, sub hubs 8, right gantry front 2, cable chain anchor 2 |
 | M5 shoulder bolt | 3 | $1.00 | $3.00 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
 | Wago 5-slot | 2 | $0.50 | $1.00 | main electronics rear |
 | Wago 3-slot | 2 | $0.30 | $0.60 | right gantry holder rear |
-| **Total** | **108** | | **$21.95** | |
+| **Total** | **118** | | **$20.55** | |
 
-**33 heat-set inserts, 71 fasteners and 4 Wago connectors per planter —
-$18.95 of hardware.**
+**38 heat-set inserts, 76 fasteners and 4 Wago connectors per planter —
+$20.55 of hardware.**
 
-The heat-set inserts are $8.17 of that: 43% of the cost from 31% of the
-pieces, and the single biggest line at $5.25 for the M4s alone. That is what
-a $0.25 part does sitting next to a $0.05 screw, and it is worth knowing
+The heat-set inserts are $9.42 of that: 46% of the cost from 32% of the
+pieces, and the single biggest line at $6.25 for the long M4s alone. That is
+what a $0.25 part does sitting next to a $0.05 screw, and it is worth knowing
 before a redesign adds two more bosses to something.
 
 The idler wheels the shoulder bolts carry are not counted here — they are a
 drive component and sit in [BOM.md](BOM.md) under core structure.
 
-Against the filament: 1,424 g is roughly $30–36 at typical PETG pricing, so
-**$49–55 of raw material per planter** for everything printed and everything
+Against the filament: 1,434 g is roughly $30–36 at typical PETG pricing, so
+**$51–57 of raw material per planter** for everything printed and everything
 holding it together.
 
 **The thread-by-thread check**, worth re-running after any edit:
 
-- **M4 balances.** 21 inserts against 18 M4×16 plus 3 shoulder bolts.
-- **M5 balances.** The adapter's 4 inserts take the 4 M5×12 flat heads; all
+- **M4 balances at 26.** 26 inserts — 25 long plus the adapter's one short —
+  against 26 screws: 22 M4×16, 1 M4×12, and the 3 shoulder bolts, which are
+  M4 at the thread.
+- **M5 balances.** The adapter's 4 inserts take the 4 M5×10 flat heads; all
   10 M5×16 go elsewhere — 2 into the VITTSJÖ frame, 8 into rail T-nuts.
 - **M3 balances.** 8 inserts against 12 screws, and the 4 over are
   deliberate: the motor is tapped, so its four screws go straight into it.
@@ -108,6 +113,12 @@ the table, or a part has a boss nothing uses — and note that a screw going
 into tapped hardware is not a mismatch: the motor here, and the eight M5×16
 in rail T-nuts.
 
+**Total both sides from the parts table, not from this one.** A balance check
+run on the totals cannot catch an error that undercounts inserts and screws by
+the same amount — it reports a clean balance at the wrong number. The M4 line
+read 21 against 18 for exactly that reason, both short by the four inserts and
+four screws in the second sub hub.
+
 A note on the shoulder bolts, because the naming invites a mistake: an M5
 shoulder bolt is 5 mm at the shoulder and **M4 at the thread**, so all three go
 into M4 inserts. They are not M5 fasteners and do not belong in that line.
@@ -116,10 +127,11 @@ into M4 inserts. They are not M5 fasteners and do not belong in that line.
 
 Every fastener is placed and every part but the camera mount is weighed.
 
-**The M3 screw lengths are missing** — all 12 of them, and they may not be
-one length: 6 into the adapter from the gantry faces, 2 holding the pump, 4
-into the motor. That is the only line that cannot be ordered against. The
-`#4` are 3/8" and every other fastener is dimensioned.
+**Six M3 screw lengths are still missing** — the ones running from the two
+gantry faces into the adapter's six M3 inserts, four from the top and two from
+the bottom. That is the only line that cannot be ordered against. The pump's
+two and the motor's four are M3×10, the `#4` are 3/8", and every other
+fastener is dimensioned.
 
 Insert dimensions are deliberately left as `long` and `short`. The inserts are
 sold as a kit from the store rather than sourced by whoever assembles the unit,
@@ -170,15 +182,16 @@ Only the parts with a constraint worth recording.
 
 - **STEMMA QT sub hubs** (each rear and front) — the cable runs back to the
   main hub are not equal: **300 mm on the left, 400 mm on the right**, measured
-  on the build rather than estimated. The two hubs are otherwise identical:
-  85 g and 30 g a side, 2 × M4 inserts, 2 × M4×16 and 4 × `#4` on each rear,
-  nothing on either front. I2C is routed away from the motor, pump and LED
+  on the build rather than estimated. The two hubs take identical hardware —
+  4 × M4 inserts, 4 × M4×16 and 4 × `#4` on each rear, nothing on either
+  front — but they are not the same prints: the left is 104 g and 21 g, the
+  right 85 g and 30 g. I2C is routed away from the motor, pump and LED
   wiring deliberately; see [SENSOR_WIRING.md](SENSOR_WIRING.md) for why bus
   capacitance and the 50 kHz clock make that routing a requirement rather than
   tidiness.
 
 - **Gantry V-slot adapter — the flat heads are deliberate.** Its four M5
-  inserts take the M5×12 **flat** heads rather than socket caps, because a
+  inserts take the M5×10 **flat** heads rather than socket caps, because a
   socket cap stands proud enough to foul the rail as the carriage travels.
   That is a constraint on any future revision of this part, not a parts-bin
   substitution: swapping them back for socket caps would bind the gantry. The
