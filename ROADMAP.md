@@ -164,42 +164,21 @@ ceilings are nowhere near the limit. Either way the A+ becomes viable as a side
 effect of shipping a prebuilt bundle rather than as separate work, so the
 cheapest path is to do that and stop caring what the build costs.
 
-**The camera is a paid optional add-on, scoped to timelapse.** That is what makes
-the A+ safe to commit to. The base unit ships without a camera and has no need
-for the headroom at all; the add-on adds the module and timelapse capture, which
-is periodic stills rather than continuous encode — well within 512 MB.
+**Nothing on this unit encodes video**, which is what makes 512 MB a
+comfortable budget rather than a tight one. The load is four I2C reads a minute,
+an SPI write per LED update, a Klipper host loop, and a web API nobody is
+usually looking at. The one thing that ever threatened the figure was a camera,
+and there is no camera.
 
-**Streaming is not a product feature**, and should not influence the board
-choice. The API can serve a live MJPEG view, for aiming the camera and looking
-in on the plants, but it is a setup and service tool on the local network
-rather than a tier anyone pays for. Nothing schedules it, nothing records it,
-and there is no UI in front of it — on a frame without the standoff to see
-every plant at once, a live view is not worth a tab.
+So the A+ is not a board chosen despite a constraint — the constraint is gone.
+The open question is narrower than it was: whether a **cold** on-device Vite
+build fits, which the measurement above does not answer. Shipping the frontend
+prebuilt removes even that, which is why it is on the critical path.
 
-Because the camera is a tier rather than a base feature, **the board can differ
-by tier**: if streaming ever does become something sold, that tier can carry a
-Pi 4 and the base unit stays on an A+. This is the thing that keeps a someday
-feature from constraining a today decision.
-
-What the live view costs is still unmeasured on an A+, and that is the one open
-question here. 640x480 at 10 fps of hardware-encoded JPEG is modest, but an
-imx708 is an 11.9 MP sensor and its buffers are not. If it will not run in
-512 MB, the live view stays a development convenience on the Pi 4 and the
-paragraph above is already true as written.
-
-Two design constraints that follow from timelapse on an A+:
-
-- **Stills accumulate, so retention is required, not optional.** One frame every
-  15 minutes at a few hundred KB is on the order of a gigabyte a month onto an SD
-  card. This wants the same treatment as sensor history, which already prunes on
-  `history_retention_days`.
-- **Don't assemble video on the device.** Encoding a timelapse from stills is a
-  batch job that does not belong on a 512 MB host competing with Klipper. Serve
-  the stills and assemble on demand elsewhere, or do it nightly at low priority.
-
-Still worth validating capture on an actual A+ before the chassis is designed
-around that mounting pattern — but the bar for the product feature is timelapse
-stills, which is a much lower one than continuous capture.
+**The A+ is in production until at least January 2030**, so staying on it is
+safe for the life of the product rather than a bet. See [BOM.md](BOM.md) for why
+the Pi Zero 2 W is not the saving it looks like, and for where the cost
+actually sits.
 
 Prerequisites whenever this starts: there is no CI yet, and the two version
 strings (`pyproject.toml`, `frontend/package.json`) are unmanaged — a release

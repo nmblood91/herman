@@ -110,15 +110,39 @@ test that first rather than working down the list.
 A Pi 4 and a 3 B/3 B+ share mounting holes but **not** port positions: the
 Pi 4 has two micro-HDMI jacks, USB-C power, and Ethernet and USB swapped.
 
-**Deferred until after launch: Pi Zero 2 W.** On paper it works and it is
-cheaper — the same Cortex-A53 and the same 512 MB as the A+, at 1 GHz rather
-than 1.4. What defers it is the camera: it carries the narrow 22-pin CSI
-connector instead of the standard 15-pin, so it needs a different ribbon and a
-third mounting pattern. Not worth carrying that while the A+ is still unproven.
-Revisit once the product has shipped.
+**The A+ is in production until at least January 2030**, per Raspberry Pi's
+own obsolescence statement. Worth having written down, because several retailer
+listings still show the older January 2026 date, and that would mean the board
+was already past its declared window. It is not. Nothing is forcing a change.
 
-**Not suitable at all:** Pi Zero / Zero W and any ARMv6 Pi — no 64-bit, and
-NodeSource ships no ARMv6 packages.
+**Not worth it: Pi Zero 2 W.** The closest thing to a step down, and it is
+software-transparent — same Cortex-A53, same 512 MB, same `raspi-config` and
+the same SPI and I2C, so the installer would not change. Three reasons it still
+loses:
+
+- **Supply.** Sold out at most major resellers through 2026, with markups above
+  the $15 list where it is in stock. A board you cannot buy at list is not a
+  saving, and this is the one component the whole stack runs on.
+- **The saving is small and partly eaten.** $15 against $30, less $3–5 for the
+  USB OTG adapter it needs — the Zero has no USB-A, and Klipper reaches the SKR
+  over USB serial. Call it $10–12 on a ~$457 build, under 3%.
+- **It costs a third mounting pattern** (65 × 30 mm) on top of the two below,
+  and runs at 1 GHz rather than 1.4, which makes the prebuilt frontend bundle
+  more necessary rather than less.
+
+Revisit if supply normalises *and* volume makes 3% worth a third chassis.
+
+**Not suitable at all:** Pi Zero / Zero W and any ARMv6 Pi. No 64-bit, and
+NodeSource ships no ARMv6 packages — though note that second objection
+disappears once the frontend ships prebuilt, since no Node runs on the device
+at all. What remains is the disqualifier: one ARMv11 core at 1 GHz shared
+between the Klipper host, the API and nginx, and Klipper's host loop is
+latency-sensitive.
+
+**If unit cost is the goal, the board is the wrong line.** Compute is $40 of
+~$457 with the SD card, and the Pi itself is $30 — 6.6%. The VITTSJÖ frame and
+the rail together are $130, nearly a third of the build, and neither has been
+shopped. Sensing is another $69.
 
 The enclosure needs to carry both the A+ and a development board — different
 outlines and different port faces, so plan for two mounting patterns rather
