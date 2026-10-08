@@ -42,18 +42,18 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 | Left gantry holder, rear | 1 | 71 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 0 |
 | Left gantry holder, front | 1 | 45 g | 2 × M4 (long) | 0 | 0 | 2 | 0 | 0 |
 | Right gantry holder, rear | 1 | 205 g | 5 × M4 (long) | 5 × M4×16, 1 × M5×16 | 0 | 0 | 0 | 2 × 3-slot |
-| Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3 (pump, into inserts), 4 × M3 (motor, into motor) | 2 | 1 | 0 | 0 |
+| Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3×10 (pump, into inserts), 4 × M3×10 (motor, into motor) | 2 | 1 | 0 | 0 |
 | Left gantry cover | 1 | 10 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
 | Right gantry cover | 1 | 35 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
-| Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short), 1 x M4(short) 6 × M3 (long) | 4 × M5×16 1 x M4x? | 0 | 0 | 4 × M5×10 | 0 |
+| Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short), 1 × M4 (short), 6 × M3 (long) | 4 × M5×16, 1 × M4×12 | 0 | 0 | 4 × M5×10 | 0 |
 | Gantry face top | 1 | 50 g | 0 | 4 × M3 | 0 | 0 | 0 | 0 |
 | Gantry face bottom (nozzle holder) | 1 | 50 g | 0 | 2 × M3 | 0 | 0 | 0 | 0 |
 | Main electronics, rear | 1 | 270 g | 4 × M4 (long) | 4 × M4×16 | 12 | 0 | 0 | 2 × 5-slot |
 | Main electronics, front | 1 | 120 g | 0 | 0 | 0 | 0 | 0 | 0 |
-| Left STEMMA QT sub hub, rear | 1 | 85 g | 4 × M4 (long) | 4 × M4×16 | 4 | 0 | 0 | 0 |
-| Left STEMMA QT sub hub, front | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
+| Left STEMMA QT sub hub, rear | 1 | 104 g | 4 × M4 (long) | 4 × M4×16 | 4 | 0 | 0 | 0 |
+| Left STEMMA QT sub hub, fronts | 1 | 21 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Right STEMMA QT sub hub, rear | 1 | 85 g | 4 × M4 (long) | 4 × M4×16 | 4 | 0 | 0 | 0 |
-| Right STEMMA QT sub hub, front | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
+| Right STEMMA QT sub hub, fronts | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Cable chain for water tube | 50 links | 150 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Cable chain anchor | 1 | 3 g | 0 | 0 | 2 | 0 | 0 | 0 |
 | Camera module mount | 1 | — | — | — | — | — | — | — |
@@ -197,11 +197,23 @@ Only the parts with a constraint worth recording.
 
 ## Still to come
 
-- **Camera module mount.** An optional paid add-on scoped to timelapse, not
-  part of the base build. It takes the standard 15-pin CSI ribbon, which the
-  Pi 3 A+ and every development board share — the narrow 22-pin connector on
-  the Pi Zero 2 W is the reason that board is deferred until after launch. See
-  [BOM.md](BOM.md) and [ROADMAP.md](ROADMAP.md).
+- **Camera module mount.** An optional paid add-on, not part of the base build.
+  It takes the standard 15-pin CSI ribbon, which the Pi 3 A+ and every
+  development board share — the narrow 22-pin connector on the Pi Zero 2 W is
+  the reason that board is deferred until after launch.
+
+  Two numbers size it, both from the 120° lens on the Camera Module 3 Wide:
+
+  - **At least 260 mm of standoff** from the plant line, which is what it takes
+    to frame all 890 mm. Less than that and the outer plants fall out of shot.
+  - **Centred on the rail within about 50 mm.** Off-centre costs a plant at one
+    end much faster than being slightly too close costs anything, so the mount
+    should locate off the rail centre rather than off whichever upright is
+    convenient.
+
+  The module is 25 × 24 mm with four M2 holes on a 21 × 12.5 mm pattern, and
+  the ribbon wants a gentle radius rather than a fold. See [BOM.md](BOM.md) and
+  [ROADMAP.md](ROADMAP.md).
 
 ## Worth capturing later
 
