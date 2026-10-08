@@ -81,7 +81,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
 | `/lights/...` | mode, brightness, colour, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
-| `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame |
+| `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame. No UI — reach these directly |
 | `/system/time`, `/system/timezone` | the planter's clock |
 | `/version` | what is running, and whether the checkout has moved on without it |
 
@@ -101,14 +101,13 @@ Nginx serves the built React app from the Pi. **Open `http://herman.local`**
 — port 80, not 8000. Port 8000 is the API, and asking it for `/` returns a JSON
 status blob rather than the page.
 
-Five tabs:
+Four tabs:
 
 | Tab | What it does |
 |---|---|
 | **Controls** | Home and jog the gantry, run a dance, move to a plant, water a plant, lighting, run the pump |
 | **Plants** | Each plant's current moisture, and its name, light window, moisture target, dose volume and rail position |
 | **Sensors** | Moisture and temperature history, and per-sensor calibration |
-| **Camera** | The live view, on units with the camera add-on fitted |
 | **Settings** | Automatic watering, idle motion, quiet hours, LED strip type and colour order, the planter's clock, and the log |
 
 ## Hardware assumptions
@@ -197,7 +196,7 @@ and `spidev`, so they run on a development machine with no hardware attached.
 | Pump | Real — Klipper `output_pin` on the SKR's HB MOSFET |
 | LEDs | Real — WS2811 (default), WS2815 or GS8208 over SPI, 12V only, strip type selectable in Settings |
 | Water level sensor | Real — non-contact sensor on the outlet tube, via Klipper; verifies a dose rather than gating it |
-| Camera | Real — Camera Module 3 Wide via rpicam-vid, MJPEG to the Camera tab. An optional add-on; absent, the tab says so. Timelapse is not built |
+| Camera | API only — Camera Module 3 Wide via rpicam-vid, MJPEG over HTTP. An optional add-on, with no UI and no timelapse |
 
 Automatic watering is disabled by default. Turn it on with **Water plants
 automatically** in the Settings tab; the choice persists across restarts.

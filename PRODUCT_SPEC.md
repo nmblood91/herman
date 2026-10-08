@@ -47,7 +47,6 @@ A 4-plant smart indoor planter system using:
 
 ### Monitoring
 - capture status data from sensors and system health checks
-- show a live view of the plants, on units with the camera add-on
 - capture camera images and time-lapse content, on units with the camera add-on
 - show plant condition trends over time
 

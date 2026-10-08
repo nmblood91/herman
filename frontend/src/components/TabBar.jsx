@@ -3,7 +3,6 @@ export function TabBar({ activeTab, onChange }) {
     { key: 'controls', label: 'Controls' },
     { key: 'plants', label: 'Plants' },
     { key: 'sensors', label: 'Sensors' },
-    { key: 'camera', label: 'Camera' },
     { key: 'settings', label: 'Settings' },
   ]
 

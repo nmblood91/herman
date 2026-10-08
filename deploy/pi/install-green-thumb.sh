@@ -37,9 +37,7 @@ sudo raspi-config nonint do_spi 0
 # The API runs as pi, so it needs these groups to reach /dev/i2c-1 and
 # /dev/spidev0.0. Raspberry Pi OS usually grants them to the first user, but not
 # to one created later, and the failure looks like a wiring fault.
-# video is for the camera add-on: libcamera reaches the sensor through
-# /dev/video* and /dev/media*, both owned by that group.
-sudo usermod -aG i2c,spi,gpio,video pi
+sudo usermod -aG i2c,spi,gpio pi
 
 # raspi-config normally applies these live, but on a first boot the device nodes
 # can be absent until the modules load.
@@ -281,19 +279,6 @@ if [ -e /dev/spidev0.0 ]; then
 else
   echo "⚠️  /dev/spidev0.0 missing — LED strip will not light"
   REBOOT_NEEDED=1
-fi
-
-# The camera is an optional add-on, so its absence is not a warning. Report
-# what is actually true and let the builder decide whether that is wrong.
-if command -v rpicam-vid >/dev/null 2>&1 || command -v libcamera-vid >/dev/null 2>&1; then
-  if rpicam-hello --list-cameras 2>/dev/null | grep -q ":"; then
-    echo "✓ Camera detected:"
-    rpicam-hello --list-cameras 2>/dev/null | sed -n 's/^\([0-9]\+\) : \(.*\)$/    \1: \2/p'
-  else
-    echo "– No camera detected (optional add-on; the Camera tab will say so)"
-  fi
-else
-  echo "– rpicam-apps not installed, so no camera capture is possible"
 fi
 
 printf "\nGreenThumb install complete.\n"

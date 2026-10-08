@@ -981,28 +981,37 @@ choose the type first and adjust the order afterwards.
 ## Connecting the Camera
 
 Optional, and an add-on rather than part of a base unit. A **Camera Module 3
-Wide** on the standard 15-pin CSI ribbon, into the Pi's camera connector. The
-Wide is not interchangeable with the 75-degree version here: framing all four
-plants needs 260 mm of standoff with the 120-degree lens and 590 mm with the
-standard one, and the frame does not have 590 mm.
+Wide** on the standard 15-pin CSI ribbon, into the Pi's camera connector.
+
+There is no UI for this. The API serves the stream and nothing else consumes
+it, so reach it with a browser or curl.
+
+The Wide covers roughly 3.5 times its standoff, against 1.5 times for the
+75-degree version, so it is the one to fit. Even so, **this frame does not have
+the 260 mm of standoff that 890 mm of rail would need**, so a fixed camera sees
+part of the rail rather than all four plants. Aim it at whatever matters most
+and expect the ends to fall outside the shot.
 
 Lift the latch on the Pi's camera connector, slide the ribbon in with the
 **silver contacts facing away from the Ethernet/USB end**, and press the latch
 down. The ribbon wants a gentle curve; a sharp fold cracks the traces.
 
-Aim it at the rail centre. Off-centre loses a plant at one end much sooner than
-being slightly too close loses anything. Use the Camera tab to check framing,
-or fetch a single frame:
+Check what it actually sees by fetching one frame, which is cheaper than
+holding a stream open:
 
 ```bash
 curl -s localhost:8000/api/v1/camera/snapshot -o frame.jpg
 ```
 
+To watch it live, open `http://herman.local/api/v1/camera/stream` in a browser.
+An MJPEG response plays in a plain `<img>`, so a browser renders it with no
+player.
+
 **Only one process can hold the camera at a time.** The API takes it while
-somebody is watching the Camera tab and releases it about fifteen seconds after
-the last viewer leaves. So `rpicam-hello` run by hand while the tab is open
+somebody is reading the stream and releases it about fifteen seconds after the
+last reader disconnects. So `rpicam-hello` run by hand while a stream is open
 will fail to acquire the camera - that is the two of them competing, not a
-fault. Close the tab, wait, and try again.
+fault. Close the stream, wait, and try again.
 
 Bringing it up, in order, so a failure points at one thing:
 
@@ -1019,9 +1028,15 @@ jerky batches, nginx is buffering it - check that the
 `/api/v1/camera/stream` location in `deploy/nginx/greenthumb.conf` carries
 `proxy_buffering off`.
 
-The service account needs the `video` group to reach the camera. The installer
-adds it; on a Pi set up before that, `sudo usermod -aG video pi` and restart
-the service.
+**The service account needs the `video` group**, and the installer does not
+add it. libcamera reaches the sensor through `/dev/video*` and `/dev/media*`,
+both owned by that group, and the API runs as `pi`. Without it the capture
+fails in a way that looks like no camera at all:
+
+```bash
+sudo usermod -aG video pi
+sudo systemctl restart greenthumb-api
+```
 
 The live view is local only. Nothing is recorded and nothing leaves the
 network - see [PRIVACY_SECURITY_SPEC.md](../PRIVACY_SECURITY_SPEC.md).

@@ -7,7 +7,6 @@ import { CalibrationPanel } from './components/CalibrationPanel'
 import { PlantsPanel } from './components/PlantsPanel'
 import { LogsPanel } from './components/LogsPanel'
 import { HistoryPanel } from './components/HistoryPanel'
-import { CameraPanel } from './components/CameraPanel'
 import './App.css'
 import { API_BASE } from './api'
 
@@ -266,8 +265,6 @@ function App() {
           <CalibrationPanel />
         </>
       )}
-
-      {activeTab === 'camera' && <CameraPanel />}
 
       {activeTab === 'settings' && (
         <>

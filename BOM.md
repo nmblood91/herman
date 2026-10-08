@@ -78,7 +78,7 @@ being duplicated here; there is one 12 V supply for the whole machine.
 |---|---|---|---|---|
 | Raspberry Pi 3 Model A+ | 1 | $30.00 | $30.00 | production target; allow +$20 for a larger board or a price rise |
 | MicroSD card | 1 | $10.00 | $10.00 |  |
-| Raspberry Pi Camera Module 3 Wide | 1 | $35.00 | $35.00 | **paid add-on, not base build**; the 120° lens is what frames all four plants |
+| Raspberry Pi Camera Module 3 Wide | 1 | $35.00 | $35.00 | **paid add-on, not base build**; 120° lens, and still short of seeing all four plants at once |
 
 **Base subtotal $40.00**, the camera excluded as an add-on. The 12 V to 5 V
 step-down that feeds the Pi is priced under *Power and electronics* with the
@@ -125,20 +125,25 @@ outlines and different port faces, so plan for two mounting patterns rather
 than one.
 
 The camera add-on is scoped to timelapse; the standard 15-pin ribbon fits both
-the A+ and the development boards. The UI also carries a live view for aiming
-the camera and looking in on the plants, which is a local tool rather than
-something sold — see [ROADMAP.md](ROADMAP.md).
+the A+ and the development boards. The API can also serve a live MJPEG view,
+which is a local tool for aiming and checking rather than something sold — see
+[ROADMAP.md](ROADMAP.md).
 
-**Which lens matters more than which sensor.** Camera Module 3 comes with a 75°
-or a 120° lens, and framing all four plants needs 890 mm of coverage:
+**Which lens matters more than which sensor, and neither is enough for one
+fixed shot of everything.** What a lens covers scales with how far back it
+sits:
 
-| Lens | Standoff needed |
-|---|---|
-| Wide, 120° | **260 mm** — fits inside the frame with room spare |
-| Standard, 75° | 590 mm — more depth than the frame has |
+| Lens | Covers | To reach 890 mm |
+|---|---|---|
+| Wide, 120° | **~3.5× its standoff** | 260 mm |
+| Standard, 75° | ~1.5× its standoff | 590 mm |
 
-So the Wide is the one to order. The 120° lens does bow the rail and stretch
-the outer two plants, which is the lens and not a mounting error.
+The Wide is still the one to order — it needs less than half the depth — but
+**this frame does not give even 260 mm**, so a fixed camera sees a subset of
+the rail rather than all four plants. Either accept the partial view, put the
+camera on the gantry so it carries to each plant in turn, or treat the rail as
+needing two cameras. The 120° lens also bows the rail and stretches whatever
+is at the edges, which is the lens and not a mounting error.
 
 ## Sensing
 

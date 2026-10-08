@@ -215,14 +215,17 @@ Only the parts with a constraint worth recording.
   development board share — the narrow 22-pin connector on the Pi Zero 2 W is
   the reason that board is deferred until after launch.
 
-  Two numbers size it, both from the 120° lens on the Camera Module 3 Wide:
+What it can see follows from where it sits. The 120° lens on the Camera
+  Module 3 Wide covers roughly **3.5 times its standoff**, so framing all
+  890 mm would take 260 mm of depth — which this frame does not have. A fixed
+  mount therefore sees part of the rail, and the mount decides which part:
 
-  - **At least 260 mm of standoff** from the plant line, which is what it takes
-    to frame all 890 mm. Less than that and the outer plants fall out of shot.
-  - **Centred on the rail within about 50 mm.** Off-centre costs a plant at one
-    end much faster than being slightly too close costs anything, so the mount
-    should locate off the rail centre rather than off whichever upright is
-    convenient.
+  - **Centred on the rail**, for the widest symmetric view of the middle.
+  - **Or deliberately off-centre**, trading the far end for a closer look at
+    one or two plants.
+
+  Worth measuring the standoff actually available before committing, since it
+  sets the coverage: 3.5 times that number is the span in shot.
 
   The module is 25 × 24 mm with four M2 holes on a 21 × 12.5 mm pattern, and
   the ribbon wants a gentle radius rather than a fold. See [BOM.md](BOM.md) and

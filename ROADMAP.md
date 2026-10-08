@@ -170,10 +170,11 @@ for the headroom at all; the add-on adds the module and timelapse capture, which
 is periodic stills rather than continuous encode — well within 512 MB.
 
 **Streaming is not a product feature**, and should not influence the board
-choice. There is a live view in the UI — a Camera tab serving MJPEG, for aiming
-the camera and looking in on the plants — but it is a setup and service tool on
-the local network, not a tier anyone pays for. Nothing schedules it, nothing
-records it, and a base unit with no camera shows a tab that says so.
+choice. The API can serve a live MJPEG view, for aiming the camera and looking
+in on the plants, but it is a setup and service tool on the local network
+rather than a tier anyone pays for. Nothing schedules it, nothing records it,
+and there is no UI in front of it — on a frame without the standoff to see
+every plant at once, a live view is not worth a tab.
 
 Because the camera is a tier rather than a base feature, **the board can differ
 by tier**: if streaming ever does become something sold, that tier can carry a

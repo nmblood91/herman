@@ -63,7 +63,8 @@ The camera is a sensitive component because it is inside a home environment.
 **Current scope.** The camera is an optional add-on, not part of the base unit.
 Two things exist, and they have different standing:
 
-- **A live view**, served as MJPEG to the Camera tab over the LAN. Built, and
+- **A live view**, served as MJPEG over the LAN by the API. Built, with no UI
+  in front of it, and
   covered by the requirements below rather than exempt from them.
 - **Timelapse capture**, which is the product feature and is not built. See
   [ROADMAP.md](ROADMAP.md).
@@ -73,7 +74,7 @@ standing constraint on work still to come rather than a description of what
 runs. The requirements on access are live now.
 
 **How the live view meets them, and where it does not.** The capture process
-runs only while somebody has the Camera tab open and is released about fifteen
+runs only while somebody is reading the stream and is released about fifteen
 seconds after the last viewer leaves, so the camera is off whenever nobody is
 looking at it — which is a stronger default than an off switch that has to be
 found. There is still **no explicit disable control**, and the requirement for
