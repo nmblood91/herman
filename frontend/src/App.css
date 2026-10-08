@@ -458,3 +458,39 @@ input[type='color'] {
   background: rgba(52, 24, 18, 0.9);
   color: #ffc9b8;
 }
+
+/* Reserve the shape before the first frame lands, so opening the tab does not
+   push the controls down the page a second later when the picture appears. */
+.camera-frame {
+  margin-top: 16px;
+  background: rgba(9, 18, 13, 0.95);
+  border: 1px solid #2a4737;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.camera-frame-empty {
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+}
+
+.camera-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}

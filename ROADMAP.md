@@ -169,11 +169,22 @@ the A+ safe to commit to. The base unit ships without a camera and has no need
 for the headroom at all; the add-on adds the module and timelapse capture, which
 is periodic stills rather than continuous encode — well within 512 MB.
 
-**Live streaming is explicitly out of scope** and far enough out that it should
-not influence the board choice. Because the camera is a tier rather than a base
-feature, **the board can differ by tier**: if streaming ever ships, that tier can
-carry a Pi 4 and the base unit stays on an A+. This is the thing that keeps a
-someday feature from constraining a today decision.
+**Streaming is not a product feature**, and should not influence the board
+choice. There is a live view in the UI — a Camera tab serving MJPEG, for aiming
+the camera and looking in on the plants — but it is a setup and service tool on
+the local network, not a tier anyone pays for. Nothing schedules it, nothing
+records it, and a base unit with no camera shows a tab that says so.
+
+Because the camera is a tier rather than a base feature, **the board can differ
+by tier**: if streaming ever does become something sold, that tier can carry a
+Pi 4 and the base unit stays on an A+. This is the thing that keeps a someday
+feature from constraining a today decision.
+
+What the live view costs is still unmeasured on an A+, and that is the one open
+question here. 640x480 at 10 fps of hardware-encoded JPEG is modest, but an
+imx708 is an 11.9 MP sensor and its buffers are not. If it will not run in
+512 MB, the live view stays a development convenience on the Pi 4 and the
+paragraph above is already true as written.
 
 Two design constraints that follow from timelapse on an A+:
 
@@ -186,8 +197,8 @@ Two design constraints that follow from timelapse on an A+:
   the stills and assemble on demand elsewhere, or do it nightly at low priority.
 
 Still worth validating capture on an actual A+ before the chassis is designed
-around that mounting pattern — but the bar is now timelapse stills, not a live
-stream, which is a much lower one.
+around that mounting pattern — but the bar for the product feature is timelapse
+stills, which is a much lower one than continuous capture.
 
 Prerequisites whenever this starts: there is no CI yet, and the two version
 strings (`pyproject.toml`, `frontend/package.json`) are unmanaged — a release

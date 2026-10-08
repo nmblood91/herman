@@ -978,6 +978,54 @@ If red and green come out swapped, change **LED colour order** in settings.
 Selecting a strip type resets that order to the one that chip normally uses, so
 choose the type first and adjust the order afterwards.
 
+## Connecting the Camera
+
+Optional, and an add-on rather than part of a base unit. A **Camera Module 3
+Wide** on the standard 15-pin CSI ribbon, into the Pi's camera connector. The
+Wide is not interchangeable with the 75-degree version here: framing all four
+plants needs 260 mm of standoff with the 120-degree lens and 590 mm with the
+standard one, and the frame does not have 590 mm.
+
+Lift the latch on the Pi's camera connector, slide the ribbon in with the
+**silver contacts facing away from the Ethernet/USB end**, and press the latch
+down. The ribbon wants a gentle curve; a sharp fold cracks the traces.
+
+Aim it at the rail centre. Off-centre loses a plant at one end much sooner than
+being slightly too close loses anything. Use the Camera tab to check framing,
+or fetch a single frame:
+
+```bash
+curl -s localhost:8000/api/v1/camera/snapshot -o frame.jpg
+```
+
+**Only one process can hold the camera at a time.** The API takes it while
+somebody is watching the Camera tab and releases it about fifteen seconds after
+the last viewer leaves. So `rpicam-hello` run by hand while the tab is open
+will fail to acquire the camera - that is the two of them competing, not a
+fault. Close the tab, wait, and try again.
+
+Bringing it up, in order, so a failure points at one thing:
+
+```bash
+rpicam-hello --list-cameras     # the sensor is detected at all
+rpicam-vid -t 2000 --codec mjpeg -o /tmp/test.mjpeg   # capture works
+curl -s localhost:8000/api/v1/camera                  # the API agrees
+```
+
+If `--list-cameras` finds nothing, it is the ribbon or its seating, and nothing
+further along can work. If capture works but the API says `fitted: false`,
+`rpicam-vid` is not on the service's PATH. If the picture is live but lags in
+jerky batches, nginx is buffering it - check that the
+`/api/v1/camera/stream` location in `deploy/nginx/greenthumb.conf` carries
+`proxy_buffering off`.
+
+The service account needs the `video` group to reach the camera. The installer
+adds it; on a Pi set up before that, `sudo usermod -aG video pi` and restart
+the service.
+
+The live view is local only. Nothing is recorded and nothing leaves the
+network - see [PRIVACY_SECURITY_SPEC.md](../PRIVACY_SECURITY_SPEC.md).
+
 ## Harness routing
 
 Dress the wiring as **two groups that do not run alongside each other**:

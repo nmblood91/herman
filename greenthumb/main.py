@@ -9,9 +9,10 @@ from typing import AsyncIterator
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Body, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from greenthumb.config import settings
+from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_stream
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
 from greenthumb import system_clock, version
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
@@ -19,6 +20,18 @@ from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyErr
 setup_logging()
 
 automation = GreenThumbAutomation()
+
+# The camera sits outside the automation service, and deliberately outside its
+# hardware lock. That lock serialises the gantry, the pump and the I2C bus, and
+# a watering cycle holds it for minutes -- the picture has to keep moving
+# through that rather than freeze until the dose finishes. The camera is a
+# separate device that nothing else here contends for.
+camera = CameraStream(
+    width=settings.camera_width,
+    height=settings.camera_height,
+    fps=settings.camera_fps,
+    quality=settings.camera_jpeg_quality,
+)
 
 
 @asynccontextmanager
@@ -47,6 +60,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         scheduler.shutdown(wait=False)
         automation.leds.stop()
+        # Terminate and reap the capture, or a restart finds the camera still
+        # held by a process whose parent systemd just killed.
+        camera.stop()
         # The SQLite connection was being left open at shutdown. Closing it
         # flushes cleanly rather than relying on the process exiting, which
         # matters on a Pi that loses power more often than it is stopped.
@@ -441,6 +457,51 @@ def move_gantry(payload: dict[str, float] = Body(default_factory=dict)) -> dict[
     distance_mm = float(payload.get("distance_mm", 0.0))
     return log_motion(
         automation.move_gantry_relative(distance_mm), f"Move gantry by {distance_mm} mm"
+    )
+
+
+# --- Camera -----------------------------------------------------------------
+#
+# Kept together at the bottom so it is one block to lift out or to build on.
+# The product plan has the camera as a paid add-on doing timelapse; this is a
+# live picture for setup and service, and nothing else.
+
+
+@app.get(f"{settings.api_prefix}/camera")
+def get_camera() -> dict[str, object]:
+    return camera.status()
+
+
+# Async, unlike the hardware endpoints above, and for the opposite reason. They
+# are sync so their blocking calls run in the threadpool; a sync generator here
+# would hold one of those threadpool workers for as long as the tab stays open.
+# This holds a thread only while waiting for each frame.
+@app.get(f"{settings.api_prefix}/camera/stream")
+async def get_camera_stream() -> Response:
+    if not camera.fitted:
+        return JSONResponse(status_code=503, content=camera.status())
+    return StreamingResponse(
+        mjpeg_stream(camera),
+        media_type=MJPEG_CONTENT_TYPE,
+        headers={
+            # A response that never ends is exactly what a cache or a proxy
+            # will sit on, and the symptom is one still frame forever.
+            # X-Accel-Buffering is read by nginx, which then turns buffering
+            # off for this response even where its own config did not.
+            "Cache-Control": "no-store",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get(f"{settings.api_prefix}/camera/snapshot")
+def get_camera_snapshot() -> Response:
+    """One frame. Enough to check framing or focus without holding a stream."""
+    frame = camera.snapshot()
+    if frame is None:
+        return JSONResponse(status_code=503, content=camera.status())
+    return Response(
+        content=frame, media_type="image/jpeg", headers={"Cache-Control": "no-store"}
     )
 
 

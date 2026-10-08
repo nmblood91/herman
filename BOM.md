@@ -32,6 +32,10 @@ around **$455**.
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
 there is no bought nozzle — the tube is held by a printed part.
 
+The **camera add-on is $35 on top** and is deliberately in none of the totals
+above, since it is sold as an upgrade rather than built into every unit. It
+needs a printed mount that does not exist yet, so budget that separately.
+
 ## Core structure
 
 | Item | Qty | Unit | Line total | Notes |
@@ -74,7 +78,7 @@ being duplicated here; there is one 12 V supply for the whole machine.
 |---|---|---|---|---|
 | Raspberry Pi 3 Model A+ | 1 | $30.00 | $30.00 | production target; allow +$20 for a larger board or a price rise |
 | MicroSD card | 1 | $10.00 | $10.00 |  |
-| Pi Camera v2 or compatible CSI camera | 1 | TBD | TBD | **paid add-on, not base build** |
+| Raspberry Pi Camera Module 3 Wide | 1 | $35.00 | $35.00 | **paid add-on, not base build**; the 120° lens is what frames all four plants |
 
 **Base subtotal $40.00**, the camera excluded as an add-on. The 12 V to 5 V
 step-down that feeds the Pi is priced under *Power and electronics* with the
@@ -120,9 +124,21 @@ The enclosure needs to carry both the A+ and a development board — different
 outlines and different port faces, so plan for two mounting patterns rather
 than one.
 
-The camera is scoped to timelapse; the standard 15-pin ribbon fits both the A+
-and the development boards. Live streaming is out of scope, see
-[ROADMAP.md](ROADMAP.md).
+The camera add-on is scoped to timelapse; the standard 15-pin ribbon fits both
+the A+ and the development boards. The UI also carries a live view for aiming
+the camera and looking in on the plants, which is a local tool rather than
+something sold — see [ROADMAP.md](ROADMAP.md).
+
+**Which lens matters more than which sensor.** Camera Module 3 comes with a 75°
+or a 120° lens, and framing all four plants needs 890 mm of coverage:
+
+| Lens | Standoff needed |
+|---|---|
+| Wide, 120° | **260 mm** — fits inside the frame with room spare |
+| Standard, 75° | 590 mm — more depth than the frame has |
+
+So the Wide is the one to order. The 120° lens does bow the rail and stretch
+the outer two plants, which is the lens and not a mounting error.
 
 ## Sensing
 

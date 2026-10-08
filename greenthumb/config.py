@@ -36,6 +36,20 @@ class Settings(BaseSettings):
     gantry_position_margin_mm: float = 20.0
     debug: bool = False
 
+    # Camera, an optional add-on. Nothing here assumes one is plugged in: with
+    # no capture tool installed the Camera tab says so instead of failing.
+    #
+    # 640x480 at 10 fps is sized for the smallest board this targets, a Pi 3 A+
+    # with 512 MB of RAM. Camera Module 3 captures far larger than this and the
+    # ISP scales it down, so a bigger number here spends WiFi bandwidth and
+    # JPEG encoding rather than buying detail the lens did not resolve.
+    camera_width: int = 640
+    camera_height: int = 480
+    camera_fps: int = 10
+    # MJPEG sends a whole frame every frame, with no delta between them, so
+    # this is the main control over how much data crosses the WiFi.
+    camera_jpeg_quality: int = 70
+
     # Control loop
     sensor_poll_seconds: int = 60
     # Watering decisions use the mean of this many polls, so at a 60s interval

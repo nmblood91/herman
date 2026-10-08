@@ -60,12 +60,25 @@ pairing work, where proximity over BLE is what issues the token — see
 
 The camera is a sensitive component because it is inside a home environment.
 
-**Current scope.** The camera is an optional paid add-on, not part of the base
-unit, and is scoped to timelapse capture. **Live streaming is explicitly out of
-scope** — see [ROADMAP.md](ROADMAP.md). The requirements below are written to
-cover streaming anyway, so that the policy exists before the feature does
-rather than being decided under pressure afterwards. They are a standing
-constraint on any future camera work, not a description of what ships today.
+**Current scope.** The camera is an optional add-on, not part of the base unit.
+Two things exist, and they have different standing:
+
+- **A live view**, served as MJPEG to the Camera tab over the LAN. Built, and
+  covered by the requirements below rather than exempt from them.
+- **Timelapse capture**, which is the product feature and is not built. See
+  [ROADMAP.md](ROADMAP.md).
+
+Nothing is recorded today, so every requirement about stored footage is a
+standing constraint on work still to come rather than a description of what
+runs. The requirements on access are live now.
+
+**How the live view meets them, and where it does not.** The capture process
+runs only while somebody has the Camera tab open and is released about fifteen
+seconds after the last viewer leaves, so the camera is off whenever nobody is
+looking at it — which is a stronger default than an off switch that has to be
+found. There is still **no explicit disable control**, and the requirement for
+one below is not yet satisfied. On a unit with no camera the tab says so and no
+capture is ever started.
 
 ### Camera requirements
 - Camera access is local-only by default.
