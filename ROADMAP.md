@@ -203,7 +203,8 @@ What the host actually has to provide:
    the strip works, and the two supported chip families need rates in windows
    that barely touch.
 4. **WiFi**, there being no Ethernet in the chassis plan.
-5. **A USB host port** for the SKR serial link, or GPIO UART instead.
+5. **A USB host port** for the SKR serial link. Not negotiable — see below
+   for why GPIO UART is not the escape hatch it looks like.
 
 Requirement 3 is the one that eliminates whole categories, because `spidev`
 silently substitutes the nearest rate its driver supports. A host that cannot
@@ -281,12 +282,30 @@ implies. Check for `140°D` before believing it.
   one distorted wide shot.
 
 **The blocker is the USB port, not the camera.** The A+ has a single USB-A and
-the SKR owns it, Klipper talking to the board over USB serial. A hub works but
-consumes the only recovery port. The clean fix is moving Klipper onto the Pi's
-GPIO UART against the SKR's TFT header, which frees USB altogether — filed
-above as a serviceability option, and load-bearing if a USB camera ever ships.
-The development Pi 4 has four ports, so a camera can be proven out before that
-is solved.
+the SKR owns it, Klipper talking to the board over USB serial.
+
+**Klipper over GPIO UART is ruled out**, so do not reach for it as the way to
+free that port. It looks like the clean fix and is not, mostly because of the
+Pi 3 specifically: its good PL011 UART is wired to the Bluetooth radio, leaving
+the mini-UART, whose baud rate follows the VPU core clock and so drifts as the
+core throttles unless the clock is pinned. Either way the fix is boot-config
+surgery plus giving up the serial console. On top of that it trades one plug
+for a hand-wired link across the enclosure, and the SKR has to be reflashed for
+serial-on-USART, which costs the USB recovery path. A motion link that can
+desync under thermal load is the wrong place to economise.
+
+That leaves two honest options, and the second is better:
+
+- **A powered USB hub.** Works, and makes the hub a single point of failure in
+  front of both the motion board and the camera, on the port that is also the
+  recovery path.
+- **The camera unit carries a different board.** A 3 B+ or a Pi 4 has four
+  ports and no contention. Since the camera is an add-on rather than base
+  equipment, the board is allowed to differ by tier — which keeps a peripheral
+  from dictating the base unit's compute. This is the one to take.
+
+The development Pi 4 has four ports, so a camera can be proven out without
+deciding any of this.
 
 **Insist on hardware MJPEG.** A UVC camera that compresses on-board means the
 host only copies frames, which is *lighter* than the CSI path and its libcamera
