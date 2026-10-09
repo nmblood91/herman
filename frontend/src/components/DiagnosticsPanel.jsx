@@ -34,9 +34,10 @@ export function DiagnosticsPanel() {
 
   const [build, setBuild] = useState(null)
 
-  // The pump. Here rather than in Controls because the only reasons to run it
-  // by hand are diagnostic: priming the line, proving the MOSFET switches, and
-  // measuring the flow rate below.
+  // The pump. Nothing in the app runs it by hand any more except the
+  // calibration run below -- watering a plant is a measured volume and stays
+  // under Controls. A raw run is only ever a diagnostic: it fills the line,
+  // proves the MOSFET switches, and produces the figure measured here.
   //
   // That flow rate is the one number in the planter that is a guess until
   // someone measures it. A dose is a run time worked out from it, so a wrong
@@ -126,6 +127,9 @@ export function DiagnosticsPanel() {
   const lastRun = pump?.last_run ?? null
   const runLongEnough =
     lastRun && lastRun.seconds >= (pump?.min_calibration_seconds ?? 0)
+  // No saving mid-run: the figure being divided by is the *previous* run, so
+  // typing a volume while another is in progress would calibrate against the
+  // wrong one.
   const canSaveFlow =
     !!runLongEnough && measuredMl !== '' && Number(measuredMl) > 0 && !runEndsAt
 
@@ -393,22 +397,27 @@ export function DiagnosticsPanel() {
           </div>
 
           <div className="field-row">
-            <div className="motion-grid two-up">
-              <button type="button" disabled={!!runEndsAt} onClick={() => pumpAction('run')}>
-                {runEndsAt
-                  ? `Running — ${secondsLeft}s left`
-                  : `Run pump for ${pump?.max_run_seconds ?? 60}s`}
-              </button>
-              {/* Never disabled: it is the panic control, and disabling it on
-                  the frontend's idea of state would fail exactly when that idea
-                  is wrong. Stopping an already-stopped pump is harmless. */}
+            {/* One control, which becomes its own abort while the run is going.
+                There is deliberately no idle Stop button: nothing in the app
+                runs the pump by hand any more, so a Stop with nothing running
+                would be a control for a state that cannot exist. An abort
+                while it *is* running is not the same thing -- that is sixty
+                seconds of pumping, and a tube that comes off wants stopping. */}
+            {runEndsAt ? (
               <button type="button" onClick={() => pumpAction('stop')}>
-                Stop Pump
+                Stop — {secondsLeft}s left
               </button>
-            </div>
+            ) : (
+              <button type="button" className="primary" onClick={() => pumpAction('run')}>
+                Run calibration ({pump?.max_run_seconds ?? 60}s)
+              </button>
+            )}
             <p className="field-hint">
-              Runs the pump where it stands, without moving the gantry. It stops
-              on its own at the end even if you close this page.
+              Runs the pump where it stands, without moving the gantry, and
+              stops on its own at the end even if you close this page. This is
+              the only thing in the app that runs the pump directly — a dose
+              you ask for on a plant is a measured volume, which is why that
+              one lives under Controls.
             </p>
             {pumpStatus && <p className="field-hint warning">{pumpStatus}</p>}
           </div>
@@ -447,9 +456,10 @@ export function DiagnosticsPanel() {
             )}
             <p className="field-hint">
               Weigh it rather than reading a jug — 1 g of water is 1 mL, and a
-              kitchen scale beats graduations. Prime the line first: the very
-              first run fills the tube, and that volume is not flow. Three runs
-              that agree within a few percent is a number you can trust.
+              kitchen scale beats graduations. Run it once and throw that result
+              away: the first run fills the tube, and that volume is not flow.
+              Three runs that agree within a few percent is a number you can
+              trust.
             </p>
           </div>
         </div>

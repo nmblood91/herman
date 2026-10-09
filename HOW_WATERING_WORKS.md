@@ -309,17 +309,21 @@ the pump's rated figure, which assumes no lift and no tubing, so your real rate
 is almost certainly lower. The panel says so in amber until it has been
 measured.
 
-1. **Prime the line.** Run the pump once until water comes out steadily. The
-   first run fills the tube, and that volume is not flow.
+1. **Press Run calibration once and ignore what comes out.** The first run
+   fills the tube, and that volume is not flow.
 2. **Catch the water in something on a kitchen scale**, tared, with the nozzle
    over it. Weigh rather than reading a jug: 1 g of water is 1 mL, and a scale
    beats graduations.
-3. **Press Run.** It runs for 60 seconds and stops on its own — you do not need
-   to press Stop, and you do not need a stopwatch. The planter times its own
-   run and remembers how long it was.
+3. **Press Run calibration.** It runs for 60 seconds and stops on its own — you
+   do not need a stopwatch, and the button only becomes a Stop in case
+   something comes loose. The planter times its own run.
 4. **Weigh what came out** and type the grams into *How much came out?*, then
    Save. The planter divides by the run it just timed.
 5. **Do it three times.** They should agree within a few percent.
+
+This is the only place in the app that runs the pump directly. Watering a plant
+asks for a measured volume, so it stays on the Controls tab; there is no raw
+"run the pump" button there any more.
 
 The panel then tells you how long a 100 mL dose will run for, which is the
 number to sanity-check: dose 100 mL into the cup and expect about 100 g.

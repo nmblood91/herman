@@ -410,8 +410,10 @@ converts a requested volume into a pump run time.
 
 ### Measuring the pump flow rate
 
-Diagnostics → Pump. Run the pump for 60 s, weigh what comes out, and type the
-millilitres in; the planter divides by the run it timed itself.
+Diagnostics → Pump. Press **Run calibration**, weigh what comes out, and type
+the millilitres in; the planter divides by the run it timed itself. This is the
+only control in the app that runs the pump directly -- watering a plant asks for
+a measured volume, so it stays on the Controls tab.
 
 ```bash
 curl -X POST http://herman.local/api/v1/pump/run
