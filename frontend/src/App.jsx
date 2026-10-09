@@ -32,6 +32,9 @@ function App() {
   // plant changes it, so it has to refresh on the same beat.
   const [profiles, setProfiles] = useState([])
   const [soils, setSoils] = useState([])
+  // The band scale, fetched once rather than hard-coded, so the UI cannot
+  // drift from greenthumb/moisture.py.
+  const [bands, setBands] = useState([])
   // Transient feedback from something the user just did. Clears itself so the
   // bar falls back to the planter's actual state rather than freezing on the
   // last thing that happened to be clicked.
@@ -55,17 +58,19 @@ function App() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [overviewData, plantsData, profileData, soilData] = await Promise.all([
+      const [overviewData, plantsData, profileData, soilData, bandData] = await Promise.all([
         fetchJson('/overview'),
         fetchJson('/plants'),
         fetchJson('/plant-profiles'),
         fetchJson('/soils'),
+        fetchJson('/moisture-bands'),
       ])
 
       setOverview(overviewData)
       setPlants(plantsData)
       setProfiles(profileData.profiles ?? [])
       setSoils(soilData.soils ?? [])
+      setBands(bandData.bands ?? [])
       // Deliberately does not touch `action`. This runs after every action, so
       // writing to the status bar here would wipe the feedback from whatever
       // the user just pressed. The bar falls back to the planter's computed
@@ -197,7 +202,7 @@ function App() {
       // Says what was left alone as well as what changed: the watering
       // location staying put is the surprising half.
       setStatus(
-        `Loaded ${result.name}: target ${result.moisture_target}%, ` +
+        `Loaded ${result.name}: waters at ${result.moisture_target}, ` +
           `${result.watering_volume_ml} mL, lights ${result.light_start_time}` +
           `–${result.light_stop_time}. Watering location unchanged at ` +
           `${result.position_mm} mm.`,
@@ -227,7 +232,7 @@ function App() {
 
       await fetchJson(`/plants/${plant.plant_id}/moisture`, {
         method: 'POST',
-        body: JSON.stringify({ moisture_target: Number(plant.moisture_target) }),
+        body: JSON.stringify({ moisture_target: plant.moisture_target }),
       })
 
       await fetchJson(`/plants/${plant.plant_id}/volume`, {
@@ -293,6 +298,7 @@ function App() {
             profiles={profiles}
             onLoadProfile={loadProfile}
             soils={soils}
+            bands={bands}
           />
           {/* Below the cards on purpose. The cards carry each plant's current
               reading and are what you act on; the chart is the trend you

@@ -5,7 +5,7 @@ const draftFrom = (plant) => ({
   soil: plant.soil ?? '',
   light_start_time: plant.light_start_time ?? '08:00',
   light_stop_time: plant.light_stop_time ?? '20:00',
-  moisture_target: plant.moisture_target ?? 45,
+  moisture_target: plant.moisture_target ?? 'dry',
   watering_volume_ml: plant.watering_volume_ml ?? 100,
   position_mm: plant.position_mm ?? 0,
 })
@@ -27,15 +27,29 @@ const describeMoisture = (status) => {
       hint: `gathering history, ${status.sample_count}/${status.window_size}`,
     }
   }
+  // The band leads and the percentage follows as detail. On a peat mix the
+  // whole actionable range is a narrow strip near the top of the scale, so the
+  // number alone invites reading precision the sensor cannot deliver.
+  const band = status.moisture_band
   const target = status.target_moisture
-  if (target != null) {
+
+  if (band === 'unknown') {
     return {
-      text,
-      hint:
-        status.moisture_percent < target
-          ? `below target of ${target}%`
-          : `target ${target}%`,
-      dry: status.moisture_percent < target,
+      text: 'no soil set',
+      hint: `${text} — set a soil so the reading can be read`,
+      warn: true,
+    }
+  }
+
+  if (band && target) {
+    // Drier than the target means due a drink. Band order is wettest first,
+    // so a higher index is drier.
+    const order = ['very wet', 'wet', 'medium', 'dry', 'very dry']
+    const thirsty = order.indexOf(band) > order.indexOf(target)
+    return {
+      text: band,
+      hint: thirsty ? `${text}, past its ${target} target` : `${text}, waters at ${target}`,
+      dry: thirsty,
     }
   }
   return { text, hint: '' }
@@ -55,6 +69,7 @@ export function PlantsPanel({
   profiles,
   onLoadProfile,
   soils,
+  bands,
 }) {
   const [drafts, setDrafts] = useState({})
   // Which saved plant each card has picked, keyed by plant so one card's
@@ -117,6 +132,9 @@ export function PlantsPanel({
 
   const profileNames = (profiles ?? []).map((profile) => profile.name)
   const soilList = soils ?? []
+  // Very wet is deliberately not offered: a pot is only that just after
+  // watering, so targeting it waters on a loop.
+  const bandList = (bands ?? []).filter((band) => band.name !== 'very wet')
 
   const togglePlantExpanded = (plantId) => {
     setExpandedPlantIds((current) =>
@@ -242,12 +260,20 @@ export function PlantsPanel({
                       />
                     </label>
                     <label>
-                      Moisture target (%)
-                      <input
-                        type="number"
+                      Water when it reaches
+                      <select
                         value={draft.moisture_target}
-                        onChange={(event) => updateDraft(plant.plant_id, 'moisture_target', event.target.value)}
-                      />
+                        onChange={(event) =>
+                          updateDraft(plant.plant_id, 'moisture_target', event.target.value)
+                        }
+                      >
+                        {bandList.map((band) => (
+                          <option key={band.name} value={band.name}>
+                            {band.name}
+                            {band.description ? ` — ${band.description}` : ''}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label>
                       Watering volume (mL)

@@ -56,7 +56,7 @@ auto = build()
 first, second = ids(auto)[0], ids(auto)[1]
 
 auto.update_plant_name(first, "Basil - Wet")
-auto.update_moisture_target(first, 62)
+auto.update_moisture_target(first, "medium")
 auto.update_watering_volume(first, 150)
 
 auto.save_plant_profile(first)
@@ -67,7 +67,7 @@ print("ok: a plant's settings save under its own name")
 auto.apply_plant_profile(second, "Basil - Wet")
 plant = auto.get_plant(second)
 assert plant.name == "Basil - Wet", plant.name
-assert plant.moisture_target == 62, plant.moisture_target
+assert plant.moisture_target == "medium", plant.moisture_target
 assert plant.watering_volume_ml == 150, plant.watering_volume_ml
 print("ok: loading copies the name and the care settings onto another pot")
 
@@ -100,34 +100,34 @@ shared = temp_state()
 auto = build(shared)
 first = ids(auto)[0]
 auto.update_plant_name(first, "Basil")
-auto.update_moisture_target(first, 40)
+auto.update_moisture_target(first, "dry")
 auto.save_plant_profile(first)
-auto.update_moisture_target(first, 70)
+auto.update_moisture_target(first, "wet")
 auto.save_plant_profile(first)
 
 profiles = auto.list_plant_profiles()
 assert len(profiles) == 1, [p["name"] for p in profiles]
-assert profiles[0]["moisture_target"] == 70, profiles[0]
+assert profiles[0]["moisture_target"] == "wet", profiles[0]
 print("ok: saving twice overwrites rather than making a second Basil")
 
 # A stray capital is not a different plant.
 auto.update_plant_name(first, "basil")
-auto.update_moisture_target(first, 55)
+auto.update_moisture_target(first, "medium")
 auto.save_plant_profile(first)
 profiles = auto.list_plant_profiles()
 assert len(profiles) == 1, [p["name"] for p in profiles]
 assert profiles[0]["name"] == "basil", profiles[0]["name"]
-assert profiles[0]["moisture_target"] == 55
+assert profiles[0]["moisture_target"] == "medium"
 print("ok: a change of capitalisation renames the entry instead of duplicating it")
 
 # And loading is case-insensitive the same way.
 auto.apply_plant_profile(ids(auto)[1], "BASIL")
-assert auto.get_plant(ids(auto)[1]).moisture_target == 55
+assert auto.get_plant(ids(auto)[1]).moisture_target == "medium"
 print("ok: loading matches a name regardless of case")
 
 # Distinct names are distinct plants, which is how you keep wet and dry apart.
 auto.update_plant_name(first, "Basil - Dry")
-auto.update_moisture_target(first, 25)
+auto.update_moisture_target(first, "very dry")
 auto.save_plant_profile(first)
 names = sorted(p["name"] for p in auto.list_plant_profiles())
 assert names == ["Basil - Dry", "basil"], names
@@ -173,11 +173,11 @@ else:
 
 # A pot still using a deleted profile keeps what it was given -- the library is
 # a source to copy from, not a live link.
-assert restored.get_plant(ids(restored)[1]).moisture_target == 55
+assert restored.get_plant(ids(restored)[1]).moisture_target == "medium"
 print("ok: deleting a saved plant does not change pots already using it")
 
 try:
-    state.save_profile("   ", {"moisture_target": 50}, restored._state_path)
+    state.save_profile("   ", {"moisture_target": "dry"}, restored._state_path)
 except ValueError:
     print("ok: a blank name is refused")
 else:
@@ -201,8 +201,8 @@ data[state.PROFILES_KEY]["Hollow"] = {}
 # value["moisture_target"] -- indexing a string with a string -- and the
 # TypeError takes the whole library down rather than one entry.
 data[state.PROFILES_KEY]["Nasty"] = "moisture_target"
-data[state.PROFILES_KEY][""] = {"moisture_target": 10}
-data[state.PROFILES_KEY]["Good"] = {"moisture_target": 33}
+data[state.PROFILES_KEY][""] = {"moisture_target": "dry"}
+data[state.PROFILES_KEY]["Good"] = {"moisture_target": "dry"}
 state.save_state(data, restored._state_path)
 
 names = sorted(state.load_profiles(restored._state_path))

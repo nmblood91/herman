@@ -11,7 +11,11 @@ class PlantSpec:
     sensor_address: int
     # Required rather than defaulted: every plant sets these, and a default that
     # no caller uses is a value nobody notices is wrong.
-    moisture_target: int
+    #
+    # The target is a band name from greenthumb.moisture, not a percentage.
+    # "water when this reaches dry" is a decision; "water at 42%" is a number
+    # against a scale whose meaning depends on the soil.
+    moisture_target: str
     watering_volume_ml: int
     light_start_time: time = time(8, 0)
     light_stop_time: time = time(20, 0)
@@ -40,7 +44,11 @@ class SensorSample:
 class PlantStatus:
     plant_id: str
     moisture_percent: float
-    target_moisture: float
+    # The band the reading falls in, and the band it is aimed at. The raw
+    # percentage stays alongside: the history chart needs it, and the rate of
+    # drying says more than the level.
+    moisture_band: str
+    target_moisture: str
     pump_active: bool = False
     lighting_mode: str = "ambient"
     last_watered: str | None = None

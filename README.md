@@ -75,6 +75,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, and move-to |
 | `/plant-profiles`, `/plants/{id}/profile` | the saved-plant library: list, save, load, delete |
 | `/soils`, `/plants/{id}/soil` | the soil library, and which mix a pot is filled with |
+| `/moisture-bands` | the band scale, for pickers and legends |
 | `/water/{plant_id}` | move to a plant and dose it |
 | `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
@@ -189,10 +190,49 @@ An unknown soil name is refused rather than stored, since a mix that is not in
 the library supplies no ratio and would read as "set" while behaving exactly
 like "not set".
 
+## Moisture bands
+
+A plant is watered when its pot reaches a **band**, not a percentage:
+
+| Band | Depletion of plant-available water |
+|---|---|
+| very wet | 0-10% — just watered |
+| wet | 10-30% |
+| medium | 30-50% |
+| **dry** | **50-75% — the conventional watering trigger** |
+| very dry | 75-100% — near the limit of what roots can pull out |
+
+The percentage is still kept and still charted — the *rate* of drying says more
+than the level, because it follows light, temperature and growth stage on its
+own where a fixed threshold cannot. The band is what a target is expressed in.
+
+**Bands are computed per soil, which is the point.** The bottom of the usable
+range is wilting point, and that sits at about 27% of field capacity for coco
+coir but 57% for a peat mix. So the same reading means different things: 80% is
+*medium* in peat and *wet* in coir. A fixed table of thresholds would put half
+of coir's bands below wilting point and squash a peat pot's into two.
+
+**Why bands rather than the number.** On a peat mix the whole actionable range
+is the top 43% of the scale, and the step from comfortable to needing water is
+about eight points of a 0-100 display. A few percent of calibration error moves
+you two bands. A percentage invites reading precision the sensor cannot
+deliver; a band states the decision and hides a distinction the hardware cannot
+make.
+
+Readings hold their band until one clears a boundary properly, so a value
+parked on a threshold does not relabel on every poll.
+
+**A pot with no soil set is never watered automatically.** Without the mix
+there is no wilting point, so a reading cannot become a band at all — and
+"cannot say" must not collapse into "very dry", or an unplugged probe would
+read as the thirstiest plant on the rail. The status bar names any pot in that
+state. Manual watering is unaffected.
+
 ### Starter profiles
 
-Five common plants ship as a starting library — Peace Lily, Lettuce, Basil,
-Pothos and Snake Plant, ordered wettest to driest:
+Five common plants ship as a starting library, ordered by when they want water:
+Lettuce (medium), Peace Lily and Basil (dry), Pothos and Snake Plant (very
+dry).
 
 ```bash
 python -m greenthumb.plant_library              # read them and why
@@ -201,20 +241,12 @@ python -m greenthumb.plant_library --install    # add them to the library
 
 Installing keeps any entry you have already tuned; `--overwrite` replaces them.
 
-**The photoperiods are researched, the moisture targets are not** — and cannot
-be, because no horticultural source publishes a sensor percentage. The
-literature describes dry-down behaviour ("let the top inch dry", "let it dry out
-completely") and the number that corresponds to depends on your sensor and its
-calibration. What the targets encode is the *ordering*: a snake plant should
-want water far later than a peace lily.
-
-They are also deliberately low, for a reason worth knowing. This scale is
-`(raw - dry) / (wet - dry)` with the wet endpoint measured in **plain water**,
-which is far wetter than saturated potting mix — so saturated soil reads
-somewhere around 60-75%, never 100%. A target above what the soil can reach
-makes a plant permanently thirsty, watered every `watering_cooldown_minutes`
-until the reservoir is empty. **Calibrate the sensors before tuning against
-these**, and keep targets well under what your own wettest reading shows.
+**The photoperiods are researched; the targets are bands for a reason.** No
+horticultural source publishes a sensor percentage, because the number depends
+on the probe and the mix. What the literature describes is behaviour — "let the
+top inch dry", "let it dry out completely" — and a band is the closest honest
+expression of that. Several plants sharing a band is honest too: the research
+does not separate basil from lettuce to within a few percent.
 
 Volumes assume a 15 cm (6 inch) pot and frequent small doses rather than a
 weekly soak. Scale with the pot.
@@ -259,7 +291,7 @@ This repository is set up to become a real product in stages:
 ## How watering decisions are made
 
 A background loop polls every sensor once a minute, averages the last ten
-readings per plant, and waters a plant whose average falls below its target.
+readings per plant, and waters a plant once its band is drier than its target.
 [HOW_WATERING_WORKS.md](HOW_WATERING_WORKS.md) explains the rules and the
 reasoning in plain language, for people who won't be reading the code.
 

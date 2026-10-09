@@ -4,7 +4,7 @@ sys.modules["smbus2"] = types.ModuleType("smbus2")
 from greenthumb.config import settings
 from greenthumb.models import SensorSample
 from greenthumb.hardware.pump import PumpController
-from tests.helpers import temp_state, temp_store
+from tests.helpers import give_every_plant_soil, temp_state, temp_store
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
 
 settings.auto_watering_enabled = True
@@ -32,7 +32,9 @@ class Leds:
 
 def build():
     klip = Klip()
-    auto = GreenThumbAutomation(Hub(), klip, PumpController(klip), Leds(), history=temp_store(), state_path=temp_state())
+    auto = give_every_plant_soil(
+        GreenThumbAutomation(Hub(), klip, PumpController(klip), Leds(), history=temp_store(), state_path=temp_state())
+    )
     return auto, klip
 
 

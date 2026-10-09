@@ -1,40 +1,29 @@
 """Starting profiles for five common plants.
 
-**Read this before trusting the moisture numbers.**
+The photoperiods come from published work and are the solid part. The moisture
+targets are **bands**, not percentages, and that is deliberate rather than a
+simplification: no plant-care source publishes a sensor percentage, because the
+number depends on the probe and the mix. What the literature does describe is
+behaviour -- "let the top inch dry", "let it dry out completely" -- and a band
+is the closest honest expression of that.
 
-The photoperiods below come from published work and are the solid part. The
-moisture targets are not, and cannot be, because *no horticultural source
-publishes a sensor percentage*. The literature describes dry-down behaviour --
-"let the top inch dry", "water weekly", "let it dry out completely" -- and
-translating that into a number depends entirely on the sensor and its
-calibration.
+A band is a depletion of plant-available water, so what a target means in
+percentage terms is worked out per soil from the mix's wilting point. See
+`greenthumb.moisture`. The consequence worth knowing: **a plant will not be
+watered automatically until its pot has a soil set**, because without one a
+reading cannot be turned into a band at all.
 
-Two things make the translation worse than it looks:
+Several plants sharing a band is honest, not a loss of precision. The research
+does not separate basil from lettuce to within a few percent, and pretending
+otherwise was the problem with the old numbers.
 
-* **This scale does not reach 100% in soil.** The percentage is
-  `(raw - dry) / (wet - dry)`, and the wet endpoint is measured with the prongs
-  in *plain water*, which is far wetter than saturated potting mix. Saturated
-  soil lands somewhere around 60-75% on this scale, never at the top of it.
-* **A target the soil cannot reach waters forever.** A plant counts as thirsty
-  while `reading < moisture_target`, so a target above what saturated mix reads
-  is a permanently thirsty plant, watered every `watering_cooldown_minutes`
-  until the reservoir is empty. The cooldown is the only thing between a
-  too-high target and a wet floor.
-
-So the targets here are deliberately **low on the scale and conservative**, and
-what they really encode is the *ordering*: a snake plant should want water far
-later than a peace lily. Treat them as a starting point to adjust against your
-own readings, not as measurements. Calibrate first -- an uncalibrated planter is
-using the placeholder endpoints in config.py, where these numbers mean even
-less.
-
-Volumes assume a **15 cm (6 inch) pot**, roughly 1.5 L of mix, and are sized
-for frequent small doses rather than a weekly soak. Scale them with the pot: a
+Volumes assume a **15 cm (6 inch) pot**, roughly 1.5 L of mix, sized for
+frequent small doses rather than a weekly soak. Scale them with the pot: a
 10 cm pot wants about half, a 20 cm pot about double.
 
 Sources are cited per plant. The houseplants have no published DLI because
 nobody grows them for yield, so their photoperiods are ordinary houseplant
-practice rather than research, and they are noted as such.
+practice rather than research, and they say so.
 """
 
 from __future__ import annotations
@@ -49,7 +38,8 @@ from greenthumb import state
 @dataclass(frozen=True)
 class LibraryPlant:
     name: str
-    moisture_target: int
+    # A band name from greenthumb.moisture: water once the pot reaches this.
+    moisture_target: str
     watering_volume_ml: int
     light_start_time: str
     light_stop_time: str
@@ -57,26 +47,12 @@ class LibraryPlant:
     note: str
 
 
-# Ordered wettest to driest, which is the part of this that is defensible.
+# Ordered by when they want water, soonest first -- the part of this that is
+# defensible. Several plants sharing a band is expected, not a loss.
 LIBRARY: tuple[LibraryPlant, ...] = (
     LibraryPlant(
-        name="Peace Lily",
-        moisture_target=45,
-        watering_volume_ml=150,
-        light_start_time="08:00",
-        light_stop_time="20:00",
-        note=(
-            "Consistently moist but never soggy, with the top inch allowed to "
-            "dry slightly before the next watering -- about weekly in average "
-            "indoor conditions. The wettest plant here, and the one that tells "
-            "you it is thirsty by drooping, so it is a forgiving one to tune "
-            "against. 12 h of light is houseplant practice, not research: it "
-            "tolerates low indirect light and is not being grown for yield."
-        ),
-    ),
-    LibraryPlant(
         name="Lettuce",
-        moisture_target=45,
+        moisture_target="medium",
         watering_volume_ml=150,
         light_start_time="06:00",
         light_stop_time="22:00",
@@ -91,8 +67,23 @@ LIBRARY: tuple[LibraryPlant, ...] = (
         ),
     ),
     LibraryPlant(
+        name="Peace Lily",
+        moisture_target="dry",
+        watering_volume_ml=150,
+        light_start_time="08:00",
+        light_stop_time="20:00",
+        note=(
+            "Consistently moist but never soggy, with the top inch allowed to "
+            "dry slightly before the next watering -- about weekly in average "
+            "indoor conditions. The wettest plant here, and the one that tells "
+            "you it is thirsty by drooping, so it is a forgiving one to tune "
+            "against. 12 h of light is houseplant practice, not research: it "
+            "tolerates low indirect light and is not being grown for yield."
+        ),
+    ),
+    LibraryPlant(
         name="Basil",
-        moisture_target=42,
+        moisture_target="dry",
         watering_volume_ml=150,
         light_start_time="06:00",
         light_stop_time="22:00",
@@ -107,7 +98,7 @@ LIBRARY: tuple[LibraryPlant, ...] = (
     ),
     LibraryPlant(
         name="Pothos",
-        moisture_target=25,
+        moisture_target="very dry",
         watering_volume_ml=120,
         light_start_time="08:00",
         light_stop_time="20:00",
@@ -121,7 +112,7 @@ LIBRARY: tuple[LibraryPlant, ...] = (
     ),
     LibraryPlant(
         name="Snake Plant",
-        moisture_target=12,
+        moisture_target="very dry",
         watering_volume_ml=80,
         light_start_time="08:00",
         light_stop_time="18:00",
@@ -190,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
             ) % 24
             print(f"\n{plant.name}")
             print(
-                f"  target {plant.moisture_target}%   dose {plant.watering_volume_ml} mL"
+                f"  water at {plant.moisture_target:<9} dose {plant.watering_volume_ml} mL"
                 f"   light {plant.light_start_time}-{plant.light_stop_time} ({hours} h)"
             )
             print(f"  {plant.note}")

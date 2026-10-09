@@ -16,7 +16,7 @@ from greenthumb.hardware.soil_sensors import SoilSensorHub, calibrate, unavailab
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
 from greenthumb.plants import default_plants, label_for
-from greenthumb import dances, state
+from greenthumb import dances, moisture, state
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,11 @@ class GreenThumbAutomation:
         # -1" is also what a planter looks like one second after boot. This
         # distinguishes the two.
         self._has_polled = False
+        # Last band reported per plant, so moisture.band_for can apply its
+        # hysteresis. Not persisted: after a restart the first reading is
+        # taken at face value, which is correct -- there is no stale label
+        # to hold on to.
+        self._bands: dict[str, str] = {}
         self._last_watered: dict[str, datetime] = {}
         self.history = history or HistoryStore(settings.history_db_path or DEFAULT_DB_PATH)
         self._last_delivery: dict[str, object] | None = None
@@ -170,11 +175,11 @@ class GreenThumbAutomation:
                 # A plant id that no longer exists is skipped rather than
                 # treated as an error: the plant set is defined by the code.
                 continue
-            for text_field in ("name", "soil"):
+            for text_field in ("name", "soil", "moisture_target"):
                 value = saved.get(text_field)
                 if isinstance(value, str) and value.strip():
                     setattr(plant, text_field, value.strip())
-            for field_name in ("moisture_target", "watering_volume_ml", "position_mm"):
+            for field_name in ("watering_volume_ml", "position_mm"):
                 value = saved.get(field_name)
                 if isinstance(value, bool) or not isinstance(value, (int, float)):
                     continue
@@ -448,6 +453,43 @@ class GreenThumbAutomation:
         except Exception:
             logger.exception("Failed to record readings")
 
+    def band_for_plant(self, plant: PlantSpec) -> str:
+        """Which moisture band this pot is in, or "unknown".
+
+        Unknown when the probe is not reporting *or* when the pot has no soil
+        set, because without the soil there is no wilting point and so no way
+        to turn a reading into a band. The two are different causes with the
+        same honest answer: we cannot say.
+
+        The previous band is passed through so the hysteresis in
+        greenthumb.moisture applies -- without it a reading parked on a
+        boundary would relabel every poll.
+        """
+        soils = state.load_soils(self._state_path)
+        key = next(
+            (k for k in soils if k.casefold() == plant.soil.casefold()), None
+        ) if plant.soil else None
+        ratio = state.available_water_fraction(soils.get(key)) if key else None
+
+        band = moisture.band_for(
+            self.smoothed_percent(plant.sensor_address),
+            ratio,
+            previous=self._bands.get(plant.plant_id),
+        )
+        self._bands[plant.plant_id] = band
+        return band
+
+    def thirsty(self, plant: PlantSpec) -> bool:
+        """True when this pot is drier than its target band.
+
+        An unknown band is never thirsty. That is the whole protection against
+        watering on a reading we do not have -- a probe that fell out, or a pot
+        whose soil was never recorded.
+        """
+        return not moisture.is_wetter_or_equal(
+            self.band_for_plant(plant), plant.moisture_target
+        )
+
     def smoothed_percent(self, address: int) -> float:
         """Mean moisture over the window; this, not a single read, drives watering."""
         window = self._history.get(address)
@@ -553,11 +595,18 @@ class GreenThumbAutomation:
             )
 
         # 6. Nothing to report, which is the normal case.
-        thirsty = [
-            plant.name
-            for plant in self.plants
-            if 0 <= self.smoothed_percent(plant.sensor_address) < plant.moisture_target
-        ]
+        # Pots with no soil cannot be judged at all, and saying so is the
+        # point: automatic watering is held for them, and silence would read
+        # as "nothing to do" rather than "cannot tell".
+        unset = [plant.name for plant in self.plants if not plant.soil]
+        if unset and self.auto_watering_enabled:
+            return state(
+                "attention",
+                f"No soil set on {', '.join(unset)}, so watering is held there. "
+                f"Set it on the Plants tab.",
+            )
+
+        thirsty = [plant.name for plant in self.plants if self.thirsty(plant)]
         if thirsty:
             return state("ok", f"{', '.join(thirsty)} due a drink shortly.")
         count = len(self.plants)
@@ -746,17 +795,17 @@ class GreenThumbAutomation:
             if not window or len(window) < window.maxlen:
                 continue
 
-            moisture = self.smoothed_percent(plant.sensor_address)
-            if moisture >= plant.moisture_target:
+            if not self.thirsty(plant):
                 continue
             if not self._cooldown_elapsed(plant.plant_id):
                 continue
 
             logger.info(
-                "Plant %s at %.1f%% is below target %.1f%%, watering",
+                "Plant %s is %s against a target of %s, watering (%.1f%%)",
                 plant.plant_id,
-                moisture,
+                self.band_for_plant(plant),
                 plant.moisture_target,
+                self.smoothed_percent(plant.sensor_address),
             )
             self._move_and_water(plant)
 
@@ -935,6 +984,7 @@ class GreenThumbAutomation:
             PlantStatus(
                 plant_id=spec.plant_id,
                 moisture_percent=self.smoothed_percent(spec.sensor_address),
+                moisture_band=self.band_for_plant(spec),
                 target_moisture=spec.moisture_target,
                 pump_active=self.pump.is_running,
                 lighting_mode=self.leds.mode,
@@ -1310,11 +1360,21 @@ class GreenThumbAutomation:
         entry = profiles[key]
         plant.name = key
 
-        for field_name in ("moisture_target", "watering_volume_ml"):
-            value = entry.get(field_name)
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                continue
-            setattr(plant, field_name, max(0, int(value)))
+        volume = entry.get("watering_volume_ml")
+        if not isinstance(volume, bool) and isinstance(volume, (int, float)):
+            plant.watering_volume_ml = max(0, int(volume))
+
+        # The target is a band name, so it needs validating rather than
+        # coercing. An unrecognised one is dropped rather than stored: a target
+        # that does not resolve makes the plant permanently not-thirsty, which
+        # reads as a working planter that has quietly stopped watering.
+        target = entry.get("moisture_target")
+        if isinstance(target, str) and target.strip().casefold() in moisture.BY_NAME:
+            plant.moisture_target = target.strip().casefold()
+        elif target is not None:
+            logger.warning(
+                "Ignoring unusable moisture target %r in profile %r", target, key
+            )
 
         for field_name in ("light_start_time", "light_stop_time"):
             text = entry.get(field_name)
@@ -1443,17 +1503,30 @@ class GreenThumbAutomation:
             "watering_volume_ml": plant.watering_volume_ml,
         }
 
-    def update_moisture_target(self, plant_id: str, moisture_target: float) -> dict[str, object]:
+    def update_moisture_target(self, plant_id: str, moisture_target: str) -> dict[str, object]:
+        """Set the band at which this plant should be watered.
+
+        Refused rather than coerced if it is not a band: a target that does not
+        resolve makes the plant permanently not-thirsty, which looks like a
+        working planter that has quietly stopped watering.
+        """
         plant = self.get_plant(plant_id)
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        clamped_target = max(0.0, min(float(moisture_target), 100.0))
-        plant.moisture_target = round(clamped_target, 1)
+        wanted = str(moisture_target).strip().casefold()
+        if wanted not in moisture.BY_NAME:
+            raise ValueError(
+                f"Unknown moisture target {moisture_target!r}. "
+                f"Use one of: {', '.join(moisture.ORDER)}"
+            )
+
+        plant.moisture_target = wanted
         self._persist()
 
         return {
             "status": "ok",
             "plant_id": plant_id,
             "moisture_target": plant.moisture_target,
+            "description": moisture.describe(wanted),
         }

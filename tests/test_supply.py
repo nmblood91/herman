@@ -13,7 +13,7 @@ import time
 import greenthumb.services.automation as automation_module
 from greenthumb.config import settings
 from greenthumb.models import SensorSample
-from tests.helpers import temp_state, temp_store
+from tests.helpers import give_every_plant_soil, temp_state, temp_store
 from greenthumb.services.automation import GreenThumbAutomation
 
 settings.auto_watering_enabled = True
@@ -61,7 +61,9 @@ class Leds:
 
 def build(supply=True):
     pump, klip, store = Pump(), Klip(supply), temp_store()
-    auto = GreenThumbAutomation(Hub(), klip, pump, Leds(), history=store, state_path=temp_state())
+    auto = give_every_plant_soil(
+        GreenThumbAutomation(Hub(), klip, pump, Leds(), history=store, state_path=temp_state())
+    )
     return auto, pump, klip, store
 
 

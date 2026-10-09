@@ -6,7 +6,7 @@ sys.modules["smbus2"] = types.ModuleType("smbus2")  # no I2C on the laptop
 from greenthumb.config import settings
 from greenthumb.hardware.soil_sensors import SoilSensorHub
 from greenthumb.models import SensorSample
-from tests.helpers import temp_state, temp_store
+from tests.helpers import give_every_plant_soil, temp_state, temp_store
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
 
 settings.auto_watering_enabled = True
@@ -71,7 +71,9 @@ class FakeLeds:
 def build(raw):
     hub = FakeHub(raw)
     pump = FakePump()
-    auto = GreenThumbAutomation(hub, FakeKlipper(), pump, FakeLeds(), history=temp_store(), state_path=temp_state())
+    auto = give_every_plant_soil(
+        GreenThumbAutomation(hub, FakeKlipper(), pump, FakeLeds(), history=temp_store(), state_path=temp_state())
+    )
     return auto, pump
 
 
@@ -145,7 +147,7 @@ class Exploding(FakeHub):
     def read_one(self, address):
         raise OSError("bus fell over")
 
-auto2 = GreenThumbAutomation(Exploding(settings.moisture_raw_dry), FakeKlipper(), FakePump(), FakeLeds(), history=temp_store(), state_path=temp_state())
+auto2 = give_every_plant_soil(GreenThumbAutomation(Exploding(settings.moisture_raw_dry), FakeKlipper(), FakePump(), FakeLeds(), history=temp_store(), state_path=temp_state()))
 auto2.tick()
 assert not auto2._hardware_lock.locked(), "lock leaked after a failing tick"
 print("ok: failing tick is contained and releases the lock")
@@ -177,7 +179,7 @@ class RefusingKlipper(FakeKlipper):
         return {"ok": False, "error": "must home first"}
 
 
-auto2 = GreenThumbAutomation(FakeHub(settings.moisture_raw_dry), RefusingKlipper(), FakePump(), FakeLeds(), history=temp_store(), state_path=temp_state())
+auto2 = give_every_plant_soil(GreenThumbAutomation(FakeHub(settings.moisture_raw_dry), RefusingKlipper(), FakePump(), FakeLeds(), history=temp_store(), state_path=temp_state()))
 result = auto2.water_plant("plant_1")
 assert result["status"] == "error", result
 assert auto2.pump.calls == [], "pumped despite a failed move"
@@ -251,13 +253,13 @@ def fresh(state_file):
 
 before = fresh(shared)
 default_target = before.get_plant("plant_1").moisture_target
-before.update_moisture_target("plant_1", 61)
+before.update_moisture_target("plant_1", "very dry")
 before.update_watering_volume("plant_2", 250)
 before.set_plant_position("plant_3", 500)
 before.update_plant_name("plant_4", "Monstera")
 
 after = fresh(shared)
-assert after.get_plant("plant_1").moisture_target == 61, after.get_plant("plant_1").moisture_target
+assert after.get_plant("plant_1").moisture_target == "very dry", after.get_plant("plant_1").moisture_target
 assert after.get_plant("plant_2").watering_volume_ml == 250
 assert after.get_plant("plant_3").position_mm == 500
 assert after.get_plant("plant_4").name == "Monstera"

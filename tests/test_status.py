@@ -13,7 +13,7 @@ sys.modules["spidev"] = types.ModuleType("spidev")
 from greenthumb.config import settings
 from greenthumb.models import SensorSample
 from greenthumb.services.automation import GreenThumbAutomation
-from tests.helpers import temp_state, temp_store
+from tests.helpers import give_every_plant_soil, temp_state, temp_store
 
 
 class Klip:
@@ -41,9 +41,14 @@ class Hub:
 
 
 def build(hub=None, klip=None):
-    return GreenThumbAutomation(
-        hub or Hub(), klip or Klip(), Nul(), Nul(),
-        history=temp_store(), state_path=temp_state(),
+    # Every plant gets a soil: without one a reading cannot become a band, so
+    # the status bar would report "no soil set" rather than anything about
+    # moisture, which is not what these cases are testing.
+    return give_every_plant_soil(
+        GreenThumbAutomation(
+            hub or Hub(), klip or Klip(), Nul(), Nul(),
+            history=temp_store(), state_path=temp_state(),
+        )
     )
 
 

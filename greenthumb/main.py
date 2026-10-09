@@ -11,6 +11,7 @@ from fastapi import Body, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from greenthumb import moisture
 from greenthumb.config import settings
 from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_stream
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
@@ -419,6 +420,22 @@ async def list_plants() -> list[dict[str, object]]:
 # may carry the same name; a profile is care settings, not a slot.
 
 
+@app.get(f"{settings.api_prefix}/moisture-bands")
+def list_moisture_bands() -> dict[str, object]:
+    """The band scale, wettest to driest, for pickers and legends."""
+    return {
+        "bands": [
+            {
+                "name": band.name,
+                "description": band.description,
+                "depleted_from": band.depleted_from,
+                "depleted_to": band.depleted_to,
+            }
+            for band in moisture.BANDS
+        ]
+    }
+
+
 @app.get(f"{settings.api_prefix}/soils")
 def list_soils() -> dict[str, object]:
     return {"soils": automation.list_soils()}
@@ -492,10 +509,12 @@ async def update_light_schedule(plant_id: str, payload: dict[str, str] = Body(de
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/moisture")
-async def update_moisture_target(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
-    moisture_target = float(payload.get("moisture_target", 45.0))
-    result = automation.update_moisture_target(plant_id, moisture_target)
-    log_event(f"Plant {plant_id} moisture target set to {result['moisture_target']}%")
+async def update_moisture_target(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+    """Set the band at which this plant is watered, e.g. {"moisture_target": "dry"}."""
+    result = automation.update_moisture_target(
+        plant_id, str(payload.get("moisture_target", "dry"))
+    )
+    log_event(f"Plant {plant_id} moisture target set to {result['moisture_target']}")
     return result
 
 

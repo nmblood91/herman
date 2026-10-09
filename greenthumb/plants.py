@@ -25,10 +25,10 @@ def default_plants() -> list[PlantSpec]:
     # each properly once the pots are placed; the Plants tab writes them to
     # data/state.json and they persist from then on.
     return [
-        PlantSpec(name="Plant 1", plant_id="plant_1", sensor_address=0x36, moisture_target=45, watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=130),
-        PlantSpec(name="Plant 2", plant_id="plant_2", sensor_address=0x37, moisture_target=42, watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=355),
-        PlantSpec(name="Plant 3", plant_id="plant_3", sensor_address=0x38, moisture_target=48, watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=580),
-        PlantSpec(name="Plant 4", plant_id="plant_4", sensor_address=0x39, moisture_target=44, watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=800),
+        PlantSpec(name="Plant 1", plant_id="plant_1", sensor_address=0x36, moisture_target="dry", watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=130),
+        PlantSpec(name="Plant 2", plant_id="plant_2", sensor_address=0x37, moisture_target="dry", watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=355),
+        PlantSpec(name="Plant 3", plant_id="plant_3", sensor_address=0x38, moisture_target="dry", watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=580),
+        PlantSpec(name="Plant 4", plant_id="plant_4", sensor_address=0x39, moisture_target="dry", watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=800),
     ]
 
 

@@ -18,7 +18,7 @@ from greenthumb.config import settings
 from greenthumb.hardware.soil_sensors import SoilSensorHub
 from greenthumb.models import SensorSample
 from greenthumb.services.automation import GreenThumbAutomation
-from tests.helpers import temp_state, temp_store
+from tests.helpers import give_every_plant_soil, temp_state, temp_store
 
 settings.water_sensor_enabled = False
 # The starting value only. Every case below sets the switch explicitly, so a
@@ -74,9 +74,11 @@ class FakeLeds:
 
 def build(state=None):
     pump = FakePump()
-    auto = GreenThumbAutomation(
-        DryHub(), FakeKlipper(), pump, FakeLeds(),
-        history=temp_store(), state_path=state or temp_state(),
+    auto = give_every_plant_soil(
+        GreenThumbAutomation(
+            DryHub(), FakeKlipper(), pump, FakeLeds(),
+            history=temp_store(), state_path=state or temp_state(),
+        )
     )
     return auto, pump
 
