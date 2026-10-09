@@ -136,10 +136,21 @@ Loading copies a saved plant onto a pot, including its name. Two pots may end
 up with the same name, which is allowed: `plant_id` is the identity and the
 name is a label, and copying one plant onto a second pot is the point.
 
-**The watering location is not part of a saved plant.** It describes where the
-pot sits on the rail, not how the plant is cared for, so loading never moves
-it. If it travelled, loading one plant onto a second pot would give both the
-same rail coordinate and watering one would dribble into the other.
+**Nothing describing the pot is part of a saved plant** -- not the watering
+location, not the watering mode or its sweep bounds, and not the soil. A saved
+plant is care settings, and loading one onto a pot must not assert physical
+facts about a pot nobody touched.
+
+The watering location is the obvious case: if it travelled, loading one plant
+onto a second pot would give both the same rail coordinate and watering one
+would dribble into the other.
+
+The soil is the one that looks arguable, since you usually *do* repot when you
+set a pot up for a different plant. But the two ways of being wrong are not
+symmetrical. If the soil stays and you did repot, you pick the mix again from a
+dropdown you are already looking at. If the soil travelled and you did not, the
+pot silently bands every reading against the wrong wilting point and waters to
+it -- and nothing about that looks broken.
 
 Stored in `data/state.json` under `plant_profiles`, alongside the rest of the
 settings.
@@ -191,7 +202,7 @@ a sweep over a span of zero.
 
 ### Soils
 
-Each plant records which mix it is potted in, chosen from a soil library that
+Each pot records which mix it is filled with, chosen from a soil library that
 works the same way as the saved plants — name as the key, overwrite on save:
 
 ```bash

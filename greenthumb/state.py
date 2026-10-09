@@ -53,14 +53,19 @@ SOILS_KEY = "soil_profiles"
 # cannot travel, so a profile carrying mode without them would load as "sweep"
 # over a span of zero. That falls back to point watering, which means the pot
 # would read as configured for something it was never doing.
+#
+# soil is out for the plainest reason of all: it is in the pot. Loading a
+# profile does not repot anything, so a travelling soil would have a saved
+# plant assert a physical fact about a pot nobody touched. And the two ways of
+# being wrong are not symmetrical. If soil stays and you *did* repot, you pick
+# the mix again from a dropdown you are already looking at. If soil travelled
+# and you did not, the pot silently bands every reading against the wrong
+# wilting point and waters to it, and nothing looks broken.
 PROFILE_FIELDS = (
     "moisture_target",
     "watering_volume_ml",
     "light_start_time",
     "light_stop_time",
-    # Which mix the plant is potted in. Care settings, not placement: a plant
-    # moved to another pot keeps its soil, so it travels on load like the rest.
-    "soil",
 )
 
 # A soil holds the two water contents that bound what a plant can actually use,

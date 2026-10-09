@@ -20,6 +20,14 @@ class PlantSpec:
     light_start_time: time = time(8, 0)
     light_stop_time: time = time(20, 0)
     position_mm: int = 0
+    # Which soil library entry this pot is filled with. Empty means not set,
+    # which is distinct from a mix whose figures are unusable -- callers report
+    # "no soil set" rather than assuming one.
+    #
+    # A property of the pot rather than of the plant, and grouped here with the
+    # rest of them for that reason: the mix is physically in the pot, so
+    # loading a saved plant leaves it alone.
+    soil: str = ""
     # How the dose is laid down. "point" empties it at position_mm, which suits
     # a small pot. "sweep" walks the nozzle between the two bounds below for
     # the length of the dose, so a wide pot is watered across its width instead
@@ -34,11 +42,6 @@ class PlantSpec:
     # configured and behave as a point.
     sweep_min_mm: float = 0.0
     sweep_max_mm: float = 0.0
-    # Which soil library entry this pot is filled with. Empty means not set,
-    # which is distinct from a mix whose figures are unusable -- callers report
-    # "no soil set" rather than assuming one. A property of the plant rather
-    # than of the slot, so it travels with a saved plant.
-    soil: str = ""
     # Auto-managed LED segment for the global strip. This is calculated by the app,
     # not exposed to the user for manual editing.
     led_start_index: int = 0

@@ -1698,7 +1698,9 @@ class GreenThumbAutomation:
         one plant's settings onto a second pot is the whole point. Nothing is
         suffixed to make the names unique.
 
-        position_mm is untouched -- see state.PROFILE_FIELDS for why.
+        position_mm, the watering mode, the sweep bounds and the soil are all
+        untouched -- see state.PROFILE_FIELDS for why. They describe the pot,
+        not the plant.
         """
         plant = self.get_plant(plant_id)
         if plant is None:
@@ -1738,9 +1740,6 @@ class GreenThumbAutomation:
             except ValueError:
                 logger.warning("Ignoring bad %s %r in profile %r", field_name, text, key)
 
-        if isinstance(entry.get("soil"), str):
-            plant.soil = entry["soil"].strip()
-
         self._persist()
         return {
             "status": "ok",
@@ -1750,9 +1749,10 @@ class GreenThumbAutomation:
             "watering_volume_ml": plant.watering_volume_ml,
             "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
             "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
-            # Echoed so the caller can see it was left alone rather than
-            # wonder whether the profile moved the pot.
+            # Echoed so the caller can see these were left alone rather than
+            # wonder whether the profile moved the pot or changed its mix.
             "position_mm": plant.position_mm,
+            "soil": plant.soil,
         }
 
     def delete_plant_profile(self, name: str) -> dict[str, object]:

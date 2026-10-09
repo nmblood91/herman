@@ -149,19 +149,53 @@ assert auto.get_plant(first).soil == ""
 print("ok: an empty name clears it, which is how you say the mix is unknown")
 
 
-# --- it travels with a saved plant, and survives a restart ---
+# --- it belongs to the pot, not to the saved plant ---
 
 auto.update_plant_soil(first, "Coco coir")
+auto.update_plant_soil(second, "Peat potting mix")
 auto.update_plant_name(first, "Fern")
 auto.save_plant_profile(first)
-auto.apply_plant_profile(second, "Fern")
-assert auto.get_plant(second).soil == "Coco coir", auto.get_plant(second).soil
-print("ok: soil travels with a saved plant, since it describes the plant not the slot")
+result = auto.apply_plant_profile(second, "Fern")
 
+# The mix is physically in the pot, and loading a saved plant repots nothing.
+# The two ways of being wrong here are not symmetrical: if the soil stays and
+# you did repot, you pick the mix again from a dropdown you are looking at. If
+# it travelled and you did not, the pot bands every reading against the wrong
+# wilting point and waters to it, and nothing looks broken.
+assert auto.get_plant(second).soil == "Peat potting mix", auto.get_plant(second).soil
+print("ok: loading a saved plant leaves the pot's soil alone")
+
+# Reported back, so the caller can say it was left rather than leave someone
+# wondering whether the profile changed the mix.
+assert result["soil"] == "Peat potting mix", result
+print("ok: and the load reports the soil it did not touch")
+
+# Not written into the entry at all, rather than written and then ignored.
+assert "soil" not in state.load_profiles(shared)["Fern"], state.load_profiles(shared)["Fern"]
+print("ok: soil is not saved into a plant in the first place")
+
+# An entry saved while soil still travelled still has the key in it. The
+# whitelist filters on read as well as write, so the old behaviour cannot come
+# back for profiles saved up to now.
+raw = state.load_state(shared)
+raw["plant_profiles"]["Legacy"] = {
+    "moisture_target": "dry",
+    "watering_volume_ml": 50,
+    "soil": "Cactus / sandy mix",
+}
+state.save_state(raw, shared)
+assert "soil" not in state.load_profiles(shared)["Legacy"]
+
+auto.update_plant_soil(second, "Loam")
+auto.apply_plant_profile(second, "Legacy")
+assert auto.get_plant(second).soil == "Loam", auto.get_plant(second).soil
+print("ok: a profile saved with a soil in it does not apply it")
+
+auto.update_plant_soil(second, "Peat potting mix")
 restored = build(shared)
 assert restored.get_plant(first).soil == "Coco coir"
-assert restored.get_plant(second).soil == "Coco coir"
-print("ok: a plant's soil survives a restart")
+assert restored.get_plant(second).soil == "Peat potting mix"
+print("ok: each pot keeps its own soil across a restart")
 
 
 # --- listing ---

@@ -199,13 +199,15 @@ function App() {
         method: 'POST',
         body: JSON.stringify({ name }),
       })
-      // Says what was left alone as well as what changed: the watering
-      // location staying put is the surprising half.
+      // Says what was left alone as well as what changed, because that is
+      // the surprising half: a saved plant carries care settings, and
+      // everything describing the pot itself stays put.
       setStatus(
         `Loaded ${result.name}: waters at ${result.moisture_target}, ` +
           `${result.watering_volume_ml} mL, lights ${result.light_start_time}` +
-          `–${result.light_stop_time}. Watering location unchanged at ` +
-          `${result.position_mm} mm.`,
+          `–${result.light_stop_time}. The pot keeps its location ` +
+          `(${result.position_mm} mm) and its soil ` +
+          `(${result.soil || 'not set'}).`,
       )
       await loadDashboard()
     } catch (error) {
