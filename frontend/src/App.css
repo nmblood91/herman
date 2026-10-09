@@ -41,17 +41,25 @@
   margin-bottom: 24px;
 }
 
-.eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.72rem;
+/* Sits under the name rather than above it, so it reads as a description and
+   not as a label. Capital case rather than uppercase: at this size uppercase
+   needed letter-spacing to stay legible, and the result competed with the name
+   above it for attention. */
+.tagline {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   color: #8bcf9f;
 }
 
 .topbar h1 {
-  margin: 8px 0 0;
-  font-size: clamp(2rem, 3vw, 3rem);
+  margin: 0;
+  /* Roughly 2.5x the tagline at every width, so the name is clearly the
+     heading and the description clearly subordinate. */
+  font-size: clamp(2.25rem, 4vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
 .tab-bar {
