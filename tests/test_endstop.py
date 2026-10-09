@@ -184,18 +184,23 @@ print("ok: the lock is released afterwards")
 
 # --- the client query itself ---
 
-# The tests above stub endstop_state, so the parsing underneath it was never
-# exercised. It has one real trap: last_query is a cache Klipper fills when a
-# query runs, so reading it alone answers nothing straight after a restart --
-# which is precisely when someone is checking a switch, having just changed the
-# config.
+# The tests above stub endstop_state, so the parsing underneath it went
+# unexercised and was wrong in three ways at once. The shape below is what a
+# real board returns, captured from one:
+#
+#   {"ok": True, "result": {"stepper_x": "open",
+#                           "stepper_y": "TRIGGERED",
+#                           "stepper_z": "TRIGGERED"}}
+#
+# No last_query wrapper, keys carrying the stepper_ prefix, and values that are
+# words rather than numbers.
 from greenthumb.hardware.klipper_client import KlipperClient
 
 
 class FakeKlipper(KlipperClient):
-    def __init__(self, last_query, gcode_ok=True):
+    def __init__(self, result, gcode_ok=True):
         super().__init__(socket_path="/nonexistent")
-        self.last_query = last_query
+        self.result = result
         self.gcode_ok = gcode_ok
         self.scripts = []
 
@@ -207,45 +212,65 @@ class FakeKlipper(KlipperClient):
 
     def _send_command(self, method, params=None, timeout=5.0):
         assert method == "query_endstops/status", method
-        return {"ok": True, "result": {"last_query": self.last_query}}
+        return {"ok": True, "result": self.result}
 
 
-client = FakeKlipper({"x": 0, "y": 1, "z": 1})
-assert client.endstop_state() == {"ok": True, "triggered": False}
-# Without this the cache can be empty and the reading is simply absent.
-assert client.scripts == ["QUERY_ENDSTOPS"], client.scripts
-print("ok: a fresh MCU query is forced before the cache is read")
+REAL = {"stepper_x": "open", "stepper_y": "TRIGGERED", "stepper_z": "TRIGGERED"}
 
-assert FakeKlipper({"x": 1}).endstop_state()["triggered"] is True
-print("ok: a triggered switch comes back triggered")
+client = FakeKlipper(REAL)
+assert client.endstop_state() == {"ok": True, "triggered": False}, client.endstop_state()
+print("ok: the shape a real board returns is read correctly")
 
-# y and z are placeholders on unused headers and read triggered forever. Taking
+# The dangerous one. Every non-empty string is truthy, so bool("open") is True
+# and a plain bool() cast reports an untriggered switch as triggered -- a
+# diagnostic confidently stating the opposite of the truth.
+assert FakeKlipper({"stepper_x": "open"}).endstop_state()["triggered"] is False
+assert FakeKlipper({"stepper_x": "TRIGGERED"}).endstop_state()["triggered"] is True
+print("ok: open and TRIGGERED are distinguished, not cast with bool()")
+
+# Case and spacing are not worth failing over.
+for text, expected in (("triggered", True), (" Open ", False), ("OPEN", False)):
+    got = FakeKlipper({"stepper_x": text}).endstop_state()["triggered"]
+    assert got is expected, (text, got)
+print("ok: the words are read case-insensitively")
+
+# The status object exposes the same state as 0 and 1.
+assert FakeKlipper({"stepper_x": 1}).endstop_state()["triggered"] is True
+assert FakeKlipper({"stepper_x": 0}).endstop_state()["triggered"] is False
+print("ok: numeric 0 and 1 are accepted too")
+
+# Something unrecognised must be reported, never guessed at.
+result = FakeKlipper({"stepper_x": "maybe"}).endstop_state()
+assert result["ok"] is False, result
+assert "maybe" in result["error"], result["error"]
+print("ok: an unrecognised value is reported rather than guessed")
+
+# Moonraker and some versions wrap the same mapping in last_query.
+assert FakeKlipper({"last_query": REAL}).endstop_state() == {"ok": True, "triggered": False}
+print("ok: the last_query wrapper is unwrapped when present")
+
+# Short-form naming still works, so a rename does not break this.
+assert FakeKlipper({"x": "TRIGGERED"}).endstop_state()["triggered"] is True
+print("ok: the short x spelling is accepted as well")
+
+# y and z are placeholders on unused headers, reading triggered forever. Taking
 # either for the home switch would report a permanent fault.
-assert FakeKlipper({"y": 1, "z": 1}).endstop_state()["ok"] is False
+result = FakeKlipper({"stepper_y": "TRIGGERED", "stepper_z": "TRIGGERED"}).endstop_state()
+assert result["ok"] is False, result
+assert "stepper_y, stepper_z" in result["error"], result["error"]
 print("ok: the y and z placeholders are not mistaken for the home switch")
 
-# An empty cache was the original failure, and the message has to be actionable.
 result = FakeKlipper({}).endstop_state()
-assert result["ok"] is False
-assert "nothing at all" in result["error"], result["error"]
-print("ok: an empty response says so rather than naming only what is missing")
+assert result["ok"] is False and "no endstops at all" in result["error"], result
+print("ok: an empty response says so")
 
-# When something unexpected comes back, the names are the thing that lets
-# anyone act on it.
-result = FakeKlipper({"a": 0, "b": 1}).endstop_state()
-assert "a, b" in result["error"], result["error"]
-print("ok: unexpected endstop names are reported, not swallowed")
+# A fresh query is forced, so a cached reading can never be shown as current.
+assert client.scripts == ["QUERY_ENDSTOPS"], client.scripts
+print("ok: a fresh MCU query is forced before the reading is read back")
 
-# Klipper's own naming strips the stepper_ prefix, but do not fail on that.
-assert FakeKlipper({"stepper_x": 1}).endstop_state() == {"ok": True, "triggered": True}
-print("ok: the unstripped spelling is accepted too")
-
-# A refused gcode must not be followed by reading a stale cache and presenting
-# it as current.
-client = FakeKlipper({"x": 0}, gcode_ok=False)
+client = FakeKlipper(REAL, gcode_ok=False)
 result = client.endstop_state()
-assert result["ok"] is False, result
-assert "shutting down" in result["error"], result["error"]
-print("ok: a refused query is reported rather than answered from the cache")
+assert result["ok"] is False and "shutting down" in result["error"], result
+print("ok: a refused query is reported rather than answered from a cache")
 
 print("\nall endstop diagnostic checks passed")

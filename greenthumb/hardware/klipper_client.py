@@ -13,6 +13,29 @@ QUERY_TIMEOUT = 5.0
 MOTION_TIMEOUT = 180.0
 
 
+def _endstop_triggered(value: Any) -> bool | None:
+    """Read Klipper's endstop value, which is the word "open" or "TRIGGERED".
+
+    None when it is neither, so the caller reports it instead of guessing.
+
+    The strings are the trap here, and bool() is the wrong tool for them: every
+    non-empty string is truthy, so bool("open") is True and an untriggered
+    switch reads as triggered. Numbers are accepted as well because the status
+    object exposes the same state as 0 and 1.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in ("triggered", "1", "true"):
+            return True
+        if text in ("open", "0", "false"):
+            return False
+    return None
+
+
 class KlipperClient:
     """Communicate with Klipper via Unix socket."""
 
@@ -93,20 +116,36 @@ class KlipperClient:
         if not response.get("ok"):
             return {"ok": False, "error": response.get("error")}
 
-        query = response.get("result", {}).get("last_query", {})
-        # Klipper names an endstop after its stepper with the prefix stripped,
-        # so x is expected -- but accept the unstripped spelling too rather
-        # than failing on a naming detail of someone else's code.
-        for key in ("x", "stepper_x"):
-            if key in query:
-                return {"ok": True, "triggered": bool(query[key])}
+        result = response.get("result")
+        if not isinstance(result, dict):
+            return {"ok": False, "error": f"Klipper answered with {result!r}"}
 
-        # Say what did come back. The previous message named only what was
-        # missing, which is the half that cannot be acted on.
-        reported = ", ".join(sorted(query)) if query else "nothing at all"
+        # Measured against a real board, Klipper answers with the mapping
+        # directly: {"stepper_x": "open", ...}. Moonraker and some versions
+        # wrap the same mapping in last_query, so unwrap that if it is there
+        # rather than depending on one shape.
+        query = result.get("last_query", result)
+        if not isinstance(query, dict) or not query:
+            return {"ok": False, "error": "Klipper reported no endstops at all"}
+
+        # stepper_x is what a real board returns. x is Klipper's short form,
+        # accepted so a naming change does not break this.
+        for key in ("stepper_x", "x"):
+            if key in query:
+                triggered = _endstop_triggered(query[key])
+                if triggered is None:
+                    return {
+                        "ok": False,
+                        "error": f"Could not read the endstop value {query[key]!r}",
+                    }
+                return {"ok": True, "triggered": triggered}
+
+        # Name what did arrive. Reporting only what was missing is the half
+        # that cannot be acted on.
         return {
             "ok": False,
-            "error": f"Klipper reported no x endstop. It reported: {reported}",
+            "error": "Klipper reported no x endstop. It reported: "
+            + ", ".join(sorted(query)),
         }
 
     def home_gantry(self) -> dict[str, Any]:
