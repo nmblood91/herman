@@ -7,7 +7,10 @@ Type=simple
 User=pi
 WorkingDirectory=/opt/greenthumb
 Environment=PATH=/opt/greenthumb/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/opt/greenthumb/.venv/bin/python -m uvicorn greenthumb.main:app --host 0.0.0.0 --port 8000
+# Bound to localhost, not 0.0.0.0: nginx proxies to 127.0.0.1:8000, so the
+# API needs no listener of its own on the LAN. With no authentication yet,
+# a second reachable door bypassing nginx is one too many.
+ExecStart=/opt/greenthumb/.venv/bin/python -m uvicorn greenthumb.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=5
 

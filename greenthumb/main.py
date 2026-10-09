@@ -532,4 +532,6 @@ def get_camera_snapshot() -> Response:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("greenthumb.main:app", host="0.0.0.0", port=8000, reload=settings.debug)
+    # Localhost, matching the systemd unit. Reach it through nginx on port 80,
+    # or from the machine it is running on.
+    uvicorn.run("greenthumb.main:app", host="127.0.0.1", port=8000, reload=settings.debug)

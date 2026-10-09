@@ -4,7 +4,7 @@ This folder contains the deployment files needed to run Herman on a Raspberry Pi
 
 ## Files
 
-- `systemd/greenthumb-api.service` — runs the FastAPI backend on port 8000
+- `systemd/greenthumb-api.service` — runs the FastAPI backend on `127.0.0.1:8000`, reached through nginx
 - `nginx/greenthumb.conf` — serves the built React app and proxies `/api` to the backend
 - `klipper/firmware.bin` — pre-built Klipper MCU firmware for SKR Mini E3 V2 (flash via SD card)
 - `klipper/printer.cfg.example` — bare-bones single-axis gantry Klipper template
@@ -278,7 +278,8 @@ with it.
 
 ## Service behavior
 
-- The backend runs as a systemd service on port 8000.
+- The backend runs as a systemd service on `127.0.0.1:8000`. It does not listen
+  on the LAN; nginx on port 80 is the only way in from another machine.
 - Nginx serves the built frontend from `/opt/greenthumb/frontend/dist`.
 - `/api` requests are proxied to the Python API.
 

@@ -63,7 +63,7 @@ This project lays down the initial application stack:
    `pip install -r requirements.txt`
 3. Copy `.env.example` to `.env` and adjust values for your station
 4. Run the service:
-   `uvicorn greenthumb.main:app --host 0.0.0.0 --port 8000 --reload`
+   `uvicorn greenthumb.main:app --host 127.0.0.1 --port 8000 --reload`
 
 ## API
 
@@ -87,20 +87,25 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/version` | what is running, and whether the checkout has moved on without it |
 
 **The full, current list is generated from the routes themselves** at
-<http://herman.local:8000/docs> — interactive, and it cannot go stale.
+<http://herman.local/docs> — interactive, and it cannot go stale.
 
-Note the port. Nginx serves the web UI on 80 but proxies only `/api/` and
-`/health`, so `/docs` is reachable only on the API's own port.
+Everything is on port 80. The API binds to `127.0.0.1` and does not listen on
+the network itself, so nginx is the only way in from another machine — it
+proxies `/api/`, `/health`, `/docs` and `/openapi.json`.
 
 Example:
 
-`curl http://herman.local:8000/api/v1/overview`
+`curl http://herman.local/api/v1/overview`
 
 ## Local web UI
 
-Nginx serves the built React app from the Pi. **Open `http://herman.local`**
-— port 80, not 8000. Port 8000 is the API, and asking it for `/` returns a JSON
-status blob rather than the page.
+Nginx serves the built React app from the Pi. **Open `http://herman.local`.**
+
+There is nothing to reach on any other port: the API listens on `127.0.0.1`
+only. That closes a second unauthenticated door onto the LAN, which matters
+because **the API still has no authentication** — anything on the WiFi can
+reach every endpoint through nginx. See
+[PRIVACY_SECURITY_SPEC.md](PRIVACY_SECURITY_SPEC.md).
 
 Four tabs:
 

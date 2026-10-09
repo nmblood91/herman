@@ -185,7 +185,7 @@ This should show devices at the configured addresses (e.g., 0x36, 0x37, 0x38, 0x
 Read sensor values via the API:
 
 ```bash
-curl http://<pi-host>:8000/api/v1/sensors
+curl http://<pi-host>/api/v1/sensors
 ```
 
 Raw sensor readings will be returned. If a sensor cannot be read, the value will be `-1`.

@@ -29,7 +29,9 @@ npm run dev
 
 `vite.config.js` proxies `/api` to `http://localhost:8000`, so run the backend on
 the same machine. To develop against the Pi instead, point that proxy target at
-`http://herman.local:8000`.
+`http://herman.local` — **port 80, not 8000**. The API binds to localhost on the
+Pi and is reached through nginx, so `:8000` is not open from another machine.
+Going through nginx also exercises the same path the real page uses.
 
 ## Build output is not committed
 

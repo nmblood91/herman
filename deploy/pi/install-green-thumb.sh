@@ -283,7 +283,7 @@ fi
 
 printf "\nGreenThumb install complete.\n"
 printf "Open: http://$(hostname -I | awk '{print $1}')\n"
-printf "API: http://$(hostname -I | awk '{print $1}'):8000\n"
+printf "API docs: http://$(hostname -I | awk '{print $1}')/docs\n"
 
 if [ "$REBOOT_NEEDED" -eq 1 ]; then
   printf "\n⚠️  Reboot required to finish enabling I2C/SPI, then re-run this script.\n"

@@ -51,9 +51,15 @@ The following rules are mandatory for all future implementation work:
 - Default credentials must be changed during setup.
 - Session handling must be secure and minimal.
 
-**Not yet implemented.** The API currently has no authentication: anything on
-the LAN can reach every endpoint. Closing that is tied to the phone-app
-pairing work, where proximity over BLE is what issues the token — see
+**Partly implemented.** The API binds to `127.0.0.1` rather than to every
+interface, so it has no listener of its own on the LAN and nginx on port 80 is
+the only way in from another machine. That satisfies the prohibition on
+all-interface listeners below.
+
+**Authentication is still absent**, and the above is not a substitute for it:
+anything on the LAN still reaches every endpoint through nginx, including the
+ones that run the pump. Closing that is tied to the phone-app pairing work,
+where proximity over BLE is what issues the token — see
 [ROADMAP.md](ROADMAP.md).
 
 ## Camera privacy policy
