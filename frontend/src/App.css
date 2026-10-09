@@ -370,8 +370,33 @@ option {
   margin: 0;
 }
 
-.save-settings-button {
-  margin-top: 8px;
+/* Settings holds five unrelated things, so they are grouped rather than left
+   as one long column of fields. Nested grids: .general-settings-form spaces the
+   groups, each group spaces its own rows. */
+.settings-group {
+  display: grid;
+  gap: 16px;
+  padding-top: 22px;
+  border-top: 1px solid #243b2e;
+}
+
+/* No rule above the first one -- the panel heading already separates it. */
+.settings-group:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.settings-group h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #8bcf9f;
+}
+
+/* Belongs to one group rather than to the panel, so it is sized to look like
+   a group's own control and not like the panel's primary action. */
+.group-save-button {
   width: min(220px, 100%);
 }
 
@@ -435,6 +460,11 @@ input[type='color'] {
 
   .panel-section + .panel-section {
     margin-top: 14px;
+  }
+
+  .settings-group {
+    padding-top: 18px;
+    gap: 14px;
   }
 }
 

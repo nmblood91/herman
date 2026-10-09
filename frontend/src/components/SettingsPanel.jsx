@@ -219,174 +219,202 @@ export function SettingsPanel({ overview, onRefresh }) {
     <section className="panel-section">
       <h2>Settings</h2>
 
+      {/* Grouped rather than left as one column of unrelated fields. The order
+          is what the planter does on its own, then when it is allowed to, then
+          the hardware it was built with, then the clock those schedules run
+          on. */}
       <div className="general-settings-form">
-        <div className="field-row">
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={autoOn}
-              disabled={savingAuto}
-              onChange={(event) => saveAutoWatering(event.target.checked)}
-            />
-            Water plants automatically
-          </label>
-          <p className="field-hint">
-            Lets the planter water on its own whenever a plant sits below its
-            moisture target. Switched off it still reads the sensors and keeps
-            the history — watering only happens when you press a button.
-          </p>
-          <p className="field-hint">
-            Before turning this on, measure the pump's flow rate and set it in{' '}
-            <code>PUMP_FLOW_ML_PER_SECOND</code>. A dose is a run time worked
-            out from that number, so if it is wrong every automatic watering is
-            wrong by the same factor and still reports success.
-          </p>
-          {autoMsg && <p className="field-hint warning">{autoMsg}</p>}
-        </div>
+        <div className="settings-group">
+          <h3>Watering</h3>
 
-        <div className="field-row">
-          <label>
-            LED strip type
-            <select value={chip} onChange={(event) => setChip(event.target.value)}>
-              {chipOptions.map((option) => (
-                <option key={option.name} value={option.name}>
-                  {option.name} ({option.description})
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="field-hint">
-            Sets the signal timing for your strip. WS2811 drives three LEDs per
-            pixel, so set LED count to a third of the LEDs you can see.
-          </p>
-        </div>
-
-        <div className="field-row">
-          <label>
-            LED colour order
-            <select value={colorOrder} onChange={(event) => setColorOrder(event.target.value)}>
-              {colorOrderOptions.map((order) => (
-                <option key={order} value={order}>
-                  {order}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="field-hint">
-            If red and green look swapped on the strip, try a different order.
-            Choosing a strip type resets this to that chip's usual order, so set
-            the type first.
-          </p>
-        </div>
-
-        <div className="field-row">
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={idleOn}
-              onChange={(event) => setIdleOn(event.target.checked)}
-            />
-            Move about now and then
-          </label>
-          <div className="slider-row">
-            <label>
-              Every
+          <div className="field-row">
+            <label className="checkbox-row">
               <input
-                type="number"
-                min="5"
-                max="1440"
-                value={idleMinutes}
-                onChange={(event) => setIdleMinutes(event.target.value)}
+                type="checkbox"
+                checked={autoOn}
+                disabled={savingAuto}
+                onChange={(event) => saveAutoWatering(event.target.checked)}
               />
+              Water plants automatically
             </label>
-            <span>minutes</span>
-            <button type="button" onClick={saveIdle}>Save</button>
-          </div>
-          <p className="field-hint">
-            Re-homes the arm and runs a short routine on this interval, cycling
-            through them. The re-home is the useful half: nothing tells the
-            planter the arm has been nudged or that a belt slipped, so every
-            plant position stays slightly wrong until it homes again.
-          </p>
-          <p className="field-hint">
-            Held during quiet hours and a snooze, same as watering — the arm is
-            the other noisy part. Routines you start yourself always run.
-            {idle?.last_at ? ` Last moved ${idle.last_at}.` : ''}
-          </p>
-          {idleMsg && <p className="field-hint warning">{idleMsg}</p>}
-        </div>
-
-        <div className="field-row">
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={quietOn}
-              onChange={(event) => setQuietOn(event.target.checked)}
-            />
-            Quiet hours
-          </label>
-          <div className="slider-row">
-            <label>
-              From
-              <input
-                type="time"
-                value={quietStart}
-                onChange={(event) => setQuietStart(event.target.value)}
-              />
-            </label>
-            <label>
-              To
-              <input
-                type="time"
-                value={quietStop}
-                onChange={(event) => setQuietStop(event.target.value)}
-              />
-            </label>
-            <button type="button" onClick={saveQuiet}>Save quiet hours</button>
-          </div>
-          <p className="field-hint">
-            Holds off <em>automatic</em> watering overnight — the pump and the
-            gantry are the only loud parts. A window that ends before it starts
-            runs through midnight. Watering you start yourself is never blocked,
-            and a plant that comes due during the window is watered as soon as
-            it ends rather than skipped.
-          </p>
-          {quietMsg && <p className="field-hint warning">{quietMsg}</p>}
-        </div>
-
-        <div className="field-row">
-          <div className="slider-row">
-            <button type="button" disabled={syncing || !clock?.can_set} onClick={syncTimezone}>
-              {syncing ? 'Syncing…' : 'Sync to Local Time'}
-            </button>
-            {/* Names itself, so there is no separate field label above it. */}
-            <span className="position-readout">Herman&apos;s clock: {planterClock}</span>
-          </div>
-          <p className="field-hint">
-            The planter runs its lighting schedule on its own clock, so if this
-            is not your local time the lights come on at the wrong hours.
-            Syncing sets it to {browserZone} — the time zone this device is in.
-          </p>
-          {clock && !clock.ntp_synchronised && (
-            <p className="field-hint warning">
-              The clock has not reached a time server yet, so it may be wrong
-              until the planter is online. There is no battery-backed clock, so
-              it reverts to roughly its last shutdown after a power cut.
+            <p className="field-hint">
+              Lets the planter water on its own whenever a plant sits below its
+              moisture target. Switched off it still reads the sensors and keeps
+              the history — watering only happens when you press a button.
             </p>
-          )}
-          {clock && !clock.can_set && (
-            <p className="field-hint warning">
-              This host cannot set its time zone from here. Set it on the Pi
-              with <code>sudo timedatectl set-timezone {browserZone}</code>.
+            <p className="field-hint">
+              Before turning this on, measure the pump's flow rate and set it in{' '}
+              <code>PUMP_FLOW_ML_PER_SECOND</code>. A dose is a run time worked
+              out from that number, so if it is wrong every automatic watering is
+              wrong by the same factor and still reports success.
             </p>
-          )}
-          {clockStatus && <p className="field-hint warning">{clockStatus}</p>}
+            {autoMsg && <p className="field-hint warning">{autoMsg}</p>}
+          </div>
         </div>
 
-        <button type="button" className="primary save-settings-button" onClick={save}>
-          Save Settings
-        </button>
-        {status && <p className="field-hint warning">{status}</p>}
+        <div className="settings-group">
+          <h3>Movement</h3>
+
+          <div className="field-row">
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={idleOn}
+                onChange={(event) => setIdleOn(event.target.checked)}
+              />
+              Move about now and then
+            </label>
+            <div className="slider-row">
+              <label>
+                Every
+                <input
+                  type="number"
+                  min="5"
+                  max="1440"
+                  value={idleMinutes}
+                  onChange={(event) => setIdleMinutes(event.target.value)}
+                />
+              </label>
+              <span>minutes</span>
+              <button type="button" onClick={saveIdle}>Save</button>
+            </div>
+            <p className="field-hint">
+              Re-homes the arm and runs a short routine on this interval, cycling
+              through them. The re-home is the useful half: nothing tells the
+              planter the arm has been nudged or that a belt slipped, so every
+              plant position stays slightly wrong until it homes again.
+            </p>
+            <p className="field-hint">
+              Held during quiet hours and a snooze, same as watering — the arm is
+              the other noisy part. Routines you start yourself always run.
+              {idle?.last_at ? ` Last moved ${idle.last_at}.` : ''}
+            </p>
+            {idleMsg && <p className="field-hint warning">{idleMsg}</p>}
+          </div>
+        </div>
+
+        <div className="settings-group">
+          <h3>Quiet hours</h3>
+
+          <div className="field-row">
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={quietOn}
+                onChange={(event) => setQuietOn(event.target.checked)}
+              />
+              Quiet hours
+            </label>
+            <div className="slider-row">
+              <label>
+                From
+                <input
+                  type="time"
+                  value={quietStart}
+                  onChange={(event) => setQuietStart(event.target.value)}
+                />
+              </label>
+              <label>
+                To
+                <input
+                  type="time"
+                  value={quietStop}
+                  onChange={(event) => setQuietStop(event.target.value)}
+                />
+              </label>
+              <button type="button" onClick={saveQuiet}>Save quiet hours</button>
+            </div>
+            <p className="field-hint">
+              Holds off <em>automatic</em> watering overnight — the pump and the
+              gantry are the only loud parts. A window that ends before it starts
+              runs through midnight. Watering you start yourself is never blocked,
+              and a plant that comes due during the window is watered as soon as
+              it ends rather than skipped.
+            </p>
+            {quietMsg && <p className="field-hint warning">{quietMsg}</p>}
+          </div>
+        </div>
+
+        <div className="settings-group">
+          <h3>Lighting</h3>
+
+          <div className="field-row">
+            <label>
+              LED strip type
+              <select value={chip} onChange={(event) => setChip(event.target.value)}>
+                {chipOptions.map((option) => (
+                  <option key={option.name} value={option.name}>
+                    {option.name} ({option.description})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="field-hint">
+              Sets the signal timing for your strip. WS2811 drives three LEDs per
+              pixel, so set LED count to a third of the LEDs you can see.
+            </p>
+          </div>
+
+          <div className="field-row">
+            <label>
+              LED colour order
+              <select value={colorOrder} onChange={(event) => setColorOrder(event.target.value)}>
+                {colorOrderOptions.map((order) => (
+                  <option key={order} value={order}>
+                    {order}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="field-hint">
+              If red and green look swapped on the strip, try a different order.
+              Choosing a strip type resets this to that chip's usual order, so set
+              the type first.
+            </p>
+          </div>
+
+          {/* In the group it belongs to, and named after it. This button only
+              ever saved these two fields, and sitting at the foot of the panel
+              labelled "Save Settings" it read as saving everything above it --
+              including three groups that each save themselves. */}
+          <button type="button" className="primary group-save-button" onClick={save}>
+            Save lighting
+          </button>
+          {status && <p className="field-hint warning">{status}</p>}
+        </div>
+
+        <div className="settings-group">
+          <h3>Time</h3>
+
+          <div className="field-row">
+            <div className="slider-row">
+              <button type="button" disabled={syncing || !clock?.can_set} onClick={syncTimezone}>
+                {syncing ? 'Syncing…' : 'Sync to Local Time'}
+              </button>
+              {/* Names itself, so there is no separate field label above it. */}
+              <span className="position-readout">Herman&apos;s clock: {planterClock}</span>
+            </div>
+            <p className="field-hint">
+              The planter runs its lighting schedule on its own clock, so if this
+              is not your local time the lights come on at the wrong hours.
+              Syncing sets it to {browserZone} — the time zone this device is in.
+            </p>
+            {clock && !clock.ntp_synchronised && (
+              <p className="field-hint warning">
+                The clock has not reached a time server yet, so it may be wrong
+                until the planter is online. There is no battery-backed clock, so
+                it reverts to roughly its last shutdown after a power cut.
+              </p>
+            )}
+            {clock && !clock.can_set && (
+              <p className="field-hint warning">
+                This host cannot set its time zone from here. Set it on the Pi
+                with <code>sudo timedatectl set-timezone {browserZone}</code>.
+              </p>
+            )}
+            {clockStatus && <p className="field-hint warning">{clockStatus}</p>}
+          </div>
+        </div>
       </div>
     </section>
   )

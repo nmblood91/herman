@@ -109,7 +109,7 @@ Four tabs:
 | **Plants** | Each plant's current moisture, its name, light window, moisture target, dose volume and rail position — then the moisture and temperature history below |
 | **Controls** | Home and jog the gantry, run a dance, move to a plant, water a plant, lighting, run the pump |
 | **Diagnostics** | Home switch test, what version is running, per-sensor moisture calibration, and the log |
-| **Settings** | Automatic watering, idle motion, quiet hours, LED strip type and colour order, and the planter's clock |
+| **Settings** | Five groups — Watering, Movement, Quiet hours, Lighting and Time |
 
 Tabs are grouped by how often you touch a thing rather than by subsystem:
 Plants is the screen to open daily, Settings holds only what you set once, and
