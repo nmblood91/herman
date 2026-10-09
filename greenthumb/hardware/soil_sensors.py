@@ -339,8 +339,19 @@ def calibrate(
 ) -> dict[int, dict[str, object]]:
     """Sample every sensor and record one calibration endpoint for each.
 
-    `endpoint` is "dry" (sensors in open air) or "wet" (prongs in water). The
-    two are separate passes so either can be redone without losing the other.
+    `endpoint` is "dry" (probe in open air) or "wet" (probe in its own pot,
+    soaked and drained to field capacity). The two are separate passes so either
+    can be redone without losing the other.
+
+    Field capacity rather than plain water. Plain water is not a soil state --
+    it holds far more than saturated mix -- so it put the top of the scale
+    somewhere the soil could never reach, which made every reading a fraction
+    of an unreachable number. Field capacity is the wettest a pot actually
+    gets, and it is a state you can create.
+
+    It follows that the wet endpoint belongs to the *mix* as much as to the
+    probe: two pots of different soil need separate passes even with identical
+    sensors.
 
     The median is used rather than the mean: it ignores a single outlier read,
     and with hundreds of samples there is no reason to be sensitive to one.
@@ -539,15 +550,27 @@ if __name__ == "__main__":
         sys.exit(_soak(hub, args.soak, args.interval))
 
     if args.calibrate:
-        where = "in open air" if args.calibrate == "dry" else "with the prongs in water"
+        where = (
+            "in open air"
+            if args.calibrate == "dry"
+            else "in their pots, soaked and drained 24h"
+        )
         print(
             f"Calibrating the {args.calibrate.upper()} point over {args.seconds}s. "
             f"All {len(hub.addresses)} sensors should be {where}."
         )
         if args.calibrate == "wet":
             print(
-                "Only the prongs, up to the marked line -- these boards are not "
-                "waterproof and the connector end must stay dry.\n"
+                """Field capacity, not a glass of water: soak the pot
+through, let it drain for 24h, then run this with the probe where it
+normally sits. That is the wettest the soil actually gets.
+
+Water in a glass holds far more than soil can, and calibrating against it
+puts the top of the scale somewhere the pot can never reach.
+
+This endpoint belongs to the soil mix as much as to the probe, so run it
+again after repotting into something different.
+"""
             )
         results = calibrate(hub, args.calibrate, args.seconds, args.interval)
 

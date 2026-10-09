@@ -64,9 +64,17 @@ class Settings(BaseSettings):
     #
     # Placeholders, so the exact numbers carry no measurement -- they only have
     # to be the right order of magnitude and far enough apart to divide by.
-    # Wet is the reading in plain water, which soil never quite reaches.
+    #
+    # Wet means the probe in soil at field capacity: soaked and drained 24h,
+    # the wettest a pot actually gets. It used to mean plain water, which is not
+    # a soil state at all and put the top of the scale somewhere unreachable.
+    #
+    # The wet placeholder dropped when that changed, and the direction is
+    # deliberate. Too high a wet endpoint reads every pot as drier than it is,
+    # and with automatic watering on that waters a plant that does not need it.
+    # Erring low is the safer way to be wrong before anyone calibrates.
     moisture_raw_dry: int = 320
-    moisture_raw_wet: int = 1020
+    moisture_raw_wet: int = 800
 
     # Off by default, and only the starting value: the Settings tab owns this
     # switch and persists any change to data/state.json, which wins over this

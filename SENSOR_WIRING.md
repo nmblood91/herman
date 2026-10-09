@@ -101,6 +101,10 @@ in identical conditions read measurably differently — on this build they span
 about 25 counts in open air — and one global pair puts that spread straight into
 every reported percentage.
 
+**The wet endpoint is soil at field capacity, not a glass of water.** Measure it
+per *mix* as well as per sensor — see *Which wet endpoint* below for why, and
+for when the other choice is the right one.
+
 Two passes, in either order. Each samples every sensor for 20 seconds and takes
 the median, so one bad read cannot skew the result:
 
@@ -110,15 +114,19 @@ cd /opt/greenthumb
 # all four sensors in open air, clean and dry
 .venv/bin/python -m greenthumb.hardware.soil_sensors --calibrate dry
 
-# prongs in water
+# each probe in its own pot, soaked through and drained for 24 hours
 .venv/bin/python -m greenthumb.hardware.soil_sensors --calibrate wet
 
 .venv/bin/python -m greenthumb.hardware.soil_sensors --show-calibration
 ```
 
-> **Only the prongs go in the water, up to the marked line.** These boards are
-> not waterproof. Submerging the PCB or the connector end destroys the sensor,
-> and doing all four at once destroys all four.
+> **Field capacity means soaked and then left alone for 24 hours.** Water until
+> it runs from the bottom, let it drain, and come back a day later. Measuring
+> while it is still draining catches the pot wetter than it will ever sit, which
+> is the same mistake as using a glass of water, just smaller.
+
+> **Never put these boards in water.** They are not waterproof, and submerging
+> the PCB or the connector end destroys the sensor.
 
 Results are written to `data/state.json`, which is gitignored and survives both
 restarts and `git pull`. Each endpoint is stored separately, so the wet pass can
@@ -127,18 +135,34 @@ measured uses the `.env` default for the other.
 
 Both passes can also be run from the web UI, which is the same code path.
 
-### Air and water measure the sensor, not the soil
+### Which wet endpoint
 
-Calibrating against air and water gives you the sensor's **full electrical
-span**. It does not mean 0% is "needs water" and 100% is "saturated" — dry soil
-will read somewhere around 30-40% and a well-watered pot perhaps 80%.
+There are two defensible choices and they measure different things. This build
+uses the second.
 
-That is deliberate. Air and a cup of water are repeatable anywhere, including on
-a production line; "soil the plant would want watering in" is not. The
-consequence is that a plant's **moisture target is a number you tune by
-observation**, not a physical quantity. The history chart in the Sensors tab exists for exactly that:
-watch moisture against watering events over a few days and move the target until
-the plant is being watered when you would have watered it.
+**Air and a glass of water** give the sensor's **full electrical span**. The
+appeal is repeatability: both are reproducible anywhere, including on a
+production line, with no soil and no waiting. The cost is that neither end means
+anything about a plant. 100% is wetter than soil can ever be, so a well-watered
+pot reads perhaps 80% and dry soil 30-40% — the scale never reaches either end,
+and a moisture target becomes a number you tune purely by observation.
+
+**Air and field capacity** give a **soil-referenced span**, where 100% is the
+wettest this pot actually gets. The scale then describes the soil rather than
+the sensor, which is what makes a target mean something and what makes depletion
+figures from irrigation practice transferable. The cost is real: it needs a
+soaked pot and a day's wait, it cannot be done at a factory, and it has to be
+redone when the mix changes — including as a mix ages and compacts, since used
+peat holds measurably less water than fresh.
+
+The second is right for a planter someone owns and tunes. The first may well be
+right for a unit coming off a line, which would then be re-calibrated in place
+on first setup. If that ever matters, it is a choice of default rather than a
+change of code.
+
+Either way the history chart on the Plants tab is how you confirm it: watch
+moisture against watering events over a few days and adjust until the plant is
+watered when you would have watered it.
 
 ### When it refuses to store a reading
 

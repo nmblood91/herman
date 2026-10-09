@@ -12,7 +12,11 @@ const ENDPOINT_NOUN = {
 
 const INSTRUCTIONS = {
   dry: 'All sensors should be out of any soil, clean and dry, sitting in open air.',
-  wet: 'The sensors should be in water — only up to the heat shrink.',
+  wet:
+    'Each probe in its own pot, soaked through and drained for 24 hours — '
+    + 'field capacity, the wettest the soil actually gets. Not a glass of water: '
+    + 'that holds far more than soil can, which puts the top of the scale '
+    + 'somewhere the pot can never reach. Re-run it after repotting.',
 }
 
 export function CalibrationPanel() {
@@ -158,7 +162,7 @@ export function CalibrationPanel() {
               disabled={Boolean(busy)}
               onClick={() => runCalibration('wet')}
             >
-              {buttonLabel('wet', 'Calibrate wet (water)')}
+              {buttonLabel('wet', 'Calibrate wet (soil at field capacity)')}
             </button>
           </div>
           <p className="field-hint">
