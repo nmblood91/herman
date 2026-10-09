@@ -142,6 +142,36 @@ same rail coordinate and watering one would dribble into the other.
 Stored in `data/state.json` under `plant_profiles`, alongside the rest of the
 settings.
 
+### Starter profiles
+
+Five common plants ship as a starting library — Peace Lily, Lettuce, Basil,
+Pothos and Snake Plant, ordered wettest to driest:
+
+```bash
+python -m greenthumb.plant_library              # read them and why
+python -m greenthumb.plant_library --install    # add them to the library
+```
+
+Installing keeps any entry you have already tuned; `--overwrite` replaces them.
+
+**The photoperiods are researched, the moisture targets are not** — and cannot
+be, because no horticultural source publishes a sensor percentage. The
+literature describes dry-down behaviour ("let the top inch dry", "let it dry out
+completely") and the number that corresponds to depends on your sensor and its
+calibration. What the targets encode is the *ordering*: a snake plant should
+want water far later than a peace lily.
+
+They are also deliberately low, for a reason worth knowing. This scale is
+`(raw - dry) / (wet - dry)` with the wet endpoint measured in **plain water**,
+which is far wetter than saturated potting mix — so saturated soil reads
+somewhere around 60-75%, never 100%. A target above what the soil can reach
+makes a plant permanently thirsty, watered every `watering_cooldown_minutes`
+until the reservoir is empty. **Calibrate the sensors before tuning against
+these**, and keep targets well under what your own wettest reading shows.
+
+Volumes assume a 15 cm (6 inch) pot and frequent small doses rather than a
+weekly soak. Scale with the pot.
+
 ## Hardware assumptions
 
 The code is written to be easy to adapt to the actual hardware stack:
