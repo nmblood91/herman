@@ -166,7 +166,16 @@ script.
 
 Re-run the install script instead of pulling when the change touches
 `printer.cfg.example`, the systemd units, or the nginx config — those are copied
-out of the repo at install time, so a pull alone does not apply them.
+out of the repo at install time, so a pull alone does not apply them:
+
+```bash
+sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
+```
+
+**Invoke it with `bash`, and with `sudo`.** The script is not committed with the
+executable bit, so `./deploy/pi/install-green-thumb.sh` answers `Permission
+denied`; and it installs apt packages and writes systemd units, so it needs
+root. Every invocation in this file is spelled that way for both reasons.
 
 **A frontend change also needs a build, not just a pull.** `frontend/dist` is
 gitignored and built here, so a pull brings new source without new output. Either
@@ -201,6 +210,23 @@ restart Klipper instead of re-running the installer:
 nano ~/printer_data/config/printer.cfg
 sudo systemctl restart klipper
 tail -20 ~/klipper_logs/klippy.log
+```
+
+Read that log rather than assuming. A bad pin name makes Klipper reject the
+whole config, which presents as the entire machine being dead rather than as one
+line being wrong.
+
+**If the change moved a pin, move the wiring to match.** Klipper will switch the
+new pin whether or not anything is connected to it, so a config-only change
+leaves the output dead with nothing reporting a fault. Confirm by driving the
+thing itself — for the pump, the Run pump control on the Controls tab.
+
+Neither a pull nor an installer run touches the live config in a way you can
+skip checking, so for a one-line change like a moved pin it is worth reading
+the value back:
+
+```bash
+grep -A3 'output_pin pump' ~/printer_data/config/printer.cfg
 ```
 
 ## Recovering a diverged checkout
