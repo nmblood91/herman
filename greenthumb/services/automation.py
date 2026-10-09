@@ -1219,6 +1219,25 @@ class GreenThumbAutomation:
         with self._exclusive("Gantry move"):
             return self.klipper.move_gantry_relative(distance_mm)
 
+    def move_gantry_to_end(self, end: str) -> dict[str, object]:
+        """Send the carriage to one end of the rail.
+
+        The far end is resolved here rather than passed in, through
+        usable_travel_mm(), which reads Klipper's own axis_maximum. The rail
+        length has one source and the browser is not it -- a page left open
+        across a re-measure would otherwise send a stale target.
+
+        Both ends are legal positions. Klipper only watches endstops while
+        homing, so arriving at position_max presses the switch without
+        complaint; it is the same place homing passes through.
+        """
+        if end not in ("left", "right"):
+            raise ValueError(f"Unknown end: {end!r}. Use 'left' or 'right'.")
+
+        with self._exclusive(f"Move gantry all the way {end}"):
+            target = 0.0 if end == "left" else self.usable_travel_mm()
+            return self.klipper.move_gantry_absolute(round(target, 1))
+
     def move_to_plant(self, plant_id: str) -> dict[str, object]:
         plant = next((item for item in self.plants if item.plant_id == plant_id), None)
         if plant is None:

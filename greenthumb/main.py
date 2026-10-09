@@ -463,6 +463,19 @@ def home_gantry() -> dict[str, object]:
     return log_motion(automation.home_gantry(), "Home gantry")
 
 
+@app.post(f"{settings.api_prefix}/gantry/end")
+def move_gantry_to_end(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+    """Send the carriage to one end of the rail: {"end": "left"} or "right".
+
+    The target is resolved server-side from Klipper's axis_maximum, so the
+    caller does not need to know how long the rail is.
+    """
+    end = str(payload.get("end", "")).strip().lower()
+    return log_motion(
+        automation.move_gantry_to_end(end), f"Move gantry all the way {end}"
+    )
+
+
 @app.post(f"{settings.api_prefix}/gantry/move")
 def move_gantry(payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
     distance_mm = float(payload.get("distance_mm", 0.0))

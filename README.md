@@ -74,7 +74,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
 | `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, and move-to |
 | `/water/{plant_id}` | move to a plant and dose it |
-| `/gantry/home`, `/gantry/move` | homing and jogging the one axis |
+| `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
 | `/watering/auto` | the master switch for unattended watering |
 | `/dances`, `/dances/run/{name}`, `/dances/auto` | the routines, and the periodic re-home |

@@ -128,6 +128,20 @@ function App() {
     }
   }
 
+  const moveGantryToEnd = async (end) => {
+    try {
+      setStatus(`Moving all the way ${end}...`, { sticky: true })
+      const result = await fetchJson('/gantry/end', {
+        method: 'POST',
+        body: JSON.stringify({ end }),
+      })
+      setStatus(`Move all the way ${end}: ${describeResult(result)}`)
+      await loadDashboard()
+    } catch (error) {
+      setStatus(`Move failed: ${error.message}`)
+    }
+  }
+
   const moveToPlant = async (plantId) => {
     try {
       const plant = plants.find((item) => item.plant_id === plantId)
@@ -252,6 +266,7 @@ function App() {
           overview={overview}
           onHome={homeGantry}
           onMove={moveGantry}
+          onMoveToEnd={moveGantryToEnd}
           onMoveToPlant={moveToPlant}
           onWaterPlant={waterPlant}
           quiet={overview?.quiet}

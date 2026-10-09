@@ -42,10 +42,22 @@ export function ControlsPanel({
   overview,
   onHome,
   onMove,
+  onMoveToEnd,
   onMoveToPlant,
   onWaterPlant,
 }) {
   const lighting = overview?.lighting
+
+  // Klipper refuses every move until the axis has a reference, so an unhomed
+  // gantry turns each of these buttons into a guaranteed failure. Disabled
+  // rather than left to fail, since the error arrives a second later in a
+  // status bar the user may not be looking at.
+  //
+  // Undefined overview counts as not ready, so the buttons stay disabled until
+  // the first poll answers rather than flickering enabled for a moment.
+  const movement = overview?.movement
+  const boardDown = movement?.ok === false
+  const motionReady = !boardDown && movement?.homed === true
 
   const [ledMode, setLedMode] = useState('schedule')
   const [brightness, setBrightness] = useState(75)
@@ -209,14 +221,33 @@ export function ControlsPanel({
           <button className="primary" onClick={onHome}>Home Gantry</button>
         </div>
 
+        {!motionReady && (
+          <p className="field-hint warning">
+            {boardDown
+              ? 'The motion board is not responding, so the gantry cannot be moved. Check the USB lead to the SKR.'
+              : 'Home the gantry first. Until it has a reference, Klipper refuses every move.'}
+          </p>
+        )}
+
         <div className="motion-grid two-up">
-          <button onClick={() => onMove(-10)}>Move Left 10 mm</button>
-          <button onClick={() => onMove(10)}>Move Right 10 mm</button>
+          <button disabled={!motionReady} onClick={() => onMove(-10)}>Move Left 10 mm</button>
+          <button disabled={!motionReady} onClick={() => onMove(10)}>Move Right 10 mm</button>
         </div>
 
         <div className="motion-grid two-up">
-          <button onClick={() => onMove(-50)}>Move Left 50 mm</button>
-          <button onClick={() => onMove(50)}>Move Right 50 mm</button>
+          <button disabled={!motionReady} onClick={() => onMove(-50)}>Move Left 50 mm</button>
+          <button disabled={!motionReady} onClick={() => onMove(50)}>Move Right 50 mm</button>
+        </div>
+
+        {/* The far end is resolved by the API from Klipper's axis_maximum, so
+            this does not need to know how long the rail is. */}
+        <div className="motion-grid two-up">
+          <button disabled={!motionReady} onClick={() => onMoveToEnd('left')}>
+            All the way left
+          </button>
+          <button disabled={!motionReady} onClick={() => onMoveToEnd('right')}>
+            All the way right
+          </button>
         </div>
 
         <div className="subsection">
@@ -245,7 +276,11 @@ export function ControlsPanel({
           <h3>Move to Plant</h3>
           <div className="plant-actions-grid">
             {plants.map((plant) => (
-              <button key={plant.plant_id} onClick={() => onMoveToPlant(plant.plant_id)}>
+              <button
+                key={plant.plant_id}
+                disabled={!motionReady}
+                onClick={() => onMoveToPlant(plant.plant_id)}
+              >
                 {plant.name}
               </button>
             ))}
@@ -256,7 +291,11 @@ export function ControlsPanel({
           <h3>Water Plant</h3>
           <div className="plant-actions-grid">
             {plants.map((plant) => (
-              <button key={plant.plant_id} onClick={() => onWaterPlant(plant.plant_id)}>
+              <button
+                key={plant.plant_id}
+                disabled={!motionReady}
+                onClick={() => onWaterPlant(plant.plant_id)}
+              >
                 {plant.name}
               </button>
             ))}
@@ -264,6 +303,7 @@ export function ControlsPanel({
           <p className="field-hint">
             Moves to the plant and doses its saved volume. Takes about a minute;
             watch the status bar at the top.
+            {!motionReady && ' Held until the gantry is homed, since a dose starts with a move.'}
           </p>
         </div>
       </section>
