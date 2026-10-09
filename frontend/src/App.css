@@ -123,6 +123,14 @@
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
 }
 
+/* Several tabs stack panels -- Controls has four, Diagnostics three -- and with
+   no margin their borders met and read as one tall box with lines across it.
+   Between adjacent panels only, so the first gets no gap above it and the last
+   none below, where .app-shell's padding already provides it. */
+.panel-section + .panel-section {
+  margin-top: 20px;
+}
+
 .panel-section h2,
 .panel-section h3 {
   margin-top: 0;
@@ -226,7 +234,13 @@ button:disabled.working {
   font-weight: 600;
 }
 
-.plant-header:hover {
+/* The header is a button for the keyboard, not an action control, so it must
+   not take the lift-and-brighten hover.
+   :not(:disabled) is here for specificity rather than for behaviour --
+   button:not(:disabled):hover scores (0,2,1) and a plain .plant-header:hover
+   only (0,2,0), so the global rule was winning and the card turned green under
+   the cursor. This scores (0,3,0) and actually takes effect. */
+.plant-header:not(:disabled):hover {
   background: transparent;
   transform: none;
 }
@@ -417,6 +431,10 @@ input[type='color'] {
   .panel-section {
     padding: 18px 16px;
     border-radius: 14px;
+  }
+
+  .panel-section + .panel-section {
+    margin-top: 14px;
   }
 }
 
