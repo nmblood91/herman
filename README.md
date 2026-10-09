@@ -82,6 +82,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/lights/...` | mode, brightness, colour, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
 | `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame. No UI — reach these directly |
+| `/diagnostics/endstop` | reads the home switch and interprets it |
 | `/system/time`, `/system/timezone` | the planter's clock |
 | `/version` | what is running, and whether the checkout has moved on without it |
 
@@ -108,7 +109,7 @@ Four tabs:
 | **Controls** | Home and jog the gantry, run a dance, move to a plant, water a plant, lighting, run the pump |
 | **Plants** | Each plant's current moisture, and its name, light window, moisture target, dose volume and rail position |
 | **Sensors** | Moisture and temperature history, and per-sensor calibration |
-| **Settings** | Automatic watering, idle motion, quiet hours, LED strip type and colour order, the planter's clock, and the log |
+| **Settings** | Automatic watering, idle motion, quiet hours, LED strip type and colour order, the planter's clock, the home switch diagnostic, and the log |
 
 ## Hardware assumptions
 

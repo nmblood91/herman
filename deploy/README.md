@@ -1088,6 +1088,23 @@ almost none. So:
   the bundle with its ground returning by some other path is the one arrangement
   that would actually pick up noise.
 
+### Testing it from the UI
+
+The Settings tab has a **Test home switch** control that reads the switch and
+interprets the reading, which saves going to `QUERY_ENDSTOPS` by hand. Its
+**Watch for 20s** mode polls once a second so you can press the switch and see
+the reading follow.
+
+That live watch is the test worth doing, because a single reading cannot tell
+a switch on the NO terminal from a broken wire -- wired normally closed, both
+read triggered with the carriage parked away from the switch. Pressing the
+switch separates them: a NO contact closes and the reading flips to open, a
+broken circuit does not change at all.
+
+It takes the gantry lock while it reads, because Klipper waits for any move in
+flight before answering an endstop query. During a watering cycle it will say
+the gantry is busy rather than hang.
+
 ### The NC wiring is load-bearing
 
 When `QUERY_ENDSTOPS` reads inverted, the tempting fix is to add `!` to the pin

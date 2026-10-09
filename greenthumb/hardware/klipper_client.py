@@ -65,6 +65,27 @@ class KlipperClient:
             return None
         return bool(sensor["filament_detected"])
 
+    def endstop_state(self) -> dict[str, Any]:
+        """Whether the home switch reads triggered right now.
+
+        Klipper runs a fresh MCU query for this rather than handing back a
+        cached value, and it waits for any move already in flight to finish
+        first -- so this must not be called while the gantry is moving.
+
+        Only x is reported. stepper_y and stepper_z are placeholders pointed at
+        unused headers, and an unconnected pin holding a pull-up reads high,
+        which is the triggered reading: they say "triggered" always and mean
+        nothing by it. Returning them would invite reading a fault into them.
+        """
+        response = self._send_command("query_endstops/status")
+        if not response.get("ok"):
+            return {"ok": False, "error": response.get("error")}
+
+        query = response.get("result", {}).get("last_query", {})
+        if "x" not in query:
+            return {"ok": False, "error": "Klipper reported no x endstop"}
+        return {"ok": True, "triggered": bool(query["x"])}
+
     def home_gantry(self) -> dict[str, Any]:
         return self.send_gcode("G28 X", timeout=MOTION_TIMEOUT)
 

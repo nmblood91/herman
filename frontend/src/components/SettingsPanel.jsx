@@ -38,6 +38,15 @@ export function SettingsPanel({ overview, onRefresh }) {
   const [skewMs, setSkewMs] = useState(null)
   const [tick, setTick] = useState(() => Date.now())
 
+  // Home switch diagnostic. Not polled on mount: reading it takes the gantry
+  // lock, so a background poll would collide with the control loop and with
+  // every watering cycle. It runs when asked, and the watch below is a short
+  // burst so you can press the switch and see the reading move -- which is the
+  // only test that separates a switch on the wrong terminal from a broken wire.
+  const [endstop, setEndstop] = useState(null)
+  const [endstopBusy, setEndstopBusy] = useState(false)
+  const [watching, setWatching] = useState(false)
+
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const readClock = async () => {
@@ -230,6 +239,47 @@ export function SettingsPanel({ overview, onRefresh }) {
     }
   }
 
+  const readEndstop = async () => {
+    setEndstopBusy(true)
+    try {
+      const response = await fetch(`${API_BASE}/diagnostics/endstop`)
+      const data = await response.json()
+      // 409 carries {ok:false,error} from the hardware-busy handler, which is
+      // a real answer rather than a failure: the gantry is mid-move.
+      setEndstop(
+        response.status === 409
+          ? { ok: false, verdict: 'busy', detail: data.error || 'The gantry is busy.' }
+          : data,
+      )
+    } catch (error) {
+      setEndstop({ ok: false, verdict: 'unavailable', detail: `Could not reach Herman: ${error.message}` })
+    } finally {
+      setEndstopBusy(false)
+    }
+  }
+
+  // Polls for twenty seconds then stops itself. Long enough to walk over and
+  // press the switch, short enough that it cannot sit there taking the gantry
+  // lock once a second forever.
+  useEffect(() => {
+    if (!watching) return undefined
+    readEndstop()
+    const poll = setInterval(readEndstop, 1000)
+    const stop = setTimeout(() => setWatching(false), 20000)
+    return () => {
+      clearInterval(poll)
+      clearTimeout(stop)
+    }
+    // readEndstop is recreated every render and depending on it would restart
+    // the interval each tick; watching is the only real trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watching])
+
+  const endstopTone =
+    endstop?.verdict === 'healthy' || endstop?.verdict === 'at_switch'
+      ? 'field-hint'
+      : 'field-hint warning'
+
   return (
     <section className="panel-section">
       <h2>Settings</h2>
@@ -396,6 +446,54 @@ export function SettingsPanel({ overview, onRefresh }) {
             </p>
           )}
           {clockStatus && <p className="field-hint warning">{clockStatus}</p>}
+        </div>
+
+        <div className="field-row">
+          <div className="slider-row">
+            <button type="button" disabled={endstopBusy || watching} onClick={readEndstop}>
+              {endstopBusy && !watching ? 'Reading…' : 'Test home switch'}
+            </button>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => setWatching((on) => !on)}
+            >
+              {watching ? 'Stop watching' : 'Watch for 20s'}
+            </button>
+            {endstop?.ok && (
+              <span className="position-readout">
+                {endstop.triggered ? 'Triggered' : 'Open'}
+              </span>
+            )}
+          </div>
+
+          {!endstop ? (
+            <p className="field-hint">
+              Reads the switch at the far end of the rail and says what the
+              reading means. <strong>Watch for 20s</strong> then press the
+              switch by hand — seeing it change is the only check that tells a
+              switch on the wrong terminal apart from a broken wire.
+            </p>
+          ) : (
+            <p className={endstopTone}>{endstop.detail}</p>
+          )}
+
+          {watching && (
+            <p className="field-hint">
+              Watching. Press and release the switch; the reading above should
+              follow. This stops by itself.
+            </p>
+          )}
+
+          {endstop?.ok && (
+            <p className="field-hint">
+              Wired normally closed, so a closed contact reads <em>open</em> and
+              an open circuit reads <em>triggered</em>. That is why an unplugged
+              switch makes homing refuse rather than drive into the end of the
+              rail.
+              {endstop.homed === false && ' The axis is not homed, so the position is a counter rather than a measurement.'}
+            </p>
+          )}
         </div>
 
         <div className="field-row">

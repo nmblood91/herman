@@ -165,6 +165,17 @@ def set_system_timezone(payload: dict[str, str] = Body(default_factory=dict)) ->
     return result
 
 
+@app.get(f"{settings.api_prefix}/diagnostics/endstop")
+def get_endstop_diagnostic() -> dict[str, object]:
+    """Read the home switch and interpret it.
+
+    Sync, like the other hardware routes: it takes the gantry lock and talks to
+    Klipper, and answers 409 through the HardwareBusyError handler if the gantry
+    is mid-move rather than waiting for it.
+    """
+    return automation.endstop_diagnostic()
+
+
 @app.get(f"{settings.api_prefix}/watering/auto")
 def get_auto_watering() -> dict[str, object]:
     return automation.watering_status()

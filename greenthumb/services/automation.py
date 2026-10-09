@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 DELIVERY_POLL_SECONDS = 1.0
 # Slack for the watcher thread to notice the dose ended and return its verdict.
 DELIVERY_JOIN_SECONDS = 5.0
+# How close to position_max counts as parked on the home switch. Wider than
+# homing_retract_dist so a carriage resting just off the switch after a failed
+# home is still read as being at it.
+NEAR_SWITCH_MM = 15.0
 
 
 class HardwareBusyError(RuntimeError):
@@ -573,6 +577,98 @@ class GreenThumbAutomation:
             "enabled" if self.auto_watering_enabled else "disabled",
         )
         return self.watering_status()
+
+    def endstop_diagnostic(self) -> dict[str, object]:
+        """Read the home switch and say what the reading means.
+
+        The switch is wired normally-closed (`endstop_pin: ^PC0`), so a closed
+        contact pulls the pin low and that is the *untriggered* reading. An open
+        circuit therefore reads the same as a pressed switch -- which is the
+        whole point, because it makes homing refuse rather than drive into the
+        end of the rail when a wire breaks.
+
+        That fail-safe is what makes diagnosis interesting: wired-to-NO and
+        wired-to-nothing look identical with the carriage parked away from the
+        switch. Both read triggered. Nothing in a single reading separates them,
+        so this reports the ambiguity and asks for the press test instead of
+        guessing, since pressing the switch does separate them -- a NO contact
+        closes and the reading flips, a broken wire does not change at all.
+        """
+        with self._exclusive("Endstop diagnostic"):
+            movement = self.klipper.status()
+            reading = self.klipper.endstop_state()
+
+        if not reading.get("ok"):
+            return {
+                "ok": False,
+                "verdict": "unavailable",
+                "detail": f"Could not read the switch: {reading.get('error')}",
+            }
+
+        triggered = bool(reading["triggered"])
+        homed = bool(movement.get("homed"))
+        position = movement.get("position")
+        switch_end = movement.get("max_x")
+
+        # The switch sits at the top of travel and homing drives onto it, so a
+        # carriage well below position_max cannot be pressing it. Only true if
+        # the axis is homed; unhomed, the reported position is a counter rather
+        # than a measurement and proves nothing about where the carriage is.
+        at_switch = (
+            homed
+            and switch_end is not None
+            and position is not None
+            and float(position) >= float(switch_end) - NEAR_SWITCH_MM
+        )
+
+        result: dict[str, object] = {
+            "ok": True,
+            "triggered": triggered,
+            "homed": homed,
+            "position": position,
+            "switch_end_mm": switch_end,
+            "wiring": "normally closed",
+        }
+
+        if not homed:
+            result["verdict"] = "unknown"
+            result["detail"] = (
+                f"The switch reads {'triggered' if triggered else 'open'}, but the axis is "
+                "not homed, so the carriage could be sitting on the switch for all this "
+                "knows. Press and release the switch by hand and watch the reading change."
+            )
+        elif at_switch and triggered:
+            result["verdict"] = "at_switch"
+            result["detail"] = (
+                "Triggered, and the carriage is parked at the switch end, which is exactly "
+                "what that should read. Jog away from the switch to learn anything more."
+            )
+        elif at_switch:
+            result["verdict"] = "suspect"
+            result["detail"] = (
+                "The carriage is at the switch end but the switch reads open. Either it is "
+                "not being depressed -- check the mounting and the alignment -- or it is "
+                "wired to the NO terminal rather than NC."
+            )
+        elif triggered:
+            result["verdict"] = "suspect"
+            result["detail"] = (
+                "Triggered while the carriage is nowhere near the switch. Two things look "
+                "like this and a single reading cannot tell them apart: the switch is wired "
+                "to NO instead of NC, or the circuit is open -- a broken wire or an unseated "
+                "connector. Press the switch: if the reading flips to open you are on NO, "
+                "and if it does not change at all the circuit is broken."
+            )
+        else:
+            result["verdict"] = "healthy"
+            result["detail"] = (
+                "Open, with the carriage away from the switch, which is correct for "
+                "normally-closed wiring. Press the switch to confirm it reads triggered, "
+                "and unplug it once to confirm that reads triggered too -- that is the "
+                "fail-safe, and it is the reason this build specifies NC."
+            )
+
+        return result
 
     def watering_status(self) -> dict[str, object]:
         return {
