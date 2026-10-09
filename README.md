@@ -405,6 +405,34 @@ automatically** in the Settings tab; the choice persists across restarts.
 `AUTO_WATERING_ENABLED` only sets the value a planter starts life with, and a
 saved choice overrides it.
 
-Enable it only after testing the pump by hand and measuring
-`pump_flow_ml_per_second` against a real dose, since that figure converts a
-requested volume into a pump run time.
+Enable it only after measuring the pump's flow rate, since that figure is what
+converts a requested volume into a pump run time.
+
+### Measuring the pump flow rate
+
+Diagnostics → Pump. Run the pump for 60 s, weigh what comes out, and type the
+millilitres in; the planter divides by the run it timed itself.
+
+```bash
+curl -X POST http://herman.local/api/v1/pump/run
+curl -X POST http://herman.local/api/v1/pump/calibrate -H 'Content-Type: application/json' -d '{"measured_ml":72}'
+curl http://herman.local/api/v1/pump                     # the rate in use, and when it was measured
+```
+
+Asking for the volume rather than the rate is deliberate: the figure in front
+of someone is a reading off a scale, and a rate they worked out themselves is a
+rate with their arithmetic in it. The run length comes from a monotonic clock
+rather than the wall clock, because the Pi has no RTC and an NTP sync landing
+mid-run would otherwise corrupt the divisor.
+
+**It is calibration, so it lives in `data/state.json`, not `.env`.**
+`PUMP_FLOW_ML_PER_SECOND` is only the value a planter starts life with; once
+measured, the stored figure wins. That means it survives a reflash with the
+rest of the hand-tuned values, and `measured_at` being empty is how the UI
+knows to warn that a planter is still dosing off a datasheet number.
+
+A measurement that could not be real is refused rather than stored — a run
+under 20 s (too little water to weigh to the gram), or a volume that works out
+to a rate outside 0.05–20 mL/s, which is the misplaced decimal. This is the one
+error nothing downstream can catch: it scales every dose by the same factor and
+still reports success.

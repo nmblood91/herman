@@ -62,7 +62,6 @@ export function ControlsPanel({
   const [ledMode, setLedMode] = useState('schedule')
   const [brightness, setBrightness] = useState(75)
   const [color, setColor] = useState('#00ff80')
-  const [pumpStatus, setPumpStatus] = useState('')
   const [lightingError, setLightingError] = useState('')
   const [quietStatus, setQuietStatus] = useState('')
   const [dances, setDances] = useState([])
@@ -145,33 +144,6 @@ export function ControlsPanel({
       onRefresh?.()
     } catch (error) {
       setQuietStatus(`Could not reach the controller: ${error.message}`)
-    }
-  }
-
-  const pumpAction = async (action) => {
-    try {
-      const response = await fetch(`${API_BASE}/pump/${action}`, { method: 'POST' })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        setPumpStatus(data.error || `Request failed (HTTP ${response.status})`)
-        return
-      }
-      // A pump that fails to start answers 200 with {status: "error"}, so
-      // response.ok alone reported it as running -- and with no
-      // max_run_seconds in that body the message read "after undefineds".
-      if (data.status === 'error') {
-        setPumpStatus(`Pump did not start: ${data.error || 'unknown error'}`)
-        return
-      }
-      setPumpStatus(
-        action === 'run'
-          ? `Pump running — stops automatically after ${data.max_run_seconds}s.`
-          : 'Pump stopped.',
-      )
-    } catch (error) {
-      // Louder than a console.error: this control moves water, so a silent
-      // failure is not acceptable.
-      setPumpStatus(`Failed to ${action} pump: ${error.message}`)
     }
   }
 
@@ -399,30 +371,6 @@ export function ControlsPanel({
         </div>
       </section>
 
-      <section className="panel-section">
-        <h2>Pump</h2>
-
-        <div className="general-settings-form">
-          <div className="field-row">
-            <div className="motion-grid two-up">
-              <button type="button" onClick={() => pumpAction('run')}>
-                Run Pump
-              </button>
-              {/* Never disabled: it is the panic control, and disabling it on
-                  the frontend's idea of state would fail exactly when that idea
-                  is wrong. Stopping an already-stopped pump is harmless. */}
-              <button type="button" onClick={() => pumpAction('stop')}>
-                Stop Pump
-              </button>
-            </div>
-            <p className="field-hint">
-              Runs the pump where it stands, without moving the gantry. It stops
-              on its own at the safety limit even if you close this page.
-            </p>
-            {pumpStatus && <p className="field-hint warning">{pumpStatus}</p>}
-          </div>
-        </div>
-      </section>
     </>
   )
 }

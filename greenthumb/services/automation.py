@@ -6,6 +6,10 @@ from collections import deque
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, time, timedelta
+# Not datetime: the Pi has no battery-backed clock, so an NTP sync can
+# land mid-run and move the wall clock. A calibration divides by this
+# duration, so it has to come from a clock that only goes forwards.
+from time import monotonic
 from pathlib import Path
 
 from greenthumb.config import settings
@@ -40,6 +44,21 @@ def within_window(now: time, start: time, stop: time) -> bool:
         return start <= now < stop
     # A window that stops before it starts runs overnight, e.g. 20:00 to 06:00.
     return now >= start or now < stop
+
+
+# A calibration run has to be long enough for the volume to be weighable.
+# This is about the scale, not the pump: a kitchen scale reading to the gram is
+# a few percent of 20 g and about one percent of 100 g.
+MIN_CALIBRATION_SECONDS = 20.0
+
+# What a flow rate is allowed to come out as. The peristaltic pump here is
+# rated at 100 mL/min, so a plausible measured figure sits near 1.67 mL/s and
+# below it once lift and tubing are in the way. These bounds are wide enough to
+# accept any real result and narrow enough to catch a misplaced decimal, which
+# is the realistic mistake -- and one that would otherwise store happily and
+# mis-dose every pot by that factor.
+MIN_FLOW_ML_PER_SECOND = 0.05
+MAX_FLOW_ML_PER_SECOND = 20.0
 
 
 class GreenThumbAutomation:
@@ -106,6 +125,16 @@ class GreenThumbAutomation:
         self._delivery_failures = 0
         self._pump_timer: threading.Timer | None = None
         self._pump_lock_held = False
+        # How long the last manual run actually lasted, which is the
+        # denominator of a flow calibration. Measured rather than assumed to be
+        # the dead-man limit: the run can be stopped early, and the timer that
+        # ends it is a host-side one with its own small lateness.
+        self._pump_run_started: float | None = None
+        self._last_pump_run: dict[str, object] | None = None
+        # When the flow rate in use was measured, or None for the code default.
+        # The UI needs to tell "measured on the real plumbing" from "a figure
+        # off the datasheet", because only one of those is trustworthy.
+        self._flow_measured_at: str | None = None
 
         # The master switch for unattended watering. Seeded from the
         # environment, then owned by the UI and persisted like every other
@@ -222,8 +251,10 @@ class GreenThumbAutomation:
                 self.idle_motion_next = nxt % len(dances.DEFAULT_ORDER)
 
         watering = stored.get("watering")
-        if isinstance(watering, dict) and isinstance(watering.get("auto_enabled"), bool):
-            self.auto_watering_enabled = watering["auto_enabled"]
+        if isinstance(watering, dict):
+            if isinstance(watering.get("auto_enabled"), bool):
+                self.auto_watering_enabled = watering["auto_enabled"]
+            self._restore_pump_flow(watering)
 
         quiet = stored.get("quiet")
         if isinstance(quiet, dict):
@@ -232,6 +263,27 @@ class GreenThumbAutomation:
         leds = stored.get("leds")
         if isinstance(leds, dict):
             self._restore_led_state(leds)
+
+    def _restore_pump_flow(self, watering: dict) -> None:
+        """Take the measured flow rate back out of state, if there is one.
+
+        Left at the configured default when there is not, which is the case
+        that must stay visible: a planter that has never been calibrated is
+        dosing off a datasheet figure, and measured_at being None is how the
+        UI says so.
+        """
+        flow = watering.get("flow_ml_per_second")
+        if isinstance(flow, bool) or not isinstance(flow, (int, float)):
+            if flow is not None:
+                logger.warning("Ignoring unusable stored pump flow rate %r", flow)
+            return
+        if not (MIN_FLOW_ML_PER_SECOND <= float(flow) <= MAX_FLOW_ML_PER_SECOND):
+            logger.warning("Ignoring out-of-range stored pump flow rate %r", flow)
+            return
+
+        self.pump.flow_ml_per_second = float(flow)
+        measured = watering.get("flow_measured_at")
+        self._flow_measured_at = measured if isinstance(measured, str) else None
 
     def _restore_quiet_state(self, quiet: dict) -> None:
         if isinstance(quiet.get("enabled"), bool):
@@ -306,7 +358,15 @@ class GreenThumbAutomation:
             # getattr throughout: a controller that does not expose one of
             # these simply has it left out of the snapshot, rather than a
             # settings save failing because of an LED attribute.
-            "watering": {"auto_enabled": self.auto_watering_enabled},
+            "watering": {
+                "auto_enabled": self.auto_watering_enabled,
+                # Calibration, not configuration: a property of this pump, this
+                # tubing and this lift. It lives here rather than in .env so it
+                # is set where it is measured, and so it comes back with the
+                # rest of the hand-tuned values after a reflash.
+                "flow_ml_per_second": self._pump_flow(),
+                "flow_measured_at": self._flow_measured_at,
+            },
             "idle_motion": {
                 "enabled": self.idle_motion_enabled,
                 "minutes": self.idle_motion_minutes,
@@ -483,19 +543,24 @@ class GreenThumbAutomation:
             "watering_mode": plant.watering_mode,
         }
 
-    def _dose_seconds(self, volume_ml: float) -> float:
-        """How long the pump runs for a dose, and so how long a sweep lasts.
+    def _pump_flow(self) -> float:
+        """The flow rate every dose is timed against, in mL/s.
 
-        Taken from the pump because the pump holds the calibrated flow rate.
-        The type check is not decoration: getattr with a default cannot fall
-        back on an object that defines __getattr__, which the test doubles do,
-        so the old `getattr(self.pump, "flow_ml_per_second", settings...)`
-        handed back a bound method where a number was wanted.
+        One checked reader rather than three unchecked ones, and the check is
+        not decoration. getattr with a default cannot fall back on an object
+        that defines __getattr__ -- which the test doubles do -- so reading
+        this straight off the pump hands back a bound method where a number is
+        wanted. That then reached the state snapshot, where it is not JSON
+        serialisable, and took every settings save down with it.
         """
         flow = getattr(self.pump, "flow_ml_per_second", None)
         if isinstance(flow, bool) or not isinstance(flow, (int, float)) or flow <= 0:
-            flow = settings.pump_flow_ml_per_second
-        return max(float(volume_ml) / max(float(flow), 0.01), 0.1)
+            return float(settings.pump_flow_ml_per_second)
+        return float(flow)
+
+    def _dose_seconds(self, volume_ml: float) -> float:
+        """How long the pump runs for a dose, and so how long a sweep lasts."""
+        return max(float(volume_ml) / max(self._pump_flow(), 0.01), 0.1)
 
     def _motion_limits(self) -> tuple[float, float] | None:
         """Klipper's top speed and acceleration, or None if it did not say.
@@ -917,6 +982,88 @@ class GreenThumbAutomation:
 
         return result
 
+    def pump_status(self) -> dict[str, object]:
+        """The flow rate in use, and the run a calibration would divide by."""
+        return {
+            "status": "ok",
+            # Read back off the pump rather than from settings, because the
+            # pump is what a dose is actually timed against.
+            "flow_ml_per_second": round(self._pump_flow(), 4),
+            "seconds_for_100ml": round(self._dose_seconds(100), 1),
+            "measured_at": self._flow_measured_at,
+            "max_run_seconds": settings.pump_max_run_seconds,
+            "min_calibration_seconds": MIN_CALIBRATION_SECONDS,
+            "last_run": self._last_pump_run,
+        }
+
+    def calibrate_pump_flow(self, measured_ml: float) -> dict[str, object]:
+        """Work the flow rate out from the last timed run and what came out.
+
+        Dividing here rather than asking for mL/s directly, because the figure
+        someone has in front of them is a reading off a scale. A rate they
+        worked out themselves is a rate with their arithmetic in it, and this
+        number scales every dose the planter ever gives.
+
+        Refused rather than stored whenever the answer could not be a real
+        measurement. A wrong flow rate is worse than no flow rate: it is the
+        one error that scales every watering by the same factor and still
+        reports success, which is exactly what nobody notices.
+        """
+        if self._last_pump_run is None:
+            raise ValueError(
+                "Run the pump first -- a flow rate is a volume divided by the "
+                "time it took to deliver it."
+            )
+
+        if isinstance(measured_ml, bool) or not isinstance(measured_ml, (int, float)):
+            raise ValueError("Give the measured volume as a number of millilitres")
+        volume = float(measured_ml)
+
+        seconds = float(self._last_pump_run["seconds"])
+        if seconds < MIN_CALIBRATION_SECONDS:
+            # Not about the pump settling -- it is about the scale. A short run
+            # delivers a small volume, and a kitchen scale reading to the gram
+            # is a far bigger share of 20 g than of 100 g.
+            raise ValueError(
+                f"That run was only {seconds:.0f}s. Run the pump for at least "
+                f"{MIN_CALIBRATION_SECONDS:.0f}s, or the volume is too small "
+                "to weigh accurately."
+            )
+
+        flow = volume / seconds
+        if not (MIN_FLOW_ML_PER_SECOND <= flow <= MAX_FLOW_ML_PER_SECOND):
+            # Catches the realistic slip: a decimal in the wrong place, or
+            # millilitres confused with something else. Both give a number that
+            # stores happily and then mis-doses every pot by that factor.
+            #
+            # It is also what rejects a volume of zero, a negative one, or an
+            # infinity: each produces a rate outside this range. A separate
+            # check for those sat here until mutation testing showed it could
+            # never fail on its own.
+            raise ValueError(
+                f"{volume:.0f} mL in {seconds:.0f}s is {flow:.2f} mL/s, which is "
+                f"outside what this pump can do ({MIN_FLOW_ML_PER_SECOND} to "
+                f"{MAX_FLOW_ML_PER_SECOND} mL/s). Check the figure."
+            )
+
+        self.pump.flow_ml_per_second = flow
+        self._flow_measured_at = datetime.now().isoformat(timespec="seconds")
+        self._persist()
+        logger.info(
+            "Pump flow calibrated to %.3f mL/s from %.1f mL in %.1fs",
+            flow, volume, seconds,
+        )
+        return {
+            "status": "ok",
+            "flow_ml_per_second": round(flow, 4),
+            "measured_ml": volume,
+            "run_seconds": seconds,
+            "measured_at": self._flow_measured_at,
+            # What the calibration means in the units the user actually sets,
+            # so the number can be sanity-checked against a real dose.
+            "seconds_for_100ml": round(100 / flow, 1),
+        }
+
     def watering_status(self) -> dict[str, object]:
         return {
             "status": "ok",
@@ -1036,6 +1183,7 @@ class GreenThumbAutomation:
         self._pump_timer.daemon = True
         self._pump_timer.start()
 
+        self._pump_run_started = monotonic()
         logger.info("Pump running, auto-stop in %ds", settings.pump_max_run_seconds)
         return {
             "status": "ok",
@@ -1050,6 +1198,13 @@ class GreenThumbAutomation:
             self._pump_timer = None
 
         self.pump.stop()
+        if self._pump_run_started is not None:
+            self._last_pump_run = {
+                "seconds": round(monotonic() - self._pump_run_started, 2),
+                "at": datetime.now().isoformat(timespec="seconds"),
+            }
+            self._pump_run_started = None
+            logger.info("Pump ran for %ss", self._last_pump_run["seconds"])
         self._release_pump_lock()
         return {"status": "ok", "running": False}
 

@@ -337,6 +337,26 @@ def run_pump() -> dict[str, object]:
     return result
 
 
+@app.get(f"{settings.api_prefix}/pump")
+def pump_status() -> dict[str, object]:
+    """The flow rate in use, and the last timed run a calibration can use."""
+    return automation.pump_status()
+
+
+@app.post(f"{settings.api_prefix}/pump/calibrate")
+def calibrate_pump_flow(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Turn the last run plus a measured volume into a flow rate.
+
+    Expects {"measured_ml": ...} -- what came out, weighed on a scale.
+    """
+    result = automation.calibrate_pump_flow(payload.get("measured_ml"))
+    log_event(
+        f"Pump flow calibrated to {result['flow_ml_per_second']} mL/s "
+        f"({result['measured_ml']} mL in {result['run_seconds']}s)"
+    )
+    return result
+
+
 @app.post(f"{settings.api_prefix}/pump/stop")
 def stop_pump() -> dict[str, object]:
     result = automation.stop_pump()

@@ -302,6 +302,38 @@ seconds." If it thinks the pump is twice as fast as it really is, every plant
 gets half as much water as intended, forever, and nothing about that looks
 broken from the outside.
 
+## Measuring the flow rate
+
+On the **Diagnostics** tab, under Pump. Until you do this the planter is using
+the pump's rated figure, which assumes no lift and no tubing, so your real rate
+is almost certainly lower. The panel says so in amber until it has been
+measured.
+
+1. **Prime the line.** Run the pump once until water comes out steadily. The
+   first run fills the tube, and that volume is not flow.
+2. **Catch the water in something on a kitchen scale**, tared, with the nozzle
+   over it. Weigh rather than reading a jug: 1 g of water is 1 mL, and a scale
+   beats graduations.
+3. **Press Run.** It runs for 60 seconds and stops on its own — you do not need
+   to press Stop, and you do not need a stopwatch. The planter times its own
+   run and remembers how long it was.
+4. **Weigh what came out** and type the grams into *How much came out?*, then
+   Save. The planter divides by the run it just timed.
+5. **Do it three times.** They should agree within a few percent.
+
+The panel then tells you how long a 100 mL dose will run for, which is the
+number to sanity-check: dose 100 mL into the cup and expect about 100 g.
+
+Two things worth knowing. The rate is measured on **your** plumbing, so redo it
+if you change the tubing, the nozzle or the height of the reservoir — though a
+peristaltic pump is positive-displacement, so it cares much less about lift
+than you would expect, which is why one number works at all. And peristaltic
+tubing takes a set as it ages, so the rate drifts; re-measure once a season.
+
+The figure lives in `data/state.json` with the rest of your calibration, not in
+`.env`. It is a property of your pump and tubing, not configuration, so it is
+set where it is measured and comes back after a reflash with everything else.
+
 ## If something goes wrong
 
 The design assumes things will fail and tries to fail toward *not watering*
@@ -327,5 +359,8 @@ rather than toward flooding:
 
 The failure this design does *not* protect against is a wrong flow rate, because
 nothing about it looks like an error — the planter reports success every time
-while quietly delivering the wrong amount. That's why measuring it by hand
-matters more than it sounds like it should.
+while quietly delivering the wrong amount. The outlet sensor confirms that
+water arrived, not how much of it. That's why measuring it matters more than it
+sounds like it should, and why the planter refuses a measurement that could not
+be a real one rather than storing it: a run too short to weigh accurately, or a
+volume that works out to a rate no pump of this kind could manage.

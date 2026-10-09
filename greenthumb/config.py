@@ -16,11 +16,19 @@ class Settings(BaseSettings):
     # through lift and tubing runs lower, so measure against a real dose: this
     # converts millilitres into a run time, and an error here scales every
     # watering by the same factor while still reporting success.
+    # The starting point only. Once the pump has been run against a scale in
+    # Diagnostics the measured figure lives in state.json and wins over this,
+    # so that a value worked out on the real plumbing is not quietly replaced
+    # by a datasheet number on the next restart.
     pump_flow_ml_per_second: float = 1.67
     # Dead-man limit for the manual run button, not a dosing figure. A pump left
     # running empties the reservoir onto the floor, so it stops itself at this
     # regardless of what the browser does.
-    pump_max_run_seconds: int = 120
+    # Also the length of a calibration run, which is what sets it: 60s is
+    # about 100 mL at the rated rate, and a kitchen scale reads 100 g to
+    # roughly a percent. Halving it from 120 also halves what a forgotten run
+    # can put on the floor.
+    pump_max_run_seconds: int = 60
     # Strip chip: sets the bit timing and the usual channel order. Selectable in
     # the Settings tab. All 12V: WS2815 and GS8208 are one pixel per LED, WS2811
     # drives three LEDs per pixel so led_count is LEDs/3 for it. No 5V chip is

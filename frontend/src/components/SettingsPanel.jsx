@@ -250,10 +250,10 @@ export function SettingsPanel({ overview, onRefresh }) {
               the history — watering only happens when you press a button.
             </p>
             <p className="field-hint">
-              Before turning this on, measure the pump's flow rate and set it in{' '}
-              <code>PUMP_FLOW_ML_PER_SECOND</code>. A dose is a run time worked
-              out from that number, so if it is wrong every automatic watering is
-              wrong by the same factor and still reports success.
+              Before turning this on, measure the pump's flow rate under
+              Diagnostics. A dose is a run time worked out from that number, so
+              if it is wrong every automatic watering is wrong by the same
+              factor and still reports success.
             </p>
             {autoMsg && <p className="field-hint warning">{autoMsg}</p>}
           </div>
