@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { API_BASE } from '../api'
 
 const DEFAULT_COLOR_ORDERS = ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']
@@ -27,76 +27,6 @@ export function SettingsPanel({ overview, onRefresh }) {
   const [quietStart, setQuietStart] = useState('21:00')
   const [quietStop, setQuietStop] = useState('08:00')
   const [quietMsg, setQuietMsg] = useState('')
-
-  const [clock, setClock] = useState(null)
-  const [clockStatus, setClockStatus] = useState('')
-  const [syncing, setSyncing] = useState(false)
-  // Ticks locally off the offset between the planter's clock and this device's,
-  // so the readout counts seconds like a device display instead of freezing on
-  // whatever the last fetch returned.
-  const [skewMs, setSkewMs] = useState(null)
-  const [tick, setTick] = useState(() => Date.now())
-
-
-  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  const readClock = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/system/time`)
-      if (!response.ok) return
-      const data = await response.json()
-      setClock(data)
-      setSkewMs(new Date(data.now).getTime() - Date.now())
-    } catch {
-      // Leaves the readout blank rather than breaking the panel.
-    }
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      if (!cancelled) await readClock()
-    }
-    load()
-    const id = setInterval(() => setTick(Date.now()), 1000)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-    }
-  }, [])
-
-  const planterClock =
-    skewMs === null
-      ? '—'
-      : new Date(tick + skewMs).toLocaleString(undefined, {
-          timeZone: clock?.timezone || undefined,
-          dateStyle: 'medium',
-          timeStyle: 'medium',
-        })
-
-  const syncTimezone = async () => {
-    setSyncing(true)
-    setClockStatus('')
-    try {
-      const response = await fetch(`${API_BASE}/system/timezone`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timezone: browserZone }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        setClockStatus(data.error || `Could not sync (HTTP ${response.status})`)
-        return
-      }
-      setClock(data)
-      setSkewMs(new Date(data.now).getTime() - Date.now())
-      setClockStatus(`Planter time zone set to ${data.timezone}.`)
-    } catch (error) {
-      setClockStatus(`Could not sync: ${error.message}`)
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   // Resynced during render rather than in an effect, so the form never paints
   // one frame of stale values after a refresh.
@@ -139,7 +69,6 @@ export function SettingsPanel({ overview, onRefresh }) {
       setStatus(`Save failed: ${error.message}`)
     }
   }
-
 
   // Saves on toggle rather than behind the Save button: it is one boolean
   // with nothing to coordinate, and the status bar answers immediately once
@@ -214,15 +143,15 @@ export function SettingsPanel({ overview, onRefresh }) {
     }
   }
 
-
   return (
     <section className="panel-section">
       <h2>Settings</h2>
 
       {/* Grouped rather than left as one column of unrelated fields. The order
           is what the planter does on its own, then when it is allowed to, then
-          the hardware it was built with, then the clock those schedules run
-          on. */}
+          the hardware it was built with. The clock those schedules run on is a
+          readout with warning states rather than a setting, so it sits in
+          Diagnostics. */}
       <div className="general-settings-form">
         <div className="settings-group">
           <h3>Watering</h3>
@@ -383,38 +312,6 @@ export function SettingsPanel({ overview, onRefresh }) {
           {status && <p className="field-hint warning">{status}</p>}
         </div>
 
-        <div className="settings-group">
-          <h3>Time</h3>
-
-          <div className="field-row">
-            <div className="slider-row">
-              <button type="button" disabled={syncing || !clock?.can_set} onClick={syncTimezone}>
-                {syncing ? 'Syncing…' : 'Sync to Local Time'}
-              </button>
-              {/* Names itself, so there is no separate field label above it. */}
-              <span className="position-readout">Herman&apos;s clock: {planterClock}</span>
-            </div>
-            <p className="field-hint">
-              The planter runs its lighting schedule on its own clock, so if this
-              is not your local time the lights come on at the wrong hours.
-              Syncing sets it to {browserZone} — the time zone this device is in.
-            </p>
-            {clock && !clock.ntp_synchronised && (
-              <p className="field-hint warning">
-                The clock has not reached a time server yet, so it may be wrong
-                until the planter is online. There is no battery-backed clock, so
-                it reverts to roughly its last shutdown after a power cut.
-              </p>
-            )}
-            {clock && !clock.can_set && (
-              <p className="field-hint warning">
-                This host cannot set its time zone from here. Set it on the Pi
-                with <code>sudo timedatectl set-timezone {browserZone}</code>.
-              </p>
-            )}
-            {clockStatus && <p className="field-hint warning">{clockStatus}</p>}
-          </div>
-        </div>
       </div>
     </section>
   )
