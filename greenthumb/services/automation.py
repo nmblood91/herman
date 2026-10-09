@@ -170,8 +170,10 @@ class GreenThumbAutomation:
                 # A plant id that no longer exists is skipped rather than
                 # treated as an error: the plant set is defined by the code.
                 continue
-            if isinstance(saved.get("name"), str) and saved["name"].strip():
-                plant.name = saved["name"]
+            for text_field in ("name", "soil"):
+                value = saved.get(text_field)
+                if isinstance(value, str) and value.strip():
+                    setattr(plant, text_field, value.strip())
             for field_name in ("moisture_target", "watering_volume_ml", "position_mm"):
                 value = saved.get(field_name)
                 if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -272,6 +274,7 @@ class GreenThumbAutomation:
                     "moisture_target": plant.moisture_target,
                     "watering_volume_ml": plant.watering_volume_ml,
                     "position_mm": plant.position_mm,
+                    "soil": plant.soil,
                     "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
                     "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
                 }
@@ -1277,6 +1280,7 @@ class GreenThumbAutomation:
                 "watering_volume_ml": plant.watering_volume_ml,
                 "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
                 "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
+                "soil": plant.soil,
             },
             self._state_path,
         )
@@ -1320,6 +1324,9 @@ class GreenThumbAutomation:
                 setattr(plant, field_name, time.fromisoformat(text))
             except ValueError:
                 logger.warning("Ignoring bad %s %r in profile %r", field_name, text, key)
+
+        if isinstance(entry.get("soil"), str):
+            plant.soil = entry["soil"].strip()
 
         self._persist()
         return {
@@ -1371,6 +1378,57 @@ class GreenThumbAutomation:
             "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
             "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
         }
+
+    def update_plant_soil(self, plant_id: str, soil: str) -> dict[str, object]:
+        """Record which mix this pot is filled with.
+
+        An unknown name is refused rather than stored: a soil that is not in
+        the library supplies no wilting-point ratio, so it would read as "set"
+        while behaving exactly like "not set". Empty clears it, which is the
+        honest way to say the mix is unknown.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        wanted = str(soil).strip()
+        if wanted:
+            soils = state.load_soils(self._state_path)
+            key = next((k for k in soils if k.casefold() == wanted.casefold()), None)
+            if key is None:
+                raise ValueError(
+                    f"No soil called {wanted!r}. Install the library with "
+                    f"python -m greenthumb.soil_library --install"
+                )
+            wanted = key
+
+        plant.soil = wanted
+        self._persist()
+        return {"status": "ok", "plant_id": plant_id, "soil": plant.soil}
+
+    def list_soils(self) -> list[dict[str, object]]:
+        """Every saved soil, with the ratio the bands need, widest window first."""
+        soils = state.load_soils(self._state_path)
+        entries = []
+        for name, values in soils.items():
+            entry = {"name": name, **values}
+            entry["wilting_fraction"] = state.available_water_fraction(values)
+            capacity = values.get("field_capacity_vwc")
+            wilting = values.get("wilting_point_vwc")
+            if isinstance(capacity, (int, float)) and isinstance(wilting, (int, float)):
+                entry["available_points"] = round(capacity - wilting, 1)
+            entries.append(entry)
+        # Widest usable window first: that is the one most forgiving to
+        # automate, and the ordering says something, unlike alphabetical.
+        entries.sort(key=lambda e: e.get("available_points") or 0, reverse=True)
+        return entries
+
+    def delete_soil(self, name: str) -> dict[str, object]:
+        """Remove a soil. Plants still naming it keep the name, unresolved."""
+        wanted = str(name).strip()
+        if not state.delete_soil(wanted, self._state_path):
+            raise ValueError(f"No soil called {wanted!r}")
+        return {"status": "ok", "deleted": wanted}
 
     def update_watering_volume(self, plant_id: str, volume_ml: int) -> dict[str, object]:
         plant = self.get_plant(plant_id)

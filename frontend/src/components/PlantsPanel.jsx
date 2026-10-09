@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 const draftFrom = (plant) => ({
   name: plant.name,
+  soil: plant.soil ?? '',
   light_start_time: plant.light_start_time ?? '08:00',
   light_stop_time: plant.light_stop_time ?? '20:00',
   moisture_target: plant.moisture_target ?? 45,
@@ -46,7 +47,15 @@ const describeMoisture = (status) => {
 // parked over that plant and the button pressed on the wrong card.
 const CONFUSION_MARGIN_MM = 50
 
-export function PlantsPanel({ plants, onSave, status, movement, profiles, onLoadProfile }) {
+export function PlantsPanel({
+  plants,
+  onSave,
+  status,
+  movement,
+  profiles,
+  onLoadProfile,
+  soils,
+}) {
   const [drafts, setDrafts] = useState({})
   // Which saved plant each card has picked, keyed by plant so one card's
   // choice cannot load onto another.
@@ -107,6 +116,7 @@ export function PlantsPanel({ plants, onSave, status, movement, profiles, onLoad
   }
 
   const profileNames = (profiles ?? []).map((profile) => profile.name)
+  const soilList = soils ?? []
 
   const togglePlantExpanded = (plantId) => {
     setExpandedPlantIds((current) =>
@@ -259,6 +269,26 @@ export function PlantsPanel({ plants, onSave, status, movement, profiles, onLoad
                         onChange={(event) => updateDraft(plant.plant_id, 'position_mm', event.target.value)}
                       />
                     </label>
+                    <label>
+                      Soil
+                      <select
+                        value={draft.soil}
+                        onChange={(event) => updateDraft(plant.plant_id, 'soil', event.target.value)}
+                      >
+                        <option value="">
+                          {soilList.length ? 'Not set' : 'No soils installed'}
+                        </option>
+                        {soilList.map((soil) => (
+                          <option key={soil.name} value={soil.name}>
+                            {soil.name}
+                            {soil.available_points != null
+                              ? ` — ${soil.available_points} pts usable`
+                              : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
                     <div>
                       {/* Names the plant on the button itself: the whole risk
                           here is pressing this on the wrong card. */}

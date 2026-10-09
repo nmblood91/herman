@@ -36,6 +36,7 @@ SCHEMA_VERSION = 1
 
 CALIBRATION_KEY = "moisture_calibration"
 PROFILES_KEY = "plant_profiles"
+SOILS_KEY = "soil_profiles"
 
 # What a saved plant carries, and the list is a whitelist rather than
 # "everything on the plant" on purpose.
@@ -50,6 +51,23 @@ PROFILE_FIELDS = (
     "watering_volume_ml",
     "light_start_time",
     "light_stop_time",
+    # Which mix the plant is potted in. Care settings, not placement: a plant
+    # moved to another pot keeps its soil, so it travels on load like the rest.
+    "soil",
+)
+
+# A soil holds the two water contents that bound what a plant can actually use,
+# as volumetric water content.
+#
+# Only their *ratio* leaves this table usefully. It is dimensionless, so a
+# published figure applies to any pot of that mix. The absolute values do not
+# transfer to raw sensor counts -- converting water content into a reading needs
+# a response curve for that specific medium -- which is why field capacity is
+# still measured per pot by --calibrate wet, and why this supplies the shape of
+# the window rather than its position.
+SOIL_FIELDS = (
+    "field_capacity_vwc",
+    "wilting_point_vwc",
 )
 
 
@@ -257,26 +275,29 @@ def _match_name(stored: dict[str, Any], name: str) -> str | None:
     return None
 
 
-def load_profiles(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
-    """Every saved plant, keyed by name. Unusable entries are skipped.
+def _load_named(
+    key: str, fields: tuple[str, ...], path: str | Path | None = None
+) -> dict[str, dict[str, Any]]:
+    """Every entry in one named library, keyed by name.
 
-    Same tolerance as the rest of this module: a hand-edited file with one bad
-    entry loses that entry, not the library.
+    Unusable entries are skipped rather than fatal, the same tolerance as the
+    rest of this module: a hand-edited file with one bad entry loses that entry,
+    not the library.
     """
-    stored = load_state(path).get(PROFILES_KEY)
+    stored = load_state(path).get(key)
     if not isinstance(stored, dict):
         return {}
 
     result: dict[str, dict[str, Any]] = {}
     for name, value in stored.items():
         if not isinstance(name, str) or not name.strip() or not isinstance(value, dict):
-            logger.warning("Skipping malformed plant profile %r", name)
+            logger.warning("Skipping malformed %s entry %r", key, name)
             continue
-        entry = {field: value[field] for field in PROFILE_FIELDS if field in value}
+        entry = {field: value[field] for field in fields if field in value}
         if not entry:
-            # Nothing worth loading. An entry with a name and no settings would
-            # show in the picker and then do nothing when applied.
-            logger.warning("Skipping empty plant profile %r", name)
+            # An entry with a name and no settings would show in the picker and
+            # then do nothing when applied.
+            logger.warning("Skipping empty %s entry %r", key, name)
             continue
         if isinstance(value.get("saved_at"), str):
             entry["saved_at"] = value["saved_at"]
@@ -284,21 +305,26 @@ def load_profiles(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
     return result
 
 
-def save_profile(
-    name: str, settings: dict[str, Any], path: str | Path | None = None
+def _save_named(
+    key: str,
+    fields: tuple[str, ...],
+    noun: str,
+    name: str,
+    settings: dict[str, Any],
+    path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Upsert one saved plant, replacing any entry of the same name."""
+    """Upsert one entry, replacing any of the same name."""
     clean = str(name).strip()
     if not clean:
-        raise ValueError("A saved plant needs a name")
+        raise ValueError(f"A {noun} needs a name")
 
-    entry = {field: settings[field] for field in PROFILE_FIELDS if field in settings}
+    entry = {field: settings[field] for field in fields if field in settings}
     if not entry:
-        raise ValueError("Nothing to save: no recognised plant settings given")
+        raise ValueError(f"Nothing to save: no recognised {noun} settings given")
     entry["saved_at"] = datetime.now().isoformat(timespec="seconds")
 
     data = load_state(path)
-    stored = data.get(PROFILES_KEY)
+    stored = data.get(key)
     if not isinstance(stored, dict):
         stored = {}
 
@@ -309,15 +335,15 @@ def save_profile(
         del stored[previous]
 
     stored[clean] = entry
-    data[PROFILES_KEY] = stored
+    data[key] = stored
     save_state(data, path)
     return entry
 
 
-def delete_profile(name: str, path: str | Path | None = None) -> bool:
-    """Remove a saved plant. False if there was nothing by that name."""
+def _delete_named(key: str, name: str, path: str | Path | None = None) -> bool:
+    """Remove one entry. False if there was nothing by that name."""
     data = load_state(path)
-    stored = data.get(PROFILES_KEY)
+    stored = data.get(key)
     if not isinstance(stored, dict):
         return False
 
@@ -326,6 +352,71 @@ def delete_profile(name: str, path: str | Path | None = None) -> bool:
         return False
 
     del stored[existing]
-    data[PROFILES_KEY] = stored
+    data[key] = stored
     save_state(data, path)
     return True
+
+
+def load_profiles(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
+    """Every saved plant, keyed by name."""
+    return _load_named(PROFILES_KEY, PROFILE_FIELDS, path)
+
+
+def save_profile(
+    name: str, settings: dict[str, Any], path: str | Path | None = None
+) -> dict[str, Any]:
+    """Upsert one saved plant, replacing any entry of the same name."""
+    return _save_named(PROFILES_KEY, PROFILE_FIELDS, "saved plant", name, settings, path)
+
+
+def delete_profile(name: str, path: str | Path | None = None) -> bool:
+    """Remove a saved plant. False if there was nothing by that name."""
+    return _delete_named(PROFILES_KEY, name, path)
+
+
+# --- soils ----------------------------------------------------------------
+#
+# The same library shape as saved plants, and deliberately a separate store:
+# soil is a property of what is in the pot, plants are a property of what grows
+# in it, and several plants share one mix.
+
+
+def load_soils(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
+    """Every saved soil, keyed by name."""
+    return _load_named(SOILS_KEY, SOIL_FIELDS, path)
+
+
+def save_soil(
+    name: str, settings: dict[str, Any], path: str | Path | None = None
+) -> dict[str, Any]:
+    """Upsert one soil, replacing any entry of the same name."""
+    return _save_named(SOILS_KEY, SOIL_FIELDS, "soil", name, settings, path)
+
+
+def delete_soil(name: str, path: str | Path | None = None) -> bool:
+    """Remove a soil. False if there was nothing by that name."""
+    return _delete_named(SOILS_KEY, name, path)
+
+
+def available_water_fraction(soil: dict[str, Any] | None) -> float | None:
+    """Where wilting point sits as a fraction of field capacity.
+
+    This is the only number that leaves the soil table usefully, and it is the
+    bottom of the usable scale: at field capacity a reading is 1.0, at wilting
+    point it is this, and everything a plant can actually use lies between.
+
+    None when the soil is unknown or its figures are not usable, so callers
+    report "no soil set" rather than silently assuming one.
+    """
+    if not isinstance(soil, dict):
+        return None
+    field_capacity = soil.get("field_capacity_vwc")
+    wilting_point = soil.get("wilting_point_vwc")
+    for value in (field_capacity, wilting_point):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+    if not 0 < wilting_point < field_capacity:
+        # Wilting point at or above field capacity would mean no usable water
+        # at all, and a negative window breaks every band derived from it.
+        return None
+    return wilting_point / field_capacity

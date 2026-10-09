@@ -31,6 +31,7 @@ function App() {
   // The saved-plant library. Fetched alongside the dashboard because saving a
   // plant changes it, so it has to refresh on the same beat.
   const [profiles, setProfiles] = useState([])
+  const [soils, setSoils] = useState([])
   // Transient feedback from something the user just did. Clears itself so the
   // bar falls back to the planter's actual state rather than freezing on the
   // last thing that happened to be clicked.
@@ -54,15 +55,17 @@ function App() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [overviewData, plantsData, profileData] = await Promise.all([
+      const [overviewData, plantsData, profileData, soilData] = await Promise.all([
         fetchJson('/overview'),
         fetchJson('/plants'),
         fetchJson('/plant-profiles'),
+        fetchJson('/soils'),
       ])
 
       setOverview(overviewData)
       setPlants(plantsData)
       setProfiles(profileData.profiles ?? [])
+      setSoils(soilData.soils ?? [])
       // Deliberately does not touch `action`. This runs after every action, so
       // writing to the status bar here would wipe the feedback from whatever
       // the user just pressed. The bar falls back to the planter's computed
@@ -237,6 +240,11 @@ function App() {
         body: JSON.stringify({ position_mm: Number(plant.position_mm) }),
       })
 
+      await fetchJson(`/plants/${plant.plant_id}/soil`, {
+        method: 'POST',
+        body: JSON.stringify({ soil: plant.soil ?? '' }),
+      })
+
       // Last, and after the name: the profile is keyed on the plant's name, so
       // this has to read the name the planter just accepted rather than the one
       // it had before. Saving the plant and remembering it under that name are
@@ -284,6 +292,7 @@ function App() {
             movement={overview?.movement}
             profiles={profiles}
             onLoadProfile={loadProfile}
+            soils={soils}
           />
           {/* Below the cards on purpose. The cards carry each plant's current
               reading and are what you act on; the chart is the trend you

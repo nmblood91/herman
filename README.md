@@ -74,6 +74,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
 | `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, and move-to |
 | `/plant-profiles`, `/plants/{id}/profile` | the saved-plant library: list, save, load, delete |
+| `/soils`, `/plants/{id}/soil` | the soil library, and which mix a pot is filled with |
 | `/water/{plant_id}` | move to a plant and dose it |
 | `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
@@ -141,6 +142,52 @@ same rail coordinate and watering one would dribble into the other.
 
 Stored in `data/state.json` under `plant_profiles`, alongside the rest of the
 settings.
+
+### Soils
+
+Each plant records which mix it is potted in, chosen from a soil library that
+works the same way as the saved plants — name as the key, overwrite on save:
+
+```bash
+python -m greenthumb.soil_library              # read them and the figures
+python -m greenthumb.soil_library --install    # add them to the library
+```
+
+**Why the soil is recorded at all is a sensor argument before an agronomic
+one.** A capacitive probe reads dielectric permittivity, and texture, organic
+matter, bulk density and salinity all shift that relationship — so two
+identical probes in two different mixes genuinely disagree. Without the mix
+written down, that spread looks like sensor variation.
+
+A soil entry holds field capacity and wilting point as volumetric water
+content. **Only their ratio transfers**: it is dimensionless, so a published
+figure applies to any pot of that mix, and it is what says where the bottom of
+the usable range sits. The absolute figures do *not* convert into raw sensor
+counts — that needs a response curve for the specific medium — which is why
+`--calibrate wet` still measures field capacity in the actual pot. The library
+supplies the *shape* of the window, calibration supplies its *position*.
+
+| Mix | Field capacity | Wilting point | Usable |
+|---|---|---|---|
+| Coco coir | 55% VWC | 15% | 40 pts |
+| Clay loam | 36% | 18% | 18 pts |
+| Loam | 28% | 11% | 17 pts |
+| Peat potting mix | 28% | 16% | 12 pts |
+| Cactus / sandy mix | 12% | 5% | 7 pts |
+
+Clay loam is the instructive one: it holds the most water of the mineral soils
+but grips half of it below wilting point, so its usable window is no wider than
+loam's. Wettest on paper is not most forgiving in practice.
+
+Two caveats. Mineral-soil figures come from standard tensions and are settled;
+container substrates are not, varying by manufacturer and by how firmly they
+were packed. And mixes **lose capacity as they age and compact** — unused peat
+holds measurably more than the same mix after a season — so re-run
+`--calibrate wet` after a repot rather than trusting the old endpoint.
+
+An unknown soil name is refused rather than stored, since a mix that is not in
+the library supplies no ratio and would read as "set" while behaving exactly
+like "not set".
 
 ### Starter profiles
 

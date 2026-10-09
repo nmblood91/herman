@@ -405,6 +405,7 @@ async def list_plants() -> list[dict[str, object]]:
             "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
             "moisture_target": plant.moisture_target,
             "watering_volume_ml": plant.watering_volume_ml,
+            "soil": plant.soil,
             "led_start_index": plant.led_start_index,
             "led_end_index": plant.led_end_index,
         }
@@ -416,6 +417,28 @@ async def list_plants() -> list[dict[str, object]]:
 #
 # Keyed by plant name, so saving overwrites the entry of that name. Two pots
 # may carry the same name; a profile is care settings, not a slot.
+
+
+@app.get(f"{settings.api_prefix}/soils")
+def list_soils() -> dict[str, object]:
+    return {"soils": automation.list_soils()}
+
+
+@app.delete(f"{settings.api_prefix}/soils/{{name}}")
+def delete_soil(name: str) -> dict[str, object]:
+    result = automation.delete_soil(name)
+    log_event(f"Deleted soil {name}")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/soil")
+def set_plant_soil(
+    plant_id: str, payload: dict[str, str] = Body(default_factory=dict)
+) -> dict[str, object]:
+    """Record the mix in this pot. An empty name clears it."""
+    result = automation.update_plant_soil(plant_id, str(payload.get("soil", "")))
+    log_event(f"Set {plant_id} soil to {result.get('soil') or 'unset'}")
+    return result
 
 
 @app.get(f"{settings.api_prefix}/plant-profiles")

@@ -16,6 +16,11 @@ class PlantSpec:
     light_start_time: time = time(8, 0)
     light_stop_time: time = time(20, 0)
     position_mm: int = 0
+    # Which soil library entry this pot is filled with. Empty means not set,
+    # which is distinct from a mix whose figures are unusable -- callers report
+    # "no soil set" rather than assuming one. A property of the plant rather
+    # than of the slot, so it travels with a saved plant.
+    soil: str = ""
     # Auto-managed LED segment for the global strip. This is calculated by the app,
     # not exposed to the user for manual editing.
     led_start_index: int = 0
