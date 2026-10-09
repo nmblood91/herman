@@ -433,6 +433,57 @@ option {
   width: min(220px, 100%);
 }
 
+/* The saved soils, as rows of name plus its two figures. */
+.soil-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.soil-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(14, 24, 18, 0.95);
+  border: 1px solid #2a4737;
+  border-radius: 10px;
+}
+
+.soil-list span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.soil-list small {
+  color: #8fae9c;
+  font-size: 0.8rem;
+}
+
+.soil-list button {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+/* Name takes the width it needs, the two readings sit beside each other. */
+.soil-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 560px) {
+  .soil-form {
+    grid-template-columns: 2fr 1fr 1fr;
+    align-items: end;
+  }
+}
+
 .slider-row {
   display: flex;
   align-items: center;

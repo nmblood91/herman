@@ -1483,6 +1483,56 @@ class GreenThumbAutomation:
         entries.sort(key=lambda e: e.get("available_points") or 0, reverse=True)
         return entries
 
+    def save_soil(
+        self, name: str, field_capacity_vwc: float, wilting_point_vwc: float
+    ) -> dict[str, object]:
+        """Add or replace a soil, keyed on its name like the plant library.
+
+        Validated rather than coerced. A mix whose figures cannot support a
+        ratio would store happily and then behave exactly like no soil at all,
+        which is worse than refusing it: the pot would read as configured and
+        never be watered.
+        """
+        # The name is validated by state.save_soil, which owns the keying for
+        # every named library. Checking it again here would be a branch that
+        # can never behave differently from the one beneath it.
+        clean = str(name).strip()
+        readings = {}
+        for label, value in (
+            ("field_capacity_vwc", field_capacity_vwc),
+            ("wilting_point_vwc", wilting_point_vwc),
+        ):
+            if isinstance(value, bool):
+                raise ValueError(f"{label} must be a number")
+            try:
+                readings[label] = float(value)
+            except (TypeError, ValueError):
+                raise ValueError(f"{label} must be a number, not {value!r}") from None
+
+        capacity = readings["field_capacity_vwc"]
+        wilting = readings["wilting_point_vwc"]
+
+        # Volumetric water content is a share of the pot's volume, so above
+        # 100 is not a measurement of anything.
+        if not 0 < capacity <= 100:
+            raise ValueError(
+                f"Field capacity must be between 0 and 100% VWC, not {capacity}"
+            )
+        if not 0 < wilting < capacity:
+            raise ValueError(
+                f"Wilting point must be above 0 and below field capacity "
+                f"({capacity}% VWC), not {wilting}"
+            )
+
+        entry = state.save_soil(clean, readings, self._state_path)
+        return {
+            "status": "ok",
+            "name": clean,
+            "soil": entry,
+            "wilting_fraction": state.available_water_fraction(readings),
+            "available_points": round(capacity - wilting, 1),
+        }
+
     def delete_soil(self, name: str) -> dict[str, object]:
         """Remove a soil. Plants still naming it keep the name, unresolved."""
         wanted = str(name).strip()

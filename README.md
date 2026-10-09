@@ -74,7 +74,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
 | `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, and move-to |
 | `/plant-profiles`, `/plants/{id}/profile` | the saved-plant library: list, save, load, delete |
-| `/soils`, `/plants/{id}/soil` | the soil library, and which mix a pot is filled with |
+| `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
 | `/moisture-bands` | the band scale, for pickers and legends |
 | `/water/{plant_id}` | move to a plant and dose it |
 | `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
@@ -189,6 +189,22 @@ holds measurably more than the same mix after a season — so re-run
 An unknown soil name is refused rather than stored, since a mix that is not in
 the library supplies no ratio and would read as "set" while behaving exactly
 like "not set".
+
+**Add your own mix** in the Soils group on the Settings tab, or over the API:
+
+```bash
+curl -X POST http://herman.local/api/v1/soils -H 'Content-Type: application/json'   -d '{"name":"My potting mix","field_capacity_vwc":30,"wilting_point_vwc":14}'
+```
+
+Saving replaces any soil of that name. Figures that cannot support a ratio are
+refused rather than stored: one that saved happily and then yielded no ratio
+would behave exactly like no soil at all, so the pot would read as configured
+and never be watered.
+
+A measured mix beats a looked-up one, and the measurement needs only a kitchen
+scale: weigh the pot soaked and drained 24 hours, weigh it again bone dry, and
+the difference is the water it holds. That matters because bagged mixes vary by
+manufacturer and by packing, and lose capacity as they age.
 
 ## Moisture bands
 

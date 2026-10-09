@@ -441,6 +441,26 @@ def list_soils() -> dict[str, object]:
     return {"soils": automation.list_soils()}
 
 
+@app.post(f"{settings.api_prefix}/soils")
+def save_soil(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Add or replace a soil. Keyed on name, so saving overwrites.
+
+    Expects {"name": ..., "field_capacity_vwc": ..., "wilting_point_vwc": ...}
+    as volumetric water content percentages.
+    """
+    result = automation.save_soil(
+        str(payload.get("name", "")),
+        payload.get("field_capacity_vwc"),
+        payload.get("wilting_point_vwc"),
+    )
+    log_event(
+        f"Saved soil {result['name']}: field capacity "
+        f"{result['soil']['field_capacity_vwc']}% VWC, wilting point "
+        f"{result['soil']['wilting_point_vwc']}%"
+    )
+    return result
+
+
 @app.delete(f"{settings.api_prefix}/soils/{{name}}")
 def delete_soil(name: str) -> dict[str, object]:
     result = automation.delete_soil(name)

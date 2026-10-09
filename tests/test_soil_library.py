@@ -184,4 +184,68 @@ print("ok: deleting a soil leaves plants naming it alone, so the gap is visible"
 assert soil_library.main([]) == 0
 print("ok: listing the library from the CLI exits cleanly")
 
+# --- adding your own ---
+#
+# The whole design expects a measured mix to beat a looked-up one, so saving
+# one has to work and has to refuse figures that cannot support a ratio.
+
+own = build(temp_state())
+
+result = own.save_soil("My mix", 30, 14)
+assert result["available_points"] == 16.0, result
+assert abs(result["wilting_fraction"] - 14 / 30) < 1e-9, result
+assert state.load_soils(own._state_path)["My mix"]["field_capacity_vwc"] == 30
+print("ok: a measured mix saves, and reports its window and ratio back")
+
+# Name as key, so saving replaces rather than accumulating.
+own.save_soil("my mix", 26, 12)
+stored = state.load_soils(own._state_path)
+assert len(stored) == 1, sorted(stored)
+assert stored["my mix"]["field_capacity_vwc"] == 26, stored
+print("ok: saving the same name replaces it, capitalisation included")
+
+# Figures that cannot support a ratio must be refused, not stored. A soil that
+# stores happily and then yields no ratio behaves exactly like no soil at all,
+# so the pot reads as configured and is never watered.
+for capacity, wilting, why in (
+    (0, 10, "zero field capacity"),
+    (-5, 2, "negative field capacity"),
+    (120, 30, "field capacity above 100% VWC"),
+    (30, 30, "wilting point equal to field capacity"),
+    (30, 40, "wilting point above field capacity"),
+    (30, 0, "zero wilting point"),
+    (30, -4, "negative wilting point"),
+    ("thirty", 14, "a non-numeric figure"),
+    (30, True, "a boolean"),
+    (None, 14, "a missing figure"),
+):
+    try:
+        own.save_soil("Rejected", capacity, wilting)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted {why}: {capacity}/{wilting}")
+assert "Rejected" not in state.load_soils(own._state_path)
+print("ok: figures that cannot support a ratio are refused, and nothing is stored")
+
+for blank in ("", "   "):
+    try:
+        own.save_soil(blank, 30, 14)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted a blank name {blank!r}")
+print("ok: a blank name is refused")
+
+# Anything saved must be usable by the band maths, which is the point of the
+# validation rather than tidiness.
+from greenthumb import moisture
+
+saved = state.load_soils(own._state_path)["my mix"]
+ratio = state.available_water_fraction(saved)
+assert ratio is not None, saved
+assert moisture.band_for(90, ratio) in moisture.ORDER
+print("ok: a saved soil always yields a ratio the bands can use")
+
+
 print("\nall soil library checks passed")

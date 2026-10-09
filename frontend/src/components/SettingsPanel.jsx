@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 
 const DEFAULT_COLOR_ORDERS = ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']
@@ -27,6 +27,15 @@ export function SettingsPanel({ overview, onRefresh }) {
   const [quietStart, setQuietStart] = useState('21:00')
   const [quietStop, setQuietStop] = useState('08:00')
   const [quietMsg, setQuietMsg] = useState('')
+
+  // The soil library. Self-fetched rather than passed down: it changes only
+  // when edited here, so putting it in the dashboard poll would reload it
+  // after every unrelated button press.
+  const [soils, setSoils] = useState([])
+  const [soilName, setSoilName] = useState('')
+  const [soilCapacity, setSoilCapacity] = useState('')
+  const [soilWilting, setSoilWilting] = useState('')
+  const [soilMsg, setSoilMsg] = useState('')
 
   // Resynced during render rather than in an effect, so the form never paints
   // one frame of stale values after a refresh.
@@ -142,6 +151,75 @@ export function SettingsPanel({ overview, onRefresh }) {
       setQuietMsg(`Save failed: ${error.message}`)
     }
   }
+
+  const readSoils = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/soils`)
+      if (!response.ok) return
+      const data = await response.json()
+      setSoils(data.soils ?? [])
+    } catch {
+      // Leaves the list empty rather than breaking the panel.
+    }
+  }
+
+  useEffect(() => {
+    readSoils()
+  }, [])
+
+  const saveSoil = async () => {
+    setSoilMsg('')
+    try {
+      const response = await fetch(`${API_BASE}/soils`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: soilName,
+          field_capacity_vwc: Number(soilCapacity),
+          wilting_point_vwc: Number(soilWilting),
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setSoilMsg(data.error || `Save failed (HTTP ${response.status})`)
+        return
+      }
+      setSoilMsg(
+        `Saved ${data.name}: ${data.available_points} points of usable water, ` +
+          `wilting at ${Math.round((data.wilting_fraction ?? 0) * 100)}% of field capacity.`,
+      )
+      setSoilName('')
+      setSoilCapacity('')
+      setSoilWilting('')
+      await readSoils()
+    } catch (error) {
+      setSoilMsg(`Save failed: ${error.message}`)
+    }
+  }
+
+  const removeSoil = async (name) => {
+    setSoilMsg('')
+    try {
+      const response = await fetch(`${API_BASE}/soils/${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setSoilMsg(data.error || `Could not remove ${name}`)
+        return
+      }
+      // Pots still naming it keep the name, which stops resolving. Saying so
+      // is the point -- a silently cleared soil hides that a pot is no longer
+      // described, and a pot with no soil is never watered automatically.
+      setSoilMsg(`Removed ${name}. Any pot still set to it needs a new soil.`)
+      await readSoils()
+    } catch (error) {
+      setSoilMsg(`Could not remove ${name}: ${error.message}`)
+    }
+  }
+
+  const soilFormReady =
+    soilName.trim() && soilCapacity !== '' && soilWilting !== ''
 
   return (
     <section className="panel-section">
@@ -310,6 +388,98 @@ export function SettingsPanel({ overview, onRefresh }) {
             Save lighting
           </button>
           {status && <p className="field-hint warning">{status}</p>}
+        </div>
+
+        <div className="settings-group">
+          <h3>Soils</h3>
+
+          <div className="field-row">
+            {soils.length ? (
+              <ul className="soil-list">
+                {soils.map((soil) => (
+                  <li key={soil.name}>
+                    <span>
+                      <strong>{soil.name}</strong>
+                      <small>
+                        field capacity {soil.field_capacity_vwc}% &middot; wilting{' '}
+                        {soil.wilting_point_vwc}% &middot; {soil.available_points} pts usable
+                      </small>
+                    </span>
+                    <button type="button" onClick={() => removeSoil(soil.name)}>
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="field-hint warning">
+                No soils yet. Install the starting set on the Pi with{' '}
+                <code>python -m greenthumb.soil_library --install</code>, or add
+                your own below. Until a pot has a soil it is never watered
+                automatically.
+              </p>
+            )}
+          </div>
+
+          <div className="field-row">
+            <div className="soil-form">
+              <label>
+                Name
+                <input
+                  value={soilName}
+                  placeholder="My potting mix"
+                  onChange={(event) => setSoilName(event.target.value)}
+                />
+              </label>
+              <label>
+                Field capacity (% VWC)
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={soilCapacity}
+                  onChange={(event) => setSoilCapacity(event.target.value)}
+                />
+              </label>
+              <label>
+                Wilting point (% VWC)
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={soilWilting}
+                  onChange={(event) => setSoilWilting(event.target.value)}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="primary group-save-button"
+              disabled={!soilFormReady}
+              onClick={saveSoil}
+            >
+              Save soil
+            </button>
+            {soilMsg && <p className="field-hint">{soilMsg}</p>}
+          </div>
+
+          <div className="field-row">
+            <p className="field-hint">
+              Saving replaces any soil of the same name. Only the <em>ratio</em>
+              {' '}of these two leaves this table usefully — it is dimensionless, so
+              a published figure applies to any pot of that mix, and it is what
+              fixes the bottom of the moisture scale. The absolute figures do
+              not convert into sensor readings, which is why field capacity is
+              still measured per pot by the wet calibration.
+            </p>
+            <p className="field-hint">
+              To measure your own: weigh the pot soaked and drained 24 hours,
+              then again bone dry, and the difference is the water it holds.
+              Bagged mixes vary by manufacturer and by how firmly they were
+              packed, and they lose capacity as they age and compact — so a
+              measured mix beats a looked-up one.
+            </p>
+          </div>
         </div>
 
       </div>
