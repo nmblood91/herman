@@ -1,44 +1,17 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
+/* Base document styling. The app's own look lives in App.css; this file sets
+   the page background, the type scale and the few bare elements.
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-  }
-
-}
+   One stylesheet, one set of values. There is no light theme and no
+   prefers-color-scheme switch: the planter UI is always this dark green, so a
+   theme toggle here only produced values that never applied and tokens that
+   contradicted App.css. */
 
 :root {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 18px;
   line-height: 1.5;
   font-weight: 400;
+  letter-spacing: 0.18px;
   color: #edf8ee;
   background: #0e1d13;
   font-synthesis: none;
@@ -47,22 +20,43 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+@media (max-width: 1024px) {
+  :root {
+    font-size: 16px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   margin: 0;
-  min-height: 100%;
   min-width: 320px;
   background: linear-gradient(180deg, #0b170f 0%, #102217 100%);
 }
 
-body {
-  min-height: 100vh;
+/* svh rather than vh: on a phone, vh counts the space behind the browser's
+   collapsing toolbar, which leaves a strip of unpainted background. */
+body,
+#root {
+  min-height: 100svh;
 }
 
-button, input {
+/* Width and centring are App.css's job, via .app-shell. #root used to set its
+   own width, a border and text-align: center, which fought it -- the border
+   drew two bright lines on a dark page, and the centring had to be undone
+   inside components. */
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+button,
+input,
+select {
   font: inherit;
 }
 
@@ -70,57 +64,20 @@ button {
   appearance: none;
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
 h1,
 h2 {
-  font-family: var(--heading);
   font-weight: 500;
-  color: var(--text-h);
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
+/* Sizes only. Colour comes from App.css, which sets it for everything inside
+   .app-shell, so declaring it here would be overridden anyway. */
 h2 {
-  font-size: 24px;
-  line-height: 118%;
+  font-size: 1.35rem;
+  line-height: 1.2;
   letter-spacing: -0.24px;
   margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
 }
+
 p {
   margin: 0;
-}
-
-code {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }

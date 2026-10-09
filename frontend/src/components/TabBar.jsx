@@ -1,8 +1,10 @@
 export function TabBar({ activeTab, onChange }) {
+  // Plants first: it is the screen someone opens to see how their plants are.
+  // Controls held that slot only because it was built first.
   const tabs = [
-    { key: 'controls', label: 'Controls' },
     { key: 'plants', label: 'Plants' },
-    { key: 'sensors', label: 'Sensors' },
+    { key: 'controls', label: 'Controls' },
+    { key: 'diagnostics', label: 'Diagnostics' },
     { key: 'settings', label: 'Settings' },
   ]
 

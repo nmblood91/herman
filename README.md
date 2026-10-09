@@ -106,10 +106,15 @@ Four tabs:
 
 | Tab | What it does |
 |---|---|
+| **Plants** | Each plant's current moisture, its name, light window, moisture target, dose volume and rail position — then the moisture and temperature history below |
 | **Controls** | Home and jog the gantry, run a dance, move to a plant, water a plant, lighting, run the pump |
-| **Plants** | Each plant's current moisture, and its name, light window, moisture target, dose volume and rail position |
-| **Sensors** | Moisture and temperature history, and per-sensor calibration |
-| **Settings** | Automatic watering, idle motion, quiet hours, LED strip type and colour order, the planter's clock, the home switch diagnostic, and the log |
+| **Diagnostics** | Home switch test, what version is running, per-sensor moisture calibration, and the log |
+| **Settings** | Automatic watering, idle motion, quiet hours, LED strip type and colour order, and the planter's clock |
+
+Tabs are grouped by how often you touch a thing rather than by subsystem:
+Plants is the screen to open daily, Settings holds only what you set once, and
+Diagnostics is where everything you reach for when something looks wrong now
+lives together.
 
 ## Hardware assumptions
 

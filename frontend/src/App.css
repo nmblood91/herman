@@ -12,6 +12,27 @@
   }
 }
 
+/* Excluded from the white-everything rule above, and the only element that
+   needs to be: a code chip sits on a pale background, so inheriting white text
+   made it invisible. Colours are literal rather than themed on purpose -- the
+   chip has to stay legible whatever the surrounding panel does.
+
+   `inline`, not `inline-flex`, so a long command wraps instead of forcing the
+   panel wider than the screen. */
+.app-shell code {
+  display: inline;
+  font-family: 'Consolas', ui-monospace, 'Courier New', monospace;
+  /* em, so it tracks whatever it is sitting in -- usually .field-hint at
+     0.85rem. A bare monospace default renders a size smaller again, which is
+     half of why these read badly. */
+  font-size: 0.95em;
+  color: #14432b;
+  background: #e8f1ea;
+  border-radius: 4px;
+  padding: 1px 6px;
+  word-break: break-word;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -368,6 +389,73 @@ input[type='color'] {
 
   .motion-grid.two-up {
     grid-template-columns: 1fr;
+  }
+
+  /* On a narrow screen the single-line treatment truncates mid-sentence, and
+     these messages are the feedback from whatever was just pressed -- "Watered
+     Basil with 50 mL" cut to "Watered Basi..." is worse than two lines. The
+     fixed height goes with it so the bar grows instead. */
+  .status-bar {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    min-height: 0;
+  }
+
+  .app-shell {
+    padding: 20px 16px 40px;
+  }
+
+  .panel-section {
+    padding: 18px 16px;
+    border-radius: 14px;
+  }
+}
+
+/* Phone width. Four tabs including "Diagnostics" do not fit one row at the
+   default padding, and a wrapped tab bar costs a whole row of vertical space
+   on the screen with least of it. */
+@media (max-width: 460px) {
+  /* One row, scrolled if it has to be, rather than wrapped. Four tabs at this
+     size are within a few pixels of fitting, and which side of that line they
+     land on depends on the device font -- so rather than bet on it, let the
+     strip scroll. A second row costs fixed vertical space on the screen with
+     least of it, and scrolling a tab strip is not the page scrolling sideways.
+     The scrollbar itself is hidden: it would sit under the tabs and the strip
+     is short enough to be obviously draggable. */
+  .tab-bar {
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+    padding: 10px 10px;
+    font-size: 0.8rem;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+
+  /* Still roughly a 44px target, which is the floor for a thumb. */
+  button {
+    padding: 12px 14px;
+  }
+
+  .slider-row {
+    flex-wrap: wrap;
+  }
+
+  /* Beside a wrapped button this would otherwise sit on its own line with the
+     button's centre-line spacing still applied. */
+  .slider-row .position-readout {
+    flex-basis: 100%;
   }
 }
 

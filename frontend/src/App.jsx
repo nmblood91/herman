@@ -3,10 +3,9 @@ import { TopBar } from './components/TopBar'
 import { TabBar } from './components/TabBar'
 import { ControlsPanel } from './components/ControlsPanel'
 import { SettingsPanel } from './components/SettingsPanel'
-import { CalibrationPanel } from './components/CalibrationPanel'
 import { PlantsPanel } from './components/PlantsPanel'
-import { LogsPanel } from './components/LogsPanel'
 import { HistoryPanel } from './components/HistoryPanel'
+import { DiagnosticsPanel } from './components/DiagnosticsPanel'
 import './App.css'
 import { API_BASE } from './api'
 
@@ -26,10 +25,9 @@ const fetchJson = async (path, options = {}) => {
 
 
 function App() {
-  const [activeTab, setActiveTab] = useState('controls')
+  const [activeTab, setActiveTab] = useState('plants')
   const [overview, setOverview] = useState(null)
   const [plants, setPlants] = useState([])
-  const [logs, setLogs] = useState([])
   // Transient feedback from something the user just did. Clears itself so the
   // bar falls back to the planter's actual state rather than freezing on the
   // last thing that happened to be clicked.
@@ -53,20 +51,17 @@ function App() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [overviewData, plantsData, logsData] = await Promise.all([
+      const [overviewData, plantsData] = await Promise.all([
         fetchJson('/overview'),
         fetchJson('/plants'),
-        fetchJson('/logs?lines=20'),
       ])
 
       setOverview(overviewData)
       setPlants(plantsData)
-      setLogs(logsData)
-      // Deliberately does not touch `action` here. The status bar shows the
-      // planter's computed state from overview.system_status; this used to
-      // overwrite it with logsData[0], the newest raw log line, timestamp and
-      // level included -- and since this runs after every action, it also
-      // wiped the feedback from whatever the user had just done.
+      // Deliberately does not touch `action`. This runs after every action, so
+      // writing to the status bar here would wipe the feedback from whatever
+      // the user just pressed. The bar falls back to the planter's computed
+      // state from overview.system_status on its own once `action` expires.
     } catch (error) {
       setStatus(`Connection failed: ${error.message}`)
     }
@@ -234,6 +229,22 @@ function App() {
         </div>
       )}
 
+      {activeTab === 'plants' && (
+        <>
+          <PlantsPanel
+            plants={plants}
+            onSave={savePlant}
+            status={overview?.plants}
+            movement={overview?.movement}
+          />
+          {/* Below the cards on purpose. The cards carry each plant's current
+              reading and are what you act on; the chart is the trend you
+              consult afterwards. It also fetches its own data, so changing a
+              range does not reload the cards. */}
+          <HistoryPanel />
+        </>
+      )}
+
       {activeTab === 'controls' && (
         <ControlsPanel
           plants={plants}
@@ -248,29 +259,10 @@ function App() {
         />
       )}
 
-      {activeTab === 'plants' && (
-        <PlantsPanel
-          plants={plants}
-          onSave={savePlant}
-          status={overview?.plants}
-          movement={overview?.movement}
-        />
-      )}
-
-      {activeTab === 'sensors' && (
-        <>
-          {/* Both fetch their own data, so changing a range or running a
-              calibration does not reload the whole dashboard. */}
-          <HistoryPanel />
-          <CalibrationPanel />
-        </>
-      )}
+      {activeTab === 'diagnostics' && <DiagnosticsPanel />}
 
       {activeTab === 'settings' && (
-        <>
-          <SettingsPanel overview={overview} onRefresh={loadDashboard} />
-          <LogsPanel logs={logs} />
-        </>
+        <SettingsPanel overview={overview} onRefresh={loadDashboard} />
       )}
     </div>
   )
