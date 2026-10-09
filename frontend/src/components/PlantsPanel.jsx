@@ -46,8 +46,11 @@ const describeMoisture = (status) => {
 // parked over that plant and the button pressed on the wrong card.
 const CONFUSION_MARGIN_MM = 50
 
-export function PlantsPanel({ plants, onSave, status, movement }) {
+export function PlantsPanel({ plants, onSave, status, movement, profiles, onLoadProfile }) {
   const [drafts, setDrafts] = useState({})
+  // Which saved plant each card has picked, keyed by plant so one card's
+  // choice cannot load onto another.
+  const [picked, setPicked] = useState({})
   const [expandedPlantIds, setExpandedPlantIds] = useState([])
   // Keyed by plant so a warning about one card cannot appear under another.
   const [captureNote, setCaptureNote] = useState({})
@@ -103,6 +106,8 @@ export function PlantsPanel({ plants, onSave, status, movement }) {
     setDrafts(Object.fromEntries(plants.map((plant) => [plant.plant_id, draftFrom(plant)])))
   }
 
+  const profileNames = (profiles ?? []).map((profile) => profile.name)
+
   const togglePlantExpanded = (plantId) => {
     setExpandedPlantIds((current) =>
       current.includes(plantId)
@@ -152,6 +157,56 @@ export function PlantsPanel({ plants, onSave, status, movement }) {
 
               {isExpanded && (
                 <>
+                  {/* At the top of the card rather than the foot: on a phone
+                      the fields push Save below the fold, and Load belongs
+                      beside it because loading then saving is the normal
+                      sequence. */}
+                  <div className="plant-actions-row">
+                    <button
+                      className="primary"
+                      onClick={() => onSave({ ...plant, ...draft })}
+                    >
+                      Save Plant
+                    </button>
+
+                    <div className="load-profile-row">
+                      <select
+                        aria-label={`Saved plant to load onto ${plant.name}`}
+                        value={picked[plant.plant_id] ?? ''}
+                        onChange={(event) =>
+                          setPicked((current) => ({
+                            ...current,
+                            [plant.plant_id]: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">
+                          {profileNames.length ? 'Load a saved plant…' : 'Nothing saved yet'}
+                        </option>
+                        {profileNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!picked[plant.plant_id]}
+                        onClick={() => onLoadProfile(plant.plant_id, picked[plant.plant_id])}
+                      >
+                        Load
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="field-hint">
+                    Saving stores these settings under the plant name, replacing
+                    anything saved under that name already. Loading copies a
+                    saved plant onto this one — <strong>not</strong> its
+                    watering location, which belongs to the pot rather than to
+                    the plant.
+                  </p>
+
                   <div className="field-grid">
                     <label>
                       Plant name
@@ -221,14 +276,6 @@ export function PlantsPanel({ plants, onSave, status, movement }) {
                     </div>
                   </div>
 
-                  <div className="plant-actions-row">
-                    <button
-                      className="primary"
-                      onClick={() => onSave({ ...plant, ...draft })}
-                    >
-                      Save Plant
-                    </button>
-                  </div>
                 </>
               )}
             </div>

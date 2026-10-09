@@ -311,11 +311,44 @@ option {
   line-height: 1.4;
 }
 
+/* Save on the left, the load picker on the right, stacking on a phone. The
+   buttons were full-width when this row held only Save. */
 .plant-actions-row {
-  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
 
-  button {
-    width: 100%;
+.plant-actions-row > button {
+  flex: 0 0 auto;
+}
+
+/* The select takes the slack so long plant names are readable, and the Load
+   button stays its own width beside it. */
+.load-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.load-profile-row select {
+  margin-top: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.load-profile-row button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 460px) {
+  .plant-actions-row > button,
+  .load-profile-row {
+    flex-basis: 100%;
   }
 }
 

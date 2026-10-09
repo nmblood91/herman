@@ -73,6 +73,7 @@ Everything is under `/api/v1`, grouped roughly as:
 |---|---|
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
 | `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, and move-to |
+| `/plant-profiles`, `/plants/{id}/profile` | the saved-plant library: list, save, load, delete |
 | `/water/{plant_id}` | move to a plant and dose it |
 | `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
@@ -111,7 +112,7 @@ Four tabs:
 
 | Tab | What it does |
 |---|---|
-| **Plants** | Each plant's current moisture, its name, light window, moisture target, dose volume and rail position — then the moisture and temperature history below |
+| **Plants** | Each plant's current moisture, its name, light window, moisture target, dose volume and rail position, plus saving and loading plants from the library — then the moisture and temperature history below |
 | **Controls** | Home and jog the gantry, run a dance, move to a plant, water a plant, lighting, run the pump |
 | **Diagnostics** | Home switch test, the planter's clock, what version is running, per-sensor moisture calibration, and the log |
 | **Settings** | Four groups — Watering, Movement, Quiet hours and Lighting |
@@ -120,6 +121,26 @@ Tabs are grouped by how often you touch a thing rather than by subsystem:
 Plants is the screen to open daily, Settings holds only what you set once, and
 Diagnostics is where everything you reach for when something looks wrong now
 lives together.
+
+## Saved plants
+
+Saving a plant stores its care settings under its **name**, which is the key:
+saving again under the same name replaces that entry rather than making a
+second one. "Basil - Wet" and "Basil - Dry" are simply two names, so they are
+two saved plants. Capitalisation is not a difference — saving "basil" over
+"Basil" renames the entry rather than duplicating it.
+
+Loading copies a saved plant onto a pot, including its name. Two pots may end
+up with the same name, which is allowed: `plant_id` is the identity and the
+name is a label, and copying one plant onto a second pot is the point.
+
+**The watering location is not part of a saved plant.** It describes where the
+pot sits on the rail, not how the plant is cared for, so loading never moves
+it. If it travelled, loading one plant onto a second pot would give both the
+same rail coordinate and watering one would dribble into the other.
+
+Stored in `data/state.json` under `plant_profiles`, alongside the rest of the
+settings.
 
 ## Hardware assumptions
 

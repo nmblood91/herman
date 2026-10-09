@@ -412,6 +412,45 @@ async def list_plants() -> list[dict[str, object]]:
     ]
 
 
+# --- saved plants -----------------------------------------------------------
+#
+# Keyed by plant name, so saving overwrites the entry of that name. Two pots
+# may carry the same name; a profile is care settings, not a slot.
+
+
+@app.get(f"{settings.api_prefix}/plant-profiles")
+def list_plant_profiles() -> dict[str, object]:
+    return {"profiles": automation.list_plant_profiles()}
+
+
+@app.delete(f"{settings.api_prefix}/plant-profiles/{{name}}")
+def delete_plant_profile(name: str) -> dict[str, object]:
+    result = automation.delete_plant_profile(name)
+    log_event(f"Deleted saved plant {name}")
+    return result
+
+
+# /profile and /profile/load rather than one route taking a verb: the save
+# reads the pot and the load writes to it, so they are different operations on
+# the same thing and a single endpoint would need a mode flag.
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/profile")
+def save_plant_profile(plant_id: str) -> dict[str, object]:
+    """Store this plant's current settings under its own name."""
+    result = automation.save_plant_profile(plant_id)
+    log_event(f"Saved plant settings as {result.get('name')}")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/profile/load")
+def load_plant_profile(
+    plant_id: str, payload: dict[str, str] = Body(default_factory=dict)
+) -> dict[str, object]:
+    """Copy a saved plant onto this one. Leaves its rail position alone."""
+    result = automation.apply_plant_profile(plant_id, str(payload.get("name", "")))
+    log_event(f"Loaded saved plant {result.get('name')} onto {plant_id}")
+    return result
+
+
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/name")
 async def update_plant_name(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     name = str(payload.get("name", "")).strip()

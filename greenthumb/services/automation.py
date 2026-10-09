@@ -1246,6 +1246,102 @@ class GreenThumbAutomation:
         with self._exclusive(f"Move to {plant_id}"):
             return self.klipper.move_gantry_absolute(plant.position_mm)
 
+    # --- saved plants ----------------------------------------------------
+    #
+    # A library of care settings keyed by plant name, so a plant can be set up
+    # once and copied onto any pot. Saving overwrites the entry of that name
+    # rather than accumulating near-duplicates.
+
+    def list_plant_profiles(self) -> list[dict[str, object]]:
+        """Every saved plant, sorted for a picker rather than by recency."""
+        profiles = state.load_profiles(self._state_path)
+        entries = [{"name": name, **values} for name, values in profiles.items()]
+        entries.sort(key=lambda entry: str(entry["name"]).casefold())
+        return entries
+
+    def save_plant_profile(self, plant_id: str) -> dict[str, object]:
+        """Store a plant's care settings under its own name.
+
+        Reads from the plant rather than from a request body, so what gets
+        saved is what the planter is actually running -- a profile that
+        disagrees with the pot it was captured from would be worse than none.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        entry = state.save_profile(
+            plant.name,
+            {
+                "moisture_target": plant.moisture_target,
+                "watering_volume_ml": plant.watering_volume_ml,
+                "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
+                "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
+            },
+            self._state_path,
+        )
+        return {"status": "ok", "name": plant.name.strip(), "profile": entry}
+
+    def apply_plant_profile(self, plant_id: str, name: str) -> dict[str, object]:
+        """Copy a saved plant onto a pot.
+
+        The name comes across too, so the pot and the profile it came from
+        agree. Two pots can then carry the same name, which is allowed on
+        purpose: plant_id is the identity and the name is a label, and copying
+        one plant's settings onto a second pot is the whole point. Nothing is
+        suffixed to make the names unique.
+
+        position_mm is untouched -- see state.PROFILE_FIELDS for why.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        wanted = str(name).strip()
+        profiles = state.load_profiles(self._state_path)
+        key = next((k for k in profiles if k.casefold() == wanted.casefold()), None)
+        if key is None:
+            raise ValueError(f"No saved plant called {wanted!r}")
+
+        entry = profiles[key]
+        plant.name = key
+
+        for field_name in ("moisture_target", "watering_volume_ml"):
+            value = entry.get(field_name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            setattr(plant, field_name, max(0, int(value)))
+
+        for field_name in ("light_start_time", "light_stop_time"):
+            text = entry.get(field_name)
+            if not isinstance(text, str):
+                continue
+            try:
+                setattr(plant, field_name, time.fromisoformat(text))
+            except ValueError:
+                logger.warning("Ignoring bad %s %r in profile %r", field_name, text, key)
+
+        self._persist()
+        return {
+            "status": "ok",
+            "plant_id": plant_id,
+            "name": plant.name,
+            "moisture_target": plant.moisture_target,
+            "watering_volume_ml": plant.watering_volume_ml,
+            "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
+            "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
+            # Echoed so the caller can see it was left alone rather than
+            # wonder whether the profile moved the pot.
+            "position_mm": plant.position_mm,
+        }
+
+    def delete_plant_profile(self, name: str) -> dict[str, object]:
+        """Remove a saved plant. Pots already using it keep their settings."""
+        wanted = str(name).strip()
+        if not state.delete_profile(wanted, self._state_path):
+            raise ValueError(f"No saved plant called {wanted!r}")
+        return {"status": "ok", "deleted": wanted}
+
     def get_plant(self, plant_id: str) -> PlantSpec | None:
         return next((plant for plant in self.plants if plant.plant_id == plant_id), None)
 

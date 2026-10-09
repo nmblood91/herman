@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,22 @@ DEFAULT_STATE_PATH = Path(__file__).resolve().parent.parent / "data" / "state.js
 SCHEMA_VERSION = 1
 
 CALIBRATION_KEY = "moisture_calibration"
+PROFILES_KEY = "plant_profiles"
+
+# What a saved plant carries, and the list is a whitelist rather than
+# "everything on the plant" on purpose.
+#
+# position_mm is the omission that matters: a profile is care settings, not
+# placement. Loading "Basil" into the third pot must not drag the first pot's
+# rail coordinate along with it -- two plants would then share a coordinate
+# and watering one would dribble into the other. plant_id and the LED range
+# are excluded for the same reason, being properties of the slot.
+PROFILE_FIELDS = (
+    "moisture_target",
+    "watering_volume_ml",
+    "light_start_time",
+    "light_stop_time",
+)
 
 
 def resolve_path(override: str | Path | None = None) -> Path:
@@ -217,3 +234,98 @@ def clear_calibration(path: str | Path | None = None) -> None:
     if CALIBRATION_KEY in data:
         del data[CALIBRATION_KEY]
         save_state(data, path)
+
+
+# --- saved plants ---------------------------------------------------------
+#
+# A small library of care settings keyed by plant name, so "Basil - Wet" can be
+# set up once and copied onto any pot. The name is the key, so saving overwrites
+# rather than accumulating "Basil (1)", "Basil (2)".
+
+
+def _match_name(stored: dict[str, Any], name: str) -> str | None:
+    """The stored key meaning the same name, ignoring case.
+
+    So "basil" overwrites "Basil" instead of sitting beside it. Keying on the
+    name is only useful if one plant means one entry, and a stray capital is
+    not a different plant.
+    """
+    folded = name.casefold()
+    for key in stored:
+        if isinstance(key, str) and key.casefold() == folded:
+            return key
+    return None
+
+
+def load_profiles(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
+    """Every saved plant, keyed by name. Unusable entries are skipped.
+
+    Same tolerance as the rest of this module: a hand-edited file with one bad
+    entry loses that entry, not the library.
+    """
+    stored = load_state(path).get(PROFILES_KEY)
+    if not isinstance(stored, dict):
+        return {}
+
+    result: dict[str, dict[str, Any]] = {}
+    for name, value in stored.items():
+        if not isinstance(name, str) or not name.strip() or not isinstance(value, dict):
+            logger.warning("Skipping malformed plant profile %r", name)
+            continue
+        entry = {field: value[field] for field in PROFILE_FIELDS if field in value}
+        if not entry:
+            # Nothing worth loading. An entry with a name and no settings would
+            # show in the picker and then do nothing when applied.
+            logger.warning("Skipping empty plant profile %r", name)
+            continue
+        if isinstance(value.get("saved_at"), str):
+            entry["saved_at"] = value["saved_at"]
+        result[name.strip()] = entry
+    return result
+
+
+def save_profile(
+    name: str, settings: dict[str, Any], path: str | Path | None = None
+) -> dict[str, Any]:
+    """Upsert one saved plant, replacing any entry of the same name."""
+    clean = str(name).strip()
+    if not clean:
+        raise ValueError("A saved plant needs a name")
+
+    entry = {field: settings[field] for field in PROFILE_FIELDS if field in settings}
+    if not entry:
+        raise ValueError("Nothing to save: no recognised plant settings given")
+    entry["saved_at"] = datetime.now().isoformat(timespec="seconds")
+
+    data = load_state(path)
+    stored = data.get(PROFILES_KEY)
+    if not isinstance(stored, dict):
+        stored = {}
+
+    # Drop the old key rather than writing alongside it, so a change of
+    # capitalisation renames the entry instead of duplicating it.
+    previous = _match_name(stored, clean)
+    if previous is not None:
+        del stored[previous]
+
+    stored[clean] = entry
+    data[PROFILES_KEY] = stored
+    save_state(data, path)
+    return entry
+
+
+def delete_profile(name: str, path: str | Path | None = None) -> bool:
+    """Remove a saved plant. False if there was nothing by that name."""
+    data = load_state(path)
+    stored = data.get(PROFILES_KEY)
+    if not isinstance(stored, dict):
+        return False
+
+    existing = _match_name(stored, str(name).strip())
+    if existing is None:
+        return False
+
+    del stored[existing]
+    data[PROFILES_KEY] = stored
+    save_state(data, path)
+    return True

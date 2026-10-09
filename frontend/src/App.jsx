@@ -28,6 +28,9 @@ function App() {
   const [activeTab, setActiveTab] = useState('plants')
   const [overview, setOverview] = useState(null)
   const [plants, setPlants] = useState([])
+  // The saved-plant library. Fetched alongside the dashboard because saving a
+  // plant changes it, so it has to refresh on the same beat.
+  const [profiles, setProfiles] = useState([])
   // Transient feedback from something the user just did. Clears itself so the
   // bar falls back to the planter's actual state rather than freezing on the
   // last thing that happened to be clicked.
@@ -51,13 +54,15 @@ function App() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [overviewData, plantsData] = await Promise.all([
+      const [overviewData, plantsData, profileData] = await Promise.all([
         fetchJson('/overview'),
         fetchJson('/plants'),
+        fetchJson('/plant-profiles'),
       ])
 
       setOverview(overviewData)
       setPlants(plantsData)
+      setProfiles(profileData.profiles ?? [])
       // Deliberately does not touch `action`. This runs after every action, so
       // writing to the status bar here would wipe the feedback from whatever
       // the user just pressed. The bar falls back to the planter's computed
@@ -179,6 +184,27 @@ function App() {
     }
   }
 
+  const loadProfile = async (plantId, name) => {
+    try {
+      setStatus(`Loading ${name}...`, { sticky: true })
+      const result = await fetchJson(`/plants/${plantId}/profile/load`, {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      })
+      // Says what was left alone as well as what changed: the watering
+      // location staying put is the surprising half.
+      setStatus(
+        `Loaded ${result.name}: target ${result.moisture_target}%, ` +
+          `${result.watering_volume_ml} mL, lights ${result.light_start_time}` +
+          `–${result.light_stop_time}. Watering location unchanged at ` +
+          `${result.position_mm} mm.`,
+      )
+      await loadDashboard()
+    } catch (error) {
+      setStatus(`Load failed: ${error.message}`)
+    }
+  }
+
   const savePlant = async (plant) => {
     try {
       setStatus(`Saving ${plant.name}...`, { sticky: true })
@@ -210,6 +236,12 @@ function App() {
         method: 'POST',
         body: JSON.stringify({ position_mm: Number(plant.position_mm) }),
       })
+
+      // Last, and after the name: the profile is keyed on the plant's name, so
+      // this has to read the name the planter just accepted rather than the one
+      // it had before. Saving the plant and remembering it under that name are
+      // one action, which is why there is no separate button.
+      await fetchJson(`/plants/${plant.plant_id}/profile`, { method: 'POST' })
 
       setStatus(`Saved ${plant.name}.`)
       await loadDashboard()
@@ -250,6 +282,8 @@ function App() {
             onSave={savePlant}
             status={overview?.plants}
             movement={overview?.movement}
+            profiles={profiles}
+            onLoadProfile={loadProfile}
           />
           {/* Below the cards on purpose. The cards carry each plant's current
               reading and are what you act on; the chart is the trend you
