@@ -68,23 +68,46 @@ class KlipperClient:
     def endstop_state(self) -> dict[str, Any]:
         """Whether the home switch reads triggered right now.
 
-        Klipper runs a fresh MCU query for this rather than handing back a
-        cached value, and it waits for any move already in flight to finish
-        first -- so this must not be called while the gantry is moving.
+        Two round trips, and the first one is the point. `last_query` is a
+        cache that Klipper fills when a query runs, so straight after a Klipper
+        restart it is empty and reading it alone answers nothing -- which is
+        exactly when someone is most likely to be checking a switch, having
+        just changed the config. Sending QUERY_ENDSTOPS first forces the MCU
+        query, and then the cache has something in it. Its gcode output arrives
+        as an async notification that _send_command discards; only the side
+        effect is wanted.
+
+        Both steps wait for any move in flight to finish, so this must not be
+        called while the gantry is moving.
 
         Only x is reported. stepper_y and stepper_z are placeholders pointed at
         unused headers, and an unconnected pin holding a pull-up reads high,
         which is the triggered reading: they say "triggered" always and mean
         nothing by it. Returning them would invite reading a fault into them.
         """
+        refresh = self.send_gcode("QUERY_ENDSTOPS")
+        if not refresh.get("ok"):
+            return {"ok": False, "error": refresh.get("error")}
+
         response = self._send_command("query_endstops/status")
         if not response.get("ok"):
             return {"ok": False, "error": response.get("error")}
 
         query = response.get("result", {}).get("last_query", {})
-        if "x" not in query:
-            return {"ok": False, "error": "Klipper reported no x endstop"}
-        return {"ok": True, "triggered": bool(query["x"])}
+        # Klipper names an endstop after its stepper with the prefix stripped,
+        # so x is expected -- but accept the unstripped spelling too rather
+        # than failing on a naming detail of someone else's code.
+        for key in ("x", "stepper_x"):
+            if key in query:
+                return {"ok": True, "triggered": bool(query[key])}
+
+        # Say what did come back. The previous message named only what was
+        # missing, which is the half that cannot be acted on.
+        reported = ", ".join(sorted(query)) if query else "nothing at all"
+        return {
+            "ok": False,
+            "error": f"Klipper reported no x endstop. It reported: {reported}",
+        }
 
     def home_gantry(self) -> dict[str, Any]:
         return self.send_gcode("G28 X", timeout=MOTION_TIMEOUT)

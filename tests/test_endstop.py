@@ -182,4 +182,70 @@ assert auto._hardware_lock.acquire(blocking=False), "the diagnostic kept the loc
 auto._hardware_lock.release()
 print("ok: the lock is released afterwards")
 
+# --- the client query itself ---
+
+# The tests above stub endstop_state, so the parsing underneath it was never
+# exercised. It has one real trap: last_query is a cache Klipper fills when a
+# query runs, so reading it alone answers nothing straight after a restart --
+# which is precisely when someone is checking a switch, having just changed the
+# config.
+from greenthumb.hardware.klipper_client import KlipperClient
+
+
+class FakeKlipper(KlipperClient):
+    def __init__(self, last_query, gcode_ok=True):
+        super().__init__(socket_path="/nonexistent")
+        self.last_query = last_query
+        self.gcode_ok = gcode_ok
+        self.scripts = []
+
+    def send_gcode(self, gcode, timeout=5.0):
+        self.scripts.append(gcode)
+        if not self.gcode_ok:
+            return {"ok": False, "error": "Klipper is shutting down"}
+        return {"ok": True}
+
+    def _send_command(self, method, params=None, timeout=5.0):
+        assert method == "query_endstops/status", method
+        return {"ok": True, "result": {"last_query": self.last_query}}
+
+
+client = FakeKlipper({"x": 0, "y": 1, "z": 1})
+assert client.endstop_state() == {"ok": True, "triggered": False}
+# Without this the cache can be empty and the reading is simply absent.
+assert client.scripts == ["QUERY_ENDSTOPS"], client.scripts
+print("ok: a fresh MCU query is forced before the cache is read")
+
+assert FakeKlipper({"x": 1}).endstop_state()["triggered"] is True
+print("ok: a triggered switch comes back triggered")
+
+# y and z are placeholders on unused headers and read triggered forever. Taking
+# either for the home switch would report a permanent fault.
+assert FakeKlipper({"y": 1, "z": 1}).endstop_state()["ok"] is False
+print("ok: the y and z placeholders are not mistaken for the home switch")
+
+# An empty cache was the original failure, and the message has to be actionable.
+result = FakeKlipper({}).endstop_state()
+assert result["ok"] is False
+assert "nothing at all" in result["error"], result["error"]
+print("ok: an empty response says so rather than naming only what is missing")
+
+# When something unexpected comes back, the names are the thing that lets
+# anyone act on it.
+result = FakeKlipper({"a": 0, "b": 1}).endstop_state()
+assert "a, b" in result["error"], result["error"]
+print("ok: unexpected endstop names are reported, not swallowed")
+
+# Klipper's own naming strips the stepper_ prefix, but do not fail on that.
+assert FakeKlipper({"stepper_x": 1}).endstop_state() == {"ok": True, "triggered": True}
+print("ok: the unstripped spelling is accepted too")
+
+# A refused gcode must not be followed by reading a stale cache and presenting
+# it as current.
+client = FakeKlipper({"x": 0}, gcode_ok=False)
+result = client.endstop_state()
+assert result["ok"] is False, result
+assert "shutting down" in result["error"], result["error"]
+print("ok: a refused query is reported rather than answered from the cache")
+
 print("\nall endstop diagnostic checks passed")
