@@ -433,6 +433,31 @@ option {
   width: min(220px, 100%);
 }
 
+/* The two ends of a sweep, side by side so the span reads as one thing. */
+.sweep-fields {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+.sweep-fields > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.sweep-fields button {
+  margin-top: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+@media (min-width: 560px) {
+  .sweep-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 /* The saved soils, as rows of name plus its two figures. */
 .soil-list {
   list-style: none;

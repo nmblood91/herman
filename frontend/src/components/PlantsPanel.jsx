@@ -8,7 +8,49 @@ const draftFrom = (plant) => ({
   moisture_target: plant.moisture_target ?? 'dry',
   watering_volume_ml: plant.watering_volume_ml ?? 100,
   position_mm: plant.position_mm ?? 0,
+  watering_mode: plant.watering_mode ?? 'point',
+  sweep_min_mm: plant.sweep_min_mm ?? 0,
+  sweep_max_mm: plant.sweep_max_mm ?? 0,
 })
+
+// Mirrors greenthumb.sweep.MIN_SPAN_MM, and only for the hint below: the
+// planter refuses a narrower span itself, so this number being stale would
+// show a misleading warning rather than let a bad span through.
+const MIN_SWEEP_SPAN_MM = 10
+
+// Which stretch of rail each capture button fills in, for a note that names it.
+// Pressing one of these on the wrong card or the wrong field is the whole risk.
+const CAPTURE_LABELS = {
+  position_mm: 'watering spot',
+  sweep_min_mm: 'left edge',
+  sweep_max_mm: 'right edge',
+}
+
+const describeSweep = (draft) => {
+  const low = Number(draft.sweep_min_mm)
+  const high = Number(draft.sweep_max_mm)
+  if (draft.sweep_min_mm === '' || draft.sweep_max_mm === '' ||
+      !Number.isFinite(low) || !Number.isFinite(high)) {
+    return { text: 'Set both edges of the span.', warn: true }
+  }
+
+  const span = Math.abs(high - low)
+  if (span < MIN_SWEEP_SPAN_MM) {
+    return {
+      text:
+        `${Math.round(span)} mm is too narrow to sweep — it needs at least ` +
+        `${MIN_SWEEP_SPAN_MM} mm. Use One spot for a pot narrower than that.`,
+      warn: true,
+    }
+  }
+  return {
+    text:
+      `Sweeping ${Math.round(span)} mm. The dose does not change: the same ` +
+      'volume is laid along the span instead of into one place, so the nozzle ' +
+      'moves for exactly as long as the pump runs. A dose too small to cross ' +
+      'the span waters at the spot above instead, rather than over-watering.',
+  }
+}
 
 // -1 is "no reading", not dry. The backend uses it for a probe that is
 // unplugged or unreadable, and showing that as 0% would read as "bone dry" and
@@ -79,7 +121,7 @@ export function PlantsPanel({
   // Keyed by plant so a warning about one card cannot appear under another.
   const [captureNote, setCaptureNote] = useState({})
 
-  const capturePosition = (plant) => {
+  const capturePosition = (plant, field = 'position_mm') => {
     const note = (text) => setCaptureNote((current) => ({ ...current, [plant.plant_id]: text }))
 
     // An unhomed axis reports a position relative to wherever it happened to
@@ -106,18 +148,27 @@ export function PlantsPanel({
     // The mistake this is guarding: jog to one pot, press the button on a
     // different plant's card. The captured value then lands on top of a plant
     // that is already configured there.
-    const clash = plants.find(
-      (other) =>
-        other.plant_id !== plant.plant_id &&
-        Math.abs(Number(other.position_mm) - here) < CONFUSION_MARGIN_MM,
-    )
-    updateDraft(plant.plant_id, 'position_mm', String(Math.round(here)))
+    // Only for the watering spot. Two pots' spots landing on top of each
+    // other is a mistake; a sweep edge sitting close to the neighbouring pot
+    // is not, because a wide pot's span can reasonably reach most of the way
+    // there -- warning about it would train the warning away.
+    const clash =
+      field === 'position_mm'
+        ? plants.find(
+            (other) =>
+              other.plant_id !== plant.plant_id &&
+              Math.abs(Number(other.position_mm) - here) < CONFUSION_MARGIN_MM,
+          )
+        : null
+    const what = CAPTURE_LABELS[field]
+    updateDraft(plant.plant_id, field, String(Math.round(here)))
     note(
       clash
-        ? `Set ${plant.name} to ${Math.round(here)} mm — but that is within ` +
-          `${CONFUSION_MARGIN_MM} mm of ${clash.name}. Check you are over the ` +
-          `right pot before saving.`
-        : `Set ${plant.name} to ${Math.round(here)} mm. Save to keep it.`,
+        ? `Set the ${what} for ${plant.name} to ${Math.round(here)} mm — but ` +
+          `that is within ${CONFUSION_MARGIN_MM} mm of ${clash.name}. Check ` +
+          'you are over the right pot before saving.'
+        : `Set the ${what} for ${plant.name} to ${Math.round(here)} mm. ` +
+          'Save to keep it.',
     )
   }
 
@@ -296,6 +347,22 @@ export function PlantsPanel({
                       />
                     </label>
                     <label>
+                      How to water
+                      <select
+                        value={draft.watering_mode}
+                        onChange={(event) =>
+                          updateDraft(plant.plant_id, 'watering_mode', event.target.value)
+                        }
+                      >
+                        <option value="point">
+                          One spot — the whole dose at the location above
+                        </option>
+                        <option value="sweep">
+                          Sweep back and forth across a span
+                        </option>
+                      </select>
+                    </label>
+                    <label>
                       Soil
                       <select
                         value={draft.soil}
@@ -315,6 +382,51 @@ export function PlantsPanel({
                       </select>
                     </label>
 
+                    {draft.watering_mode === 'sweep' && (
+                      <div className="sweep-fields">
+                        <label>
+                          Left edge (mm)
+                          <input
+                            type="number"
+                            value={draft.sweep_min_mm}
+                            onChange={(event) =>
+                              updateDraft(plant.plant_id, 'sweep_min_mm', event.target.value)
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() => capturePosition(plant, 'sweep_min_mm')}
+                          >
+                            Use current position
+                          </button>
+                        </label>
+                        <label>
+                          Right edge (mm)
+                          <input
+                            type="number"
+                            value={draft.sweep_max_mm}
+                            onChange={(event) =>
+                              updateDraft(plant.plant_id, 'sweep_max_mm', event.target.value)
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() => capturePosition(plant, 'sweep_max_mm')}
+                          >
+                            Use current position
+                          </button>
+                        </label>
+                        {(() => {
+                          const summary = describeSweep(draft)
+                          return (
+                            <p className={`field-hint${summary.warn ? ' warning' : ''}`}>
+                              {summary.text}
+                            </p>
+                          )
+                        })()}
+                      </div>
+                    )}
+
                     <div>
                       {/* Names the plant on the button itself: the whole risk
                           here is pressing this on the wrong card. */}
@@ -324,7 +436,8 @@ export function PlantsPanel({
                       <p className="field-hint">
                         Jog the carriage until the nozzle is over this pot, then
                         press. Fills the field above — nothing is stored until
-                        you Save.
+                        you Save. The sweep edges have their own buttons, so you
+                        can jog to each side of a wide pot and capture it there.
                       </p>
                       {captureNote[plant.plant_id] && (
                         <p className="field-hint warning">{captureNote[plant.plant_id]}</p>

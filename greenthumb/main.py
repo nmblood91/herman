@@ -402,6 +402,9 @@ async def list_plants() -> list[dict[str, object]]:
             "plant_id": plant.plant_id,
             "name": plant.name,
             "position_mm": plant.position_mm,
+            "watering_mode": plant.watering_mode,
+            "sweep_min_mm": plant.sweep_min_mm,
+            "sweep_max_mm": plant.sweep_max_mm,
             "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
             "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
             "moisture_target": plant.moisture_target,
@@ -551,6 +554,27 @@ async def set_plant_position(plant_id: str, payload: dict[str, float] = Body(def
     position_mm = float(payload.get("position_mm", 0.0))
     result = automation.set_plant_position(plant_id, position_mm)
     log_event(f"Plant {plant_id} position set to {position_mm} mm")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/sweep")
+async def set_plant_sweep(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
+    """The span an oscillating dose travels across, in rail coordinates."""
+    result = automation.set_plant_sweep(
+        plant_id, payload.get("sweep_min_mm"), payload.get("sweep_max_mm")
+    )
+    log_event(
+        f"Plant {plant_id} sweep set to {result['sweep_min_mm']}"
+        f"-{result['sweep_max_mm']} mm"
+    )
+    return result
+
+
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/watering-mode")
+async def set_watering_mode(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+    """Lay the dose down at one point, or sweep it across a span."""
+    result = automation.set_watering_mode(plant_id, payload.get("watering_mode", ""))
+    log_event(f"Plant {plant_id} watering mode set to {result['watering_mode']}")
     return result
 
 

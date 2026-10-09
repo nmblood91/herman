@@ -75,6 +75,62 @@ must be yes** or it moves on and tries again next minute.
 
 Only then does the pump run.
 
+## Two ways to lay the dose down
+
+Each pot chooses one, on its card under **How to water**.
+
+**One spot** is the original behaviour: the arm goes to the pot's watering
+location and the whole dose goes in there.
+
+**Sweep back and forth** walks the nozzle between a left edge and a right edge
+for as long as the pump runs, so the same volume arrives spread across the pot
+instead of into one place. This is for a wide pot, where a dose landing on one
+spot runs straight down through one column of soil and out of the bottom while
+the rest of the root ball stays dry. You can see that happen: the moisture
+reading barely moves after watering, and the top of the pot is dry a centimetre
+away from the wet patch.
+
+Set the edges by jogging the arm to each side of the pot and pressing the
+button next to each field, the same way you set a watering location. The span
+needs to be at least 10 mm; anything narrower is a spot with extra steps and is
+refused rather than quietly rounded.
+
+**The dose does not change.** The pump runs for exactly as long either way —
+the volume you set is the volume delivered, and the arm simply moves during it
+rather than standing still. Nothing about a sweep makes a pot wetter or drier
+than the same dose at one spot; it changes *where* the water lands.
+
+### What a sweep will not do
+
+Three cases make a pot water at its spot instead, and the log says which:
+
+* **The dose is too small to cross the span.** A few millilitres over 400 mm
+  would mean running the pump longer to fit the motion, which would over-water
+  the pot. The dose wins and the sweep is dropped.
+* **The span has fallen off the rail.** If the rail is re-measured shorter than
+  a saved span, the arm would be sent somewhere it cannot go and the whole
+  dose would fail. Watering at the spot is better than not watering.
+* **The motion board has not said how fast it can move.** A sweep is timed
+  against the board's own speed and acceleration figures, because a pass costs
+  the time it spends speeding up and slowing down at each end. Guessing those
+  too high would leave the pump running past the end of the motion.
+
+In all three the plant still drinks. A sweep decides how the water is spread,
+not whether it arrives.
+
+### Why it is one instruction and not two
+
+Worth knowing if you are reading the logs. The pump and the arm are both driven
+by the motion board, and a dose is sent to it as a single block: switch the pump
+on, run the passes, switch the pump off. The passes *are* the timer.
+
+It cannot work any other way. The original dose is timed with a wait
+instruction, and a wait blocks the board's queue — so a move sent separately
+during a dose would not run alongside it, it would sit behind the wait and
+happen after the pump had already stopped. Sending it all as one block also
+means a dropped network connection mid-dose cannot strand the pump on with the
+arm parked over one spot, which is the flood worth designing against.
+
 ## Checking that the water actually arrived
 
 There is a sensor clipped to the tube that feeds the nozzle. It does not decide

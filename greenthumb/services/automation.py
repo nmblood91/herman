@@ -12,6 +12,7 @@ from greenthumb.config import settings
 from greenthumb.hardware.klipper_client import KlipperClient, MOTION_TIMEOUT
 from greenthumb.hardware.lighting import LedController
 from greenthumb.hardware.pump import PumpController
+from greenthumb import sweep
 from greenthumb.hardware.soil_sensors import SoilSensorHub, calibrate, unavailable_sample
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
@@ -179,7 +180,21 @@ class GreenThumbAutomation:
                 value = saved.get(text_field)
                 if isinstance(value, str) and value.strip():
                     setattr(plant, text_field, value.strip())
-            for field_name in ("watering_volume_ml", "position_mm"):
+            # Validated rather than taken as written, unlike the names: an
+            # unknown mode would make every dose fall back to a point while the
+            # card said otherwise.
+            mode = saved.get("watering_mode")
+            if isinstance(mode, str) and mode.strip().casefold() in sweep.MODES:
+                plant.watering_mode = mode.strip().casefold()
+            elif mode is not None:
+                logger.warning("Ignoring unknown watering mode %r", mode)
+
+            for field_name in (
+                "watering_volume_ml",
+                "position_mm",
+                "sweep_min_mm",
+                "sweep_max_mm",
+            ):
                 value = saved.get(field_name)
                 if isinstance(value, bool) or not isinstance(value, (int, float)):
                     continue
@@ -279,6 +294,9 @@ class GreenThumbAutomation:
                     "moisture_target": plant.moisture_target,
                     "watering_volume_ml": plant.watering_volume_ml,
                     "position_mm": plant.position_mm,
+                    "watering_mode": plant.watering_mode,
+                    "sweep_min_mm": plant.sweep_min_mm,
+                    "sweep_max_mm": plant.sweep_max_mm,
                     "soil": plant.soil,
                     "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
                     "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
@@ -376,6 +394,183 @@ class GreenThumbAutomation:
             "plant_id": plant_id,
             "position_mm": plant.position_mm,
         }
+
+    def set_plant_sweep(
+        self, plant_id: str, min_mm: float, max_mm: float
+    ) -> dict[str, object]:
+        """Record the span an oscillating dose travels across.
+
+        Refused rather than clamped, unlike set_plant_position. A position that
+        lands slightly off the rail is still obviously meant for that pot, so
+        clamping it is a kindness; a span clamped to fit would water a
+        different stretch of the planter than the one asked for, and report
+        success. The bounds are swapped if given the wrong way round, which is
+        an ordering, not a value.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        # Before float(), which turns True into 1.0 and would accept a boolean
+        # as a rail coordinate.
+        if isinstance(min_mm, bool) or isinstance(max_mm, bool):
+            raise ValueError("Sweep bounds must be numbers")
+        try:
+            low, high = float(min_mm), float(max_mm)
+        except (TypeError, ValueError):
+            raise ValueError("Sweep bounds must be numbers")
+        if low > high:
+            low, high = high, low
+        # Ordered already, so this is purely the infinity and not-a-number
+        # check: every comparison against nan is false, so both fail here.
+        if not (float("-inf") < low <= high < float("inf")):
+            raise ValueError("Sweep bounds must be numbers")
+
+        limit = self.usable_travel_mm()
+        if low < 0 or high > limit:
+            raise ValueError(
+                f"A sweep has to stay on the rail, which is 0 to {limit:.0f} mm"
+            )
+        if high - low < sweep.MIN_SPAN_MM:
+            raise ValueError(
+                f"A sweep needs at least {sweep.MIN_SPAN_MM:.0f} mm to cross. "
+                "Use point watering for a pot narrower than that."
+            )
+
+        plant.sweep_min_mm = round(low, 1)
+        plant.sweep_max_mm = round(high, 1)
+        self._persist()
+        return {
+            "status": "ok",
+            "plant_id": plant_id,
+            "sweep_min_mm": plant.sweep_min_mm,
+            "sweep_max_mm": plant.sweep_max_mm,
+            "sweep_span_mm": round(plant.sweep_max_mm - plant.sweep_min_mm, 1),
+        }
+
+    def set_watering_mode(self, plant_id: str, mode: str) -> dict[str, object]:
+        """Switch a pot between a fixed point and an oscillating sweep.
+
+        Turning on sweep is refused while the span is too narrow to be one. The
+        mode and the span are separate settings, so the alternative is a pot
+        labelled "sweep" that waters as a point every time -- configured for
+        something it never does, which is the failure mode this codebase keeps
+        running into and the reason for the refusal rather than a default span.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        wanted = str(mode).strip().casefold()
+        if wanted not in sweep.MODES:
+            raise ValueError(
+                "Watering mode has to be one of: " + ", ".join(sweep.MODES)
+            )
+        if wanted == sweep.SWEEP:
+            span = abs(plant.sweep_max_mm - plant.sweep_min_mm)
+            if span < sweep.MIN_SPAN_MM:
+                raise ValueError(
+                    "Set the sweep span first -- it needs at least "
+                    f"{sweep.MIN_SPAN_MM:.0f} mm to cross, and is currently "
+                    f"{span:.0f} mm."
+                )
+
+        plant.watering_mode = wanted
+        self._persist()
+        return {
+            "status": "ok",
+            "plant_id": plant_id,
+            "watering_mode": plant.watering_mode,
+        }
+
+    def _dose_seconds(self, volume_ml: float) -> float:
+        """How long the pump runs for a dose, and so how long a sweep lasts.
+
+        Taken from the pump because the pump holds the calibrated flow rate.
+        The type check is not decoration: getattr with a default cannot fall
+        back on an object that defines __getattr__, which the test doubles do,
+        so the old `getattr(self.pump, "flow_ml_per_second", settings...)`
+        handed back a bound method where a number was wanted.
+        """
+        flow = getattr(self.pump, "flow_ml_per_second", None)
+        if isinstance(flow, bool) or not isinstance(flow, (int, float)) or flow <= 0:
+            flow = settings.pump_flow_ml_per_second
+        return max(float(volume_ml) / max(float(flow), 0.01), 0.1)
+
+    def _motion_limits(self) -> tuple[float, float] | None:
+        """Klipper's top speed and acceleration, or None if it did not say.
+
+        None rather than a fallback pair. A sweep's passes are timed to fill
+        the dose, so an invented acceleration that is too high leaves the pump
+        running through ramps nobody budgeted for and over-waters the pot. No
+        sweep is better than a mistimed one.
+        """
+        status = self.klipper.status()
+        speed, accel = status.get("max_velocity"), status.get("max_accel")
+        for value in (speed, accel):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return None
+            if value <= 0:
+                return None
+        return float(speed), float(accel)
+
+    def _sweep_motion(
+        self, plant: PlantSpec, volume_ml: int
+    ) -> tuple[float, list[str] | None]:
+        """Where to start the dose, and what to run while it is delivered.
+
+        A motion of None is a point dose, and that is also the fallback every
+        time a configured sweep cannot be honoured. The plant still drinks and
+        the log says the sweep did not happen, which is the right way round:
+        the sweep decides how the water is spread, not whether it arrives.
+        """
+        if plant.watering_mode != sweep.SWEEP:
+            return float(plant.position_mm), None
+
+        low = min(plant.sweep_min_mm, plant.sweep_max_mm)
+        high = max(plant.sweep_min_mm, plant.sweep_max_mm)
+        span = high - low
+        fallback = float(plant.position_mm)
+
+        limit = self.usable_travel_mm()
+        if low < 0 or high > limit:
+            # A saved span can fall off the rail later: position_max is
+            # re-measured from time to time, and Klipper refuses an
+            # out-of-range move outright, which would abort the dose rather
+            # than spread it differently.
+            logger.warning(
+                "Watering %s as a point: its sweep of %.0f to %.0f mm is off "
+                "the usable rail (0 to %.0f mm)",
+                plant.plant_id, low, high, limit,
+            )
+            return fallback, None
+
+        limits = self._motion_limits()
+        if limits is None:
+            logger.warning(
+                "Watering %s as a point: Klipper did not report its motion "
+                "limits, so the passes cannot be timed against the dose",
+                plant.plant_id,
+            )
+            return fallback, None
+
+        duration = self._dose_seconds(volume_ml)
+        plan = sweep.plan(span, duration, limits[0], limits[1])
+        if plan is None:
+            logger.warning(
+                "Watering %s as a point: %d mL runs the pump for %.1fs, which "
+                "is not long enough to cross %.0f mm. Stretching the dose to "
+                "fit the motion would over-water it.",
+                plant.plant_id, volume_ml, duration, span,
+            )
+            return fallback, None
+
+        logger.info(
+            "Sweeping %s across %.0f mm: %d passes at F%d, %.1fs of a %.1fs dose",
+            plant.plant_id, span, plan.passes, plan.feedrate_mm_min,
+            plan.predicted_seconds, duration,
+        )
+        return low, sweep.gcode(plan, low, high)
 
     @contextmanager
     def _exclusive(self, what: str) -> Iterator[None]:
@@ -907,7 +1102,10 @@ class GreenThumbAutomation:
     ) -> dict[str, object]:
         volume = plant.watering_volume_ml if volume_ml is None else max(0, int(volume_ml))
 
-        move = self.klipper.move_gantry_absolute(plant.position_mm)
+        # Resolved before the move, because a sweep starts at one end of its
+        # span rather than at the pot's point position.
+        start_mm, motion = self._sweep_motion(plant, volume)
+        move = self.klipper.move_gantry_absolute(start_mm)
         if not move.get("ok"):
             logger.warning(
                 "Not watering %s: gantry move failed (%s)", plant.plant_id, move.get("error")
@@ -918,12 +1116,12 @@ class GreenThumbAutomation:
         watcher: threading.Thread | None = None
         finished = threading.Event()
         if settings.water_sensor_enabled and volume > 0:
-            # settings, not a literal fallback. A stale 1.67 here would time the
-            # delivery window against the uncalibrated rate while the operator
-            # believed their measured one was in use -- the silent wrong-flow-rate
-            # failure HOW_WATERING_WORKS.md calls out as the unguarded one.
-            flow = getattr(self.pump, "flow_ml_per_second", settings.pump_flow_ml_per_second)
-            duration = volume / max(flow, 0.01)
+            # The pump's own figure, not a literal. A stale 1.67 here would
+            # time the delivery window against the uncalibrated rate while the
+            # operator believed their measured one was in use -- the silent
+            # wrong-flow-rate failure HOW_WATERING_WORKS.md calls out as the
+            # unguarded one.
+            duration = self._dose_seconds(volume)
             watcher = threading.Thread(
                 target=self._watch_delivery,
                 args=(duration, verdict, finished),
@@ -932,7 +1130,7 @@ class GreenThumbAutomation:
             watcher.start()
 
         try:
-            self.pump.deliver_ml(volume)
+            self.pump.deliver_ml(volume, motion=motion)
         finally:
             finished.set()
 

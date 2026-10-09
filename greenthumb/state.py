@@ -46,6 +46,13 @@ SOILS_KEY = "soil_profiles"
 # rail coordinate along with it -- two plants would then share a coordinate
 # and watering one would dribble into the other. plant_id and the LED range
 # are excluded for the same reason, being properties of the slot.
+#
+# watering_mode and the two sweep bounds are left out on the same grounds, and
+# the mode is the one that looks arguable. "This plant likes a spread-out
+# drink" sounds like care -- but the bounds it needs are rail coordinates that
+# cannot travel, so a profile carrying mode without them would load as "sweep"
+# over a span of zero. That falls back to point watering, which means the pot
+# would read as configured for something it was never doing.
 PROFILE_FIELDS = (
     "moisture_target",
     "watering_volume_ml",

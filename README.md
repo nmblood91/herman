@@ -72,7 +72,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | Group | What it covers |
 |---|---|
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
-| `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, and move-to |
+| `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
 | `/plant-profiles`, `/plants/{id}/profile` | the saved-plant library: list, save, load, delete |
 | `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
 | `/moisture-bands` | the band scale, for pickers and legends |
@@ -143,6 +143,51 @@ same rail coordinate and watering one would dribble into the other.
 
 Stored in `data/state.json` under `plant_profiles`, alongside the rest of the
 settings.
+
+### Watering modes
+
+A pot either takes its dose in one place or has it swept across a span:
+
+```bash
+curl -X POST http://herman.local/api/v1/plants/plant_1/sweep -H 'Content-Type: application/json' -d '{"sweep_min_mm":120,"sweep_max_mm":320}'
+curl -X POST http://herman.local/api/v1/plants/plant_1/watering-mode -H 'Content-Type: application/json' -d '{"watering_mode":"sweep"}'
+```
+
+The span goes first, because switching a pot to `sweep` is refused while its
+span is narrower than 10 mm. The two are separate settings, so the alternative
+is a pot labelled "sweep" that waters as a point for ever — configured for
+something it never does.
+
+**The sweep's passes replace the pump's dwell, and that is forced rather than
+chosen.** A dose is one gcode block — pin on, time passes, pin off — and the
+`G4` that times it blocks Klipper's queue, so moves sent from another thread
+during a dose would run *after* the pump stopped rather than during it. The
+passes have to be the timer, inside the same script.
+
+Which makes travel time into dose time, and puts acceleration in the maths. A
+pass is not distance over speed: the carriage ramps up and down at every
+reversal, and at fifty reversals that is not a rounding error. So
+`greenthumb/sweep.py` models each pass as the trapezoid Klipper will actually
+run — using `max_velocity` and `max_accel` queried from Klipper, never a second
+copy in `.env` — and then solves the feedrate backwards from the dose.
+
+One property outranks the rest: **the motion must never outlast the dose**,
+because the pump stops when the passes finish. An overrun does not show up as a
+wrong number on a screen; the pot overflows. It is enforced by dropping a pass
+until the plan fits, rather than inferred from the arithmetic, since the
+feedrate has to go out as a whole number of mm/min and that rounding can land
+below the speed that was solved for.
+
+A sweep that cannot honour the dose falls back to watering at the pot's point
+position, with the reason logged — a dose too small to cross the span, a span
+that has fallen off a re-measured rail, or Klipper not reporting its motion
+limits. The plant still drinks either way: the sweep decides how the water is
+spread, not whether it arrives.
+
+The mode and the two bounds are **not** part of a saved plant profile, for the
+same reason `position_mm` is not. They are rail coordinates, so they cannot
+travel between pots, and a profile carrying the mode without them would load as
+a sweep over a span of zero.
 
 ### Soils
 

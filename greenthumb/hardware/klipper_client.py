@@ -13,6 +13,18 @@ QUERY_TIMEOUT = 5.0
 MOTION_TIMEOUT = 180.0
 
 
+def _positive(value: Any) -> float | None:
+    """A motion limit, or None when Klipper did not give a usable one.
+
+    None rather than a default, because a sweep timed against an invented
+    acceleration is worse than no sweep: too high and the pump keeps running
+    through the ramps it did not budget for, over-dosing the pot.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if value > 0 else None
+
+
 def _endstop_triggered(value: Any) -> bool | None:
     """Read Klipper's endstop value, which is the word "open" or "TRIGGERED".
 
@@ -49,7 +61,23 @@ class KlipperClient:
             # rail goes instead of keeping its own copy of the number. The
             # limit lives in printer.cfg as position_max, and a second copy in
             # .env drifts the moment the rail is measured properly.
-            {"objects": {"toolhead": ["position", "homed_axes", "axis_maximum"]}},
+            #
+            # max_velocity and max_accel are for timing a sweep. The passes of
+            # an oscillating dose have to take exactly as long as the pump
+            # runs, and a pass is not distance over speed -- the carriage ramps
+            # up and down at every reversal. Predicting that needs Klipper's
+            # own figures, not a guess.
+            {
+                "objects": {
+                    "toolhead": [
+                        "position",
+                        "homed_axes",
+                        "axis_maximum",
+                        "max_velocity",
+                        "max_accel",
+                    ]
+                }
+            },
         )
         if not response.get("ok"):
             return {"ok": False, "error": response.get("error"), "position": 0.0, "homed": False}
@@ -64,6 +92,8 @@ class KlipperClient:
             # None when Klipper did not report it, so callers can tell "not
             # known" from a real limit of zero.
             "max_x": round(float(maximum[0]), 1) if maximum else None,
+            "max_velocity": _positive(toolhead.get("max_velocity")),
+            "max_accel": _positive(toolhead.get("max_accel")),
         }
 
     def water_supply_present(self) -> bool | None:

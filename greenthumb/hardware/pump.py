@@ -36,14 +36,36 @@ class PumpController:
         self.is_running = False
         return result
 
-    def deliver_ml(self, volume_ml: int = 100) -> dict[str, Any]:
-        duration_seconds = max(volume_ml / self.flow_ml_per_second, 0.1)
-        # One script so the dwell and the switch-off are queued together on the
+    def seconds_for_ml(self, volume_ml: float) -> float:
+        """How long the pump must run for a dose. The dose's one definition.
+
+        Exposed because a sweep has to be planned against it: the passes stand
+        in for the dwell, so they have to last exactly this long.
+        """
+        return max(volume_ml / self.flow_ml_per_second, 0.1)
+
+    def deliver_ml(
+        self, volume_ml: int = 100, motion: list[str] | None = None
+    ) -> dict[str, Any]:
+        """Run the pump for the dose, optionally moving while it runs.
+
+        `motion` is gcode that takes the place of the dwell, and that is a
+        substitution rather than an addition. A `G4` blocks Klipper's queue, so
+        moves sent from elsewhere during a dose would not run alongside it --
+        they would sit behind the dwell and execute after the pump had already
+        stopped. The caller is responsible for the lines lasting as long as the
+        dose; greenthumb.sweep exists to work that out.
+        """
+        duration_seconds = self.seconds_for_ml(volume_ml)
+        # One script so the timing and the switch-off are queued together on the
         # MCU; splitting them would let a dropped connection strand the pump on.
-        script = (
-            f"SET_PIN PIN={self.pin_name} VALUE=1\n"
-            f"G4 P{int(duration_seconds * 1000)}\n"
-            f"SET_PIN PIN={self.pin_name} VALUE=0"
+        # That matters more with motion in the middle, not less: the carriage
+        # would be left mid-pass with the pin still high.
+        filler = motion or [f"G4 P{int(duration_seconds * 1000)}"]
+        script = "\n".join(
+            [f"SET_PIN PIN={self.pin_name} VALUE=1"]
+            + filler
+            + [f"SET_PIN PIN={self.pin_name} VALUE=0"]
         )
 
         self.is_running = True
