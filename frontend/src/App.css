@@ -164,6 +164,60 @@
   gap: 8px;
 }
 
+.save-delete-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Idle, this looks like any other button. Holding is what changes it -- the
+   ring appears and the background shifts, same amber the rest of the app
+   uses for "needs attention" rather than a red this project avoids
+   elsewhere. */
+.hold-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* Without these, a real long-press on a touchscreen shows the OS text
+     callout or starts a selection instead of reaching onPointerDown. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.hold-delete.holding {
+  background: #4a3418;
+  cursor: default;
+}
+
+.hold-ring {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  /* Starts the fill at 12 o'clock instead of 3 o'clock. */
+  transform: rotate(-90deg);
+}
+
+.hold-ring-track,
+.hold-ring-fill {
+  fill: none;
+  stroke-width: 3;
+}
+
+.hold-ring-track {
+  stroke: rgba(255, 255, 255, 0.25);
+}
+
+.hold-ring-fill {
+  stroke: #e6a04a;
+  /* The only animated property, and only while a hold is live -- see
+     DELETE_HOLD_MS in PlantEditorPanel.jsx. Matched to roughly one
+     requestAnimationFrame tick so the sweep reads as smooth rather than
+     stepped, without animating anything while idle. */
+  transition: stroke-dashoffset 0.05s linear;
+}
+
 button {
   background: #2e7d4b;
   border: 1px solid rgba(255, 255, 255, 0.08);

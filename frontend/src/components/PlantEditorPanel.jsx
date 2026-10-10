@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api'
 
 const BLANK = {
@@ -9,6 +9,16 @@ const BLANK = {
   watering_volume_ml: 100,
   notes: '',
 }
+
+// How long Delete has to be held. Long enough that it cannot fire by brushing
+// the button, short enough that meaning it does not feel like a chore.
+const DELETE_HOLD_MS = 5000
+
+// A ring drawn with a dashed stroke the circle's own circumference long, so
+// stroke-dashoffset can reveal it like a clock hand sweeping back rather than
+// draw it with canvas or an animation library.
+const RING_RADIUS = 8
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
 // The library of saved plants, edited in its own right.
 //
@@ -24,7 +34,54 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
   const [picked, setPicked] = useState('')
   const [form, setForm] = useState(BLANK)
   const [message, setMessage] = useState('')
-  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // 0 while idle, otherwise how far through the hold -- 1 is release the
+  // delete. A ref for the frame id and the start time rather than state: both
+  // change every frame, and only holdProgress needs to repaint anything.
+  const [holdProgress, setHoldProgress] = useState(0)
+  const holdFrame = useRef(null)
+  const holdStart = useRef(0)
+
+  const stopHold = () => {
+    if (holdFrame.current !== null) {
+      cancelAnimationFrame(holdFrame.current)
+      holdFrame.current = null
+    }
+    setHoldProgress(0)
+  }
+
+  const tickHold = () => {
+    // Only ever reached from the requestAnimationFrame loop below, itself
+    // only ever started from startHold, itself only ever an event handler --
+    // never during render. The lint rule cannot trace that through the
+    // recursive rAF callback, the same way it already trusts Date.now()
+    // inside a useEffect's setInterval but not a bare closure.
+    // eslint-disable-next-line react-hooks/purity
+    const fraction = Math.min(1, (performance.now() - holdStart.current) / DELETE_HOLD_MS)
+    setHoldProgress(fraction)
+    if (fraction >= 1) {
+      // Reset before firing: remove() is async, and the ring should not sit
+      // at full while the request is in flight or after it fails.
+      holdFrame.current = null
+      setHoldProgress(0)
+      remove()
+      return
+    }
+    holdFrame.current = requestAnimationFrame(tickHold)
+  }
+
+  const startHold = () => {
+    if (holdFrame.current !== null) return
+    // eslint-disable-next-line react-hooks/purity -- see tickHold above
+    holdStart.current = performance.now()
+    holdFrame.current = requestAnimationFrame(tickHold)
+  }
+
+  // A hold in progress belongs to the plant that was picked when it started.
+  // If picked changes under it -- there is no ordinary way to do that with
+  // one pointer, but a keyboard can tab away mid-hold -- it must not go on to
+  // delete whatever is picked by the time the five seconds are up.
+  useEffect(() => stopHold, [picked])
 
   const list = profiles ?? []
   // Very wet is deliberately not offered: a pot is only that just after
@@ -37,7 +94,6 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
   const [syncedPick, setSyncedPick] = useState('')
   if (picked !== syncedPick) {
     setSyncedPick(picked)
-    setConfirmDelete(false)
     const entry = list.find((profile) => profile.name === picked)
     setForm(
       entry
@@ -63,7 +119,6 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
     setPicked('')
     setSyncedPick('')
     setForm(BLANK)
-    setConfirmDelete(false)
     setMessage('')
   }
 
@@ -231,25 +286,6 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
           </label>
         </div>
 
-        {mode === 'existing' && picked && (
-          <div className="field-row">
-            {!confirmDelete ? (
-              <button type="button" onClick={() => setConfirmDelete(true)}>
-                Delete {picked}
-              </button>
-            ) : (
-              <>
-                <button type="button" onClick={remove}>
-                  Delete {picked}
-                </button>
-                <button type="button" onClick={() => setConfirmDelete(false)}>
-                  Cancel
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
         <div className="field-row">
           <label>
             Notes
@@ -263,14 +299,55 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
         </div>
 
         <div className="field-row">
-          <button
-            type="button"
-            className="primary group-save-button"
-            disabled={!form.name.trim()}
-            onClick={save}
-          >
-            Save plant
-          </button>
+          <div className="save-delete-row">
+            <button
+              type="button"
+              className="primary group-save-button"
+              disabled={!form.name.trim()}
+              onClick={save}
+            >
+              Save plant
+            </button>
+            {/* Hold rather than click-twice: a slip of the thumb cannot finish
+                five seconds by accident, so there is nothing left for a
+                second confirmation to catch. Releasing early -- pointer up,
+                leaving the button, losing focus -- cancels for free, since
+                nothing happens until the hold completes. */}
+            {mode === 'existing' && picked && (
+              <button
+                type="button"
+                className={holdProgress > 0 ? 'hold-delete holding' : 'hold-delete'}
+                onPointerDown={startHold}
+                onPointerUp={stopHold}
+                onPointerLeave={stopHold}
+                onPointerCancel={stopHold}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') startHold()
+                }}
+                onKeyUp={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') stopHold()
+                }}
+                onContextMenu={(event) => event.preventDefault()}
+              >
+                {holdProgress > 0 && (
+                  <svg className="hold-ring" viewBox="0 0 20 20" aria-hidden="true">
+                    <circle cx="10" cy="10" r={RING_RADIUS} className="hold-ring-track" />
+                    <circle
+                      cx="10"
+                      cy="10"
+                      r={RING_RADIUS}
+                      className="hold-ring-fill"
+                      style={{
+                        strokeDasharray: RING_CIRCUMFERENCE,
+                        strokeDashoffset: RING_CIRCUMFERENCE * (1 - holdProgress),
+                      }}
+                    />
+                  </svg>
+                )}
+                {holdProgress > 0 ? `Deleting ${picked}…` : `Hold to delete ${picked}`}
+              </button>
+            )}
+          </div>
           {message && <p className="field-hint">{message}</p>}
         </div>
       </div>
