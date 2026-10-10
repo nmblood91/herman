@@ -4,7 +4,7 @@ sys.modules["smbus2"] = types.ModuleType("smbus2")
 from greenthumb.config import settings
 from greenthumb.models import SensorSample
 from greenthumb.hardware.pump import PumpController
-from tests.helpers import give_every_plant_soil, temp_state, temp_store
+from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state, temp_store
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
 
 settings.auto_watering_enabled = True
@@ -19,7 +19,7 @@ class Klip:
     def status(self): return {"ok": True}
     def water_supply_present(self): return True
 
-class Hub:
+class Hub(CalibrationSurface):
     addresses = [0x36, 0x37, 0x38, 0x39]
     def raw_to_percent(self, raw, address=None): return 0.0
     def read_one(self, a): return SensorSample(a, 0.0, 350.0, 22.0)

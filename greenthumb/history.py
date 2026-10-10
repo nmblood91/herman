@@ -173,7 +173,13 @@ class HistoryStore:
                 "       AVG(moisture_percent) AS moisture_percent,"
                 "       AVG(temperature_c) AS temperature_c"
                 " FROM readings"
-                " WHERE recorded_at >= ?"
+                # The write filter admits any row with a usable raw count,
+                # which is right -- a raw is worth keeping for forensics even
+                # when no field capacity existed to turn it into a percentage.
+                # But -1 in that column is "cannot say", and averaging it into
+                # a bucket drags the line to the floor, which reads as a bone
+                # dry pot.
+                " WHERE recorded_at >= ? AND moisture_percent >= 0"
                 " GROUP BY sensor_address, bucket"
                 " ORDER BY bucket",
                 (bucket, bucket, since),

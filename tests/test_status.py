@@ -13,7 +13,7 @@ sys.modules["spidev"] = types.ModuleType("spidev")
 from greenthumb.config import settings
 from greenthumb.models import SensorSample
 from greenthumb.services.automation import GreenThumbAutomation
-from tests.helpers import give_every_plant_soil, temp_state, temp_store
+from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state, temp_store
 
 
 class Klip:
@@ -27,10 +27,8 @@ class Nul:
     def __getattr__(self, n): return lambda *a, **k: {}
 
 
-class Hub:
+class Hub(CalibrationSurface):
     addresses = [0x36, 0x37, 0x38, 0x39]
-    raw_dry, raw_wet = 320, 1020
-    calibration = {}
     def __init__(self, dead=(), raw=900.0): self.dead, self.raw = set(dead), raw
     def read_one(self, a):
         if a in self.dead:

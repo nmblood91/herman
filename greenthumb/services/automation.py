@@ -17,7 +17,12 @@ from greenthumb.hardware.klipper_client import KlipperClient, MOTION_TIMEOUT
 from greenthumb.hardware.lighting import LedController
 from greenthumb.hardware.pump import PumpController
 from greenthumb import sweep
-from greenthumb.hardware.soil_sensors import SoilSensorHub, calibrate, unavailable_sample
+from greenthumb.hardware.soil_sensors import (
+    SoilSensorHub,
+    calibrate,
+    measure_endpoint,
+    unavailable_sample,
+)
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
 from greenthumb.plants import default_plants, label_for
@@ -78,7 +83,6 @@ class GreenThumbAutomation:
         self.sensor_hub = sensor_hub or SoilSensorHub(
             addresses=settings.moisture_sensor_addresses_list,
             raw_dry=settings.moisture_raw_dry,
-            raw_wet=settings.moisture_raw_wet,
             calibration=state.load_calibration(self._state_path),
         )
         self.klipper = klipper_client or KlipperClient(socket_path=settings.klipper_host)
@@ -171,6 +175,35 @@ class GreenThumbAutomation:
         # user choices that used to live only in memory, so every restart reset
         # them to the literals above. Restore whatever was saved last.
         self._restore_state()
+        self._sync_field_capacity()
+
+    def _sync_field_capacity(self) -> None:
+        """Hand the hub each probe's top-of-scale, taken from its pot.
+
+        The hub reads raw counts and knows nothing about soils or plants, so it
+        is given a plain address-to-count map -- the same shape as the dry
+        calibration it already holds. Called after every write that can change
+        a pot's field capacity, because a stale map means readings mapped
+        against the previous mix.
+        """
+        self.sensor_hub.field_capacity = {
+            plant.sensor_address: int(plant.field_capacity_raw)
+            for plant in self.plants
+            if plant.field_capacity_raw is not None
+        }
+
+    def plant_for_address(self, address: int) -> PlantSpec | None:
+        """Which pot a bus address belongs to, or None if no pot claims it.
+
+        The converse of _warn_on_orphaned_plants: that covers a plant whose
+        address is never polled, this covers an address polled that no plant
+        owns. Both are reachable, because the two lists are configured
+        separately.
+        """
+        for plant in self.plants:
+            if plant.sensor_address == address:
+                return plant
+        return None
 
     def _warn_on_orphaned_plants(self) -> None:
         """Say so when a plant's sensor address is not one the hub polls.
@@ -230,6 +263,25 @@ class GreenThumbAutomation:
                 plant.watering_mode = mode.strip().casefold()
             elif mode is not None:
                 logger.warning("Ignoring unknown watering mode %r", mode)
+
+            source = saved.get("field_capacity_source")
+            if isinstance(source, str) and source in ("", "soil", "pot"):
+                plant.field_capacity_source = source
+            elif source is not None:
+                logger.warning("Ignoring unknown field capacity source %r", source)
+
+            for field_name in ("field_capacity_soil", "field_capacity_measured_at"):
+                value = saved.get(field_name)
+                if isinstance(value, str):
+                    setattr(plant, field_name, value)
+
+            # Nullable, so they cannot go through the loop below -- that one
+            # casts to the existing attribute's type, and int(None) raises.
+            for field_name in ("field_capacity_raw", "field_capacity_address"):
+                value = saved.get(field_name)
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    continue
+                setattr(plant, field_name, int(value))
 
             for field_name in (
                 "watering_volume_ml",
@@ -366,6 +418,11 @@ class GreenThumbAutomation:
                     "sweep_max_mm": plant.sweep_max_mm,
                     "soil": plant.soil,
                     "notes": plant.notes,
+                    "field_capacity_raw": plant.field_capacity_raw,
+                    "field_capacity_source": plant.field_capacity_source,
+                    "field_capacity_soil": plant.field_capacity_soil,
+                    "field_capacity_measured_at": plant.field_capacity_measured_at,
+                    "field_capacity_address": plant.field_capacity_address,
                     "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
                     "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
                 }
@@ -751,7 +808,7 @@ class GreenThumbAutomation:
         ratio = state.available_water_fraction(soils.get(key)) if key else None
 
         band = moisture.band_for(
-            self.smoothed_percent(plant.sensor_address),
+            self.percent_for_plant(plant),
             ratio,
             previous=self._bands.get(plant.plant_id),
         )
@@ -769,16 +826,33 @@ class GreenThumbAutomation:
             self.band_for_plant(plant), plant.moisture_target
         )
 
-    def smoothed_percent(self, address: int) -> float:
-        """Mean moisture over the window; this, not a single read, drives watering."""
+    def _smoothed_raw(self, address: int) -> float | None:
+        """Mean raw count over the window, or None while it is empty."""
         window = self._history.get(address)
         if not window:
+            return None
+        return sum(window) / len(window)
+
+    def percent_for_plant(self, plant: PlantSpec) -> float:
+        """Mean moisture for one pot; this, not a single read, drives watering.
+
+        Takes the plant rather than an address because the top of the scale is
+        the pot's field capacity, and two pots on two probes reading the same
+        raw count are not at the same place on their own scales.
+
+        smoothed_percent(address) used to do this and has been deleted rather
+        than kept alongside. While any function can turn an address into a
+        percentage on its own, something will call it and get a number computed
+        against the wrong pot's scale -- and a plausible wrong percentage is
+        the failure here that nothing downstream can catch.
+
+        -1.0 when there is no judgement to make: an empty window, or no field
+        capacity measured for this pot.
+        """
+        mean = self._smoothed_raw(plant.sensor_address)
+        if mean is None:
             return -1.0
-        # Pass the address: without it raw_to_percent falls back to the global
-        # endpoints, so per-sensor calibration applied to individual reads was
-        # being dropped from the averaged value -- the one that actually decides
-        # watering and feeds the overview.
-        return self.sensor_hub.raw_to_percent(sum(window) / len(window), address)
+        return self.sensor_hub.raw_to_percent(mean, plant.sensor_address)
 
     def _seed_delivery_failures(self) -> None:
         """Count the run of failed deliveries at the end of the history."""
@@ -883,6 +957,27 @@ class GreenThumbAutomation:
                 "attention",
                 f"No soil set on {', '.join(unset)}, so watering is held there. "
                 f"Set it on the Plants tab.",
+            )
+
+        # A pot with a mix but no measured field capacity cannot be judged at
+        # all: its reading is -1, its band is unknown, and it is skipped by
+        # every cycle. Without this it fell through to "all plants are happy",
+        # which is what every planter looks like the moment field capacity
+        # moved onto the soil.
+        unmeasured = [
+            plant.name
+            for plant in self.plants
+            if plant.soil and self.sensor_hub.span_for(plant.sensor_address) is None
+        ]
+        if unmeasured and self.auto_watering_enabled:
+            mixes = sorted(
+                {plant.soil for plant in self.plants if plant.name in unmeasured}
+            )
+            return state(
+                "attention",
+                f"No field capacity measured for {', '.join(mixes)}, so watering "
+                f"is held on {', '.join(unmeasured)}. Measure it under Plants "
+                f"and Soil.",
             )
 
         thirsty = [plant.name for plant in self.plants if self.thirsty(plant)]
@@ -1166,7 +1261,7 @@ class GreenThumbAutomation:
                 plant.plant_id,
                 self.band_for_plant(plant),
                 plant.moisture_target,
-                self.smoothed_percent(plant.sensor_address),
+                self.percent_for_plant(plant),
             )
             self._move_and_water(plant)
 
@@ -1355,7 +1450,7 @@ class GreenThumbAutomation:
         plant_status = [
             PlantStatus(
                 plant_id=spec.plant_id,
-                moisture_percent=self.smoothed_percent(spec.sensor_address),
+                moisture_percent=self.percent_for_plant(spec),
                 moisture_band=self.band_for_plant(spec),
                 target_moisture=spec.moisture_target,
                 pump_active=self.pump.is_running,
@@ -1412,15 +1507,27 @@ class GreenThumbAutomation:
         }
 
     def read_sensors(self) -> list[dict[str, object]]:
-        """Last polled reading per sensor; the control loop owns the I2C bus."""
-        return [
-            {
-                **self._latest[address].__dict__,
-                "moisture_percent_avg": self.smoothed_percent(address),
-                "sample_count": len(self._history[address]),
-            }
-            for address in self.sensor_hub.addresses
-        ]
+        """Last polled reading per sensor; the control loop owns the I2C bus.
+
+        Keyed by bus address rather than by plant, so an address no pot claims
+        still appears -- it is reported with a null plant_id and no average,
+        which is how a stray or misconfigured sensor stays visible instead of
+        borrowing another pot's scale.
+        """
+        entries = []
+        for address in self.sensor_hub.addresses:
+            plant = self.plant_for_address(address)
+            entries.append(
+                {
+                    **self._latest[address].__dict__,
+                    "plant_id": plant.plant_id if plant else None,
+                    "moisture_percent_avg": (
+                        self.percent_for_plant(plant) if plant else -1.0
+                    ),
+                    "sample_count": len(self._history[address]),
+                }
+            )
+        return entries
 
     def water_plant(self, plant_id: str, volume_ml: int | None = None) -> dict[str, object]:
         plant = self.get_plant(plant_id)
@@ -1439,8 +1546,12 @@ class GreenThumbAutomation:
         and a watering cycle running at the same time would both skew the
         readings and be slowed by them.
         """
-        if endpoint not in ("dry", "wet"):
-            raise ValueError(f"endpoint must be 'dry' or 'wet', not {endpoint!r}")
+        if endpoint != "dry":
+            raise ValueError(
+                f"endpoint must be 'dry', not {endpoint!r}. Field capacity is "
+                "measured per soil mix: POST /soils/{name}/field-capacity, or "
+                "POST /plants/{plant_id}/field-capacity to override one pot."
+            )
         bounded = max(5, min(int(seconds), 120))
 
         with self._exclusive(f"Calibrating {endpoint} point"):
@@ -1472,25 +1583,207 @@ class GreenThumbAutomation:
         return {plant.sensor_address: plant.name for plant in self.plants}
 
     def moisture_calibration(self) -> dict[str, object]:
+        """Both ends of every probe's scale, with where each came from.
+
+        The two halves no longer share a source. Dry is measured per probe and
+        read back from moisture_calibration; field capacity is measured per mix
+        and lives on the pot. Reporting them together is what makes a pot with
+        one and not the other visible -- it reads -1 rather than a percentage,
+        and is never watered.
+        """
         stored = state.load_calibration(self._state_path)
         names = self.plant_names()
-        return {
-            "status": "ok",
-            "default_dry": settings.moisture_raw_dry,
-            "default_wet": settings.moisture_raw_wet,
-            "sensors": [
+        sensors = []
+        for address in self.sensor_hub.addresses:
+            plant = self.plant_for_address(address)
+            sensors.append(
                 {
                     "address": f"0x{address:02x}",
                     "plant": names.get(address),
+                    "plant_id": plant.plant_id if plant else None,
                     "label": label_for(address, names),
-                    "dry": self.sensor_hub.endpoints_for(address)[0],
-                    "wet": self.sensor_hub.endpoints_for(address)[1],
+                    "dry": self.sensor_hub.dry_for(address),
                     "calibrated_dry": "dry" in stored.get(address, {}),
-                    "calibrated_wet": "wet" in stored.get(address, {}),
+                    "field_capacity_raw": plant.field_capacity_raw if plant else None,
+                    "field_capacity_source": plant.field_capacity_source if plant else "",
+                    "field_capacity_soil": plant.field_capacity_soil if plant else "",
+                    "field_capacity_measured_at": (
+                        plant.field_capacity_measured_at if plant else ""
+                    ),
+                    # False when the two ends are too close to divide by, which
+                    # is its own failure: field capacity measured on one probe
+                    # can land near another probe's dry point.
+                    "usable": self.sensor_hub.span_for(address) is not None,
                 }
-                for address in self.sensor_hub.addresses
-            ],
+            )
+        return {
+            "status": "ok",
+            "default_dry": settings.moisture_raw_dry,
+            "sensors": sensors,
         }
+
+    def _capture_field_capacity(self, plant: PlantSpec, seconds: int) -> dict[str, object]:
+        """Sample one probe for a field-capacity figure. Stores nothing.
+
+        The span check compares against that probe's own dry point rather than
+        anything on the soil, because the figure is denominated in this
+        probe's counts. Unlike the old wet pass the dry side always has a
+        value -- the configured default if nothing was measured -- so the check
+        always runs rather than being skipped.
+        """
+        bounded = max(5, min(int(seconds), 120))
+        with self._exclusive(f"Measuring field capacity on {plant.name}"):
+            return measure_endpoint(
+                self.sensor_hub,
+                plant.sensor_address,
+                seconds=bounded,
+                opposite=self.sensor_hub.dry_for(plant.sensor_address),
+                expect="above",
+                opposite_label="this probe's dry point",
+            )
+
+    def calibrate_soil_field_capacity(
+        self, soil_name: str, plant_id: str, seconds: int = 20
+    ) -> dict[str, object]:
+        """Measure a mix's field capacity using one pot's probe.
+
+        `plant_id` names only *which probe* to read; the figure lands on the
+        mix. Probes of the same kind read closely enough that one good figure
+        per mix beats four nobody got round to taking, and a pot that wants
+        better can measure its own.
+
+        Pots already filled with this mix are back-filled, except any that
+        measured their own -- a per-pot figure is more specific and must not be
+        overwritten by a general one. The count is reported rather than done
+        quietly, because it changes how those pots read.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        soils = state.load_soils(self._state_path)
+        key = next((k for k in soils if k.casefold() == str(soil_name).strip().casefold()), None)
+        if key is None:
+            raise ValueError(f"No soil called {str(soil_name).strip()!r}")
+
+        outcome = self._capture_field_capacity(plant, seconds)
+        outcome["soil"] = key
+        outcome["measured_with"] = plant.name
+        outcome["inherited_by"] = []
+        if not outcome.get("written"):
+            return outcome
+
+        measured_at = datetime.now().isoformat(timespec="seconds")
+        state.save_soil(
+            key,
+            {
+                "field_capacity_raw": int(outcome["value"]),
+                "field_capacity_samples": outcome.get("samples"),
+                "field_capacity_measured_at": measured_at,
+                "field_capacity_address": plant.sensor_address,
+            },
+            self._state_path,
+        )
+
+        inherited = []
+        for pot in self.plants:
+            if pot.soil.casefold() != key.casefold():
+                continue
+            if pot.field_capacity_source == "pot":
+                continue
+            pot.field_capacity_raw = int(outcome["value"])
+            pot.field_capacity_source = "soil"
+            pot.field_capacity_soil = key
+            pot.field_capacity_measured_at = measured_at
+            pot.field_capacity_address = plant.sensor_address
+            inherited.append(pot.name)
+
+        outcome["inherited_by"] = inherited
+        self._persist()
+        self._sync_field_capacity()
+        logger.info(
+            "Field capacity for %r is %s, measured on %s, applied to %d pot(s)",
+            key, outcome["value"], plant.name, len(inherited),
+        )
+        return outcome
+
+    def calibrate_plant_field_capacity(
+        self, plant_id: str, seconds: int = 20
+    ) -> dict[str, object]:
+        """Measure field capacity for one pot, overriding whatever it inherited."""
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        outcome = self._capture_field_capacity(plant, seconds)
+        outcome["plant_id"] = plant_id
+        if not outcome.get("written"):
+            return outcome
+
+        plant.field_capacity_raw = int(outcome["value"])
+        plant.field_capacity_source = "pot"
+        plant.field_capacity_soil = plant.soil
+        plant.field_capacity_measured_at = datetime.now().isoformat(timespec="seconds")
+        plant.field_capacity_address = plant.sensor_address
+        self._persist()
+        self._sync_field_capacity()
+        logger.info("Field capacity for %s is %s, measured in the pot", plant.name, outcome["value"])
+        return outcome
+
+    def clear_plant_field_capacity(self, plant_id: str) -> dict[str, object]:
+        """Drop a pot's own figure and go back to inheriting from its mix.
+
+        An override you cannot undo is a trap: having measured one pot, there
+        would be no way back to the mix's figure short of editing the state
+        file.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        plant.field_capacity_raw = None
+        plant.field_capacity_source = ""
+        plant.field_capacity_soil = ""
+        plant.field_capacity_measured_at = ""
+        plant.field_capacity_address = None
+        self._inherit_field_capacity(plant)
+        self._persist()
+        self._sync_field_capacity()
+        return {
+            "status": "ok",
+            "plant_id": plant_id,
+            "field_capacity_raw": plant.field_capacity_raw,
+            "field_capacity_source": plant.field_capacity_source,
+        }
+
+    def _inherit_field_capacity(self, plant: PlantSpec) -> None:
+        """Copy the mix's figure onto a pot, if the mix has one.
+
+        A copy rather than a live lookup. Reading through to the soil would
+        mean re-measuring a mix silently rescaling every pot filled with it --
+        the same hazard that keeps soil out of a saved plant. The explicit,
+        logged back-fill in calibrate_soil_field_capacity is how a mix's new
+        figure reaches existing pots.
+        """
+        if not plant.soil:
+            return
+        soils = state.load_soils(self._state_path)
+        entry = soils.get(plant.soil) or {}
+        raw = entry.get("field_capacity_raw")
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            return
+
+        plant.field_capacity_raw = int(raw)
+        plant.field_capacity_source = "soil"
+        plant.field_capacity_soil = plant.soil
+        measured = entry.get("field_capacity_measured_at")
+        plant.field_capacity_measured_at = measured if isinstance(measured, str) else ""
+        address = entry.get("field_capacity_address")
+        plant.field_capacity_address = (
+            int(address)
+            if isinstance(address, (int, float)) and not isinstance(address, bool)
+            else None
+        )
 
     def reset_moisture_calibration(self) -> dict[str, object]:
         state.clear_calibration(self._state_path)
@@ -1950,9 +2243,42 @@ class GreenThumbAutomation:
                 )
             wanted = key
 
+        previous = plant.soil
         plant.soil = wanted
+
+        # A per-pot figure is kept only while the mix is the same one it was
+        # measured in. A reading taken in coir is simply wrong for cactus mix,
+        # and keeping it is the silent mis-watering case -- the pot would read
+        # as calibrated against a mix it no longer contains.
+        same_mix = previous.casefold() == wanted.casefold()
+        if plant.field_capacity_source == "pot" and same_mix:
+            pass
+        elif wanted:
+            plant.field_capacity_raw = None
+            plant.field_capacity_source = ""
+            plant.field_capacity_soil = ""
+            plant.field_capacity_measured_at = ""
+            plant.field_capacity_address = None
+            self._inherit_field_capacity(plant)
+        elif plant.field_capacity_source != "pot":
+            # Clearing the mix drops an inherited figure, since it described a
+            # mix this pot no longer claims. A measured one is left: it is a
+            # fact about this pot whatever the mix is called.
+            plant.field_capacity_raw = None
+            plant.field_capacity_source = ""
+            plant.field_capacity_soil = ""
+            plant.field_capacity_measured_at = ""
+            plant.field_capacity_address = None
+
         self._persist()
-        return {"status": "ok", "plant_id": plant_id, "soil": plant.soil}
+        self._sync_field_capacity()
+        return {
+            "status": "ok",
+            "plant_id": plant_id,
+            "soil": plant.soil,
+            "field_capacity_raw": plant.field_capacity_raw,
+            "field_capacity_source": plant.field_capacity_source,
+        }
 
     def list_soils(self) -> list[dict[str, object]]:
         """Every saved soil, with the ratio the bands need, widest window first."""

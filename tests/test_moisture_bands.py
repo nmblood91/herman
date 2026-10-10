@@ -168,7 +168,7 @@ print("ok: every band explains itself, and unknown says what to check")
 from greenthumb.config import settings
 from greenthumb.hardware.soil_sensors import unavailable_sample
 from greenthumb.services.automation import GreenThumbAutomation
-from tests.helpers import give_every_plant_soil, temp_state, temp_store
+from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state, temp_store
 
 settings.auto_watering_enabled = False
 settings.idle_motion_enabled = False
@@ -180,7 +180,7 @@ class _Klip:
     def __getattr__(self, n): return lambda *a, **k: {"ok": True}
 
 
-class _Hub:
+class _Hub(CalibrationSurface):
     addresses = [0x36, 0x37, 0x38, 0x39]
     def read_one(self, a): return unavailable_sample(a)
 
@@ -200,7 +200,7 @@ pot = auto.plants[0]
 
 # Peat: wilting at 57% of field capacity, so the medium/dry edge sits at 79%.
 reading = [0.0]
-auto.smoothed_percent = lambda address: reading[0]
+auto.percent_for_plant = lambda plant: reading[0]
 
 reading[0] = 80.0
 assert auto.band_for_plant(pot) == MEDIUM, auto.band_for_plant(pot)

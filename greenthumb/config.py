@@ -70,19 +70,19 @@ class Settings(BaseSettings):
     # differently from one another, so a shared pair puts that spread straight
     # into the reported percentage.
     #
-    # Placeholders, so the exact numbers carry no measurement -- they only have
-    # to be the right order of magnitude and far enough apart to divide by.
+    # A placeholder, so the exact number carries no measurement -- it only has
+    # to be the right order of magnitude. Defensible as a fallback in a way the
+    # other end is not: dry is the floor of the scale, so being wrong about it
+    # compresses a reading rather than inventing a ceiling for it.
     #
-    # Wet means the probe in soil at field capacity: soaked and drained 24h,
-    # the wettest a pot actually gets. It used to mean plain water, which is not
-    # a soil state at all and put the top of the scale somewhere unreachable.
-    #
-    # The wet placeholder dropped when that changed, and the direction is
-    # deliberate. Too high a wet endpoint reads every pot as drier than it is,
-    # and with automatic watering on that waters a plant that does not need it.
-    # Erring low is the safer way to be wrong before anyone calibrates.
+    # There is deliberately no wet counterpart. The top of the scale is field
+    # capacity, which is measured per soil mix and stored on the soil and the
+    # pot. A configured placeholder there would give a never-calibrated pot a
+    # perfectly plausible percentage against a number nobody measured -- the
+    # one error in this whole system that nothing downstream can catch. A pot
+    # with no measured field capacity reads -1 instead, and -1 is never
+    # watered.
     moisture_raw_dry: int = 320
-    moisture_raw_wet: int = 800
 
     # Off by default, and only the starting value: the Settings tab owns this
     # switch and persists any change to data/state.json, which wins over this

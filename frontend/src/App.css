@@ -512,6 +512,29 @@ option {
   font-size: 0.85rem;
 }
 
+/* The probe picker and its button, under the figures for that mix. */
+.soil-capacity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.soil-capacity select {
+  width: auto;
+  min-width: 110px;
+  margin-top: 0;
+}
+
+.soil-capacity button {
+  margin-top: 0;
+}
+
+.soil-list small.warning {
+  color: #e8b45f;
+}
+
 /* Name takes the width it needs, the two readings sit beside each other. */
 .soil-form {
   display: grid;

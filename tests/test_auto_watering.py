@@ -30,9 +30,11 @@ class DryHub:
     """Every plant reading bone dry, so anything that can water, will."""
 
     raw_dry = settings.moisture_raw_dry
-    raw_wet = settings.moisture_raw_wet
     calibration = {}
-    endpoints_for = SoilSensorHub.endpoints_for
+    calibration: dict = {}
+    field_capacity: dict = {}
+    dry_for = SoilSensorHub.dry_for
+    span_for = SoilSensorHub.span_for
     raw_to_percent = SoilSensorHub.raw_to_percent
     addresses = [0x36, 0x37, 0x38, 0x39]
 

@@ -101,12 +101,15 @@ in identical conditions read measurably differently — on this build they span
 about 25 counts in open air — and one global pair puts that spread straight into
 every reported percentage.
 
-**The wet endpoint is soil at field capacity, not a glass of water.** Measure it
-per *mix* as well as per sensor — see *Which wet endpoint* below for why, and
-for when the other choice is the right one.
+**The two ends of the scale come from different places, and that is the whole
+design.** The dry end is a property of the *probe* — prongs in open air — so it
+is measured per sensor. The wet end is field capacity, which is a property of
+the *mix*: the same soil in another pot gives roughly the same reading, and a
+different soil does not. So it is measured once per mix and shared by every pot
+filled with it.
 
-Two passes, in either order. Each samples every sensor for 20 seconds and takes
-the median, so one bad read cannot skew the result:
+The dry pass, all four at once, sampling for 20 seconds and taking the median
+so one bad read cannot skew it:
 
 ```bash
 cd /opt/greenthumb
@@ -114,11 +117,18 @@ cd /opt/greenthumb
 # all four sensors in open air, clean and dry
 .venv/bin/python -m greenthumb.hardware.soil_sensors --calibrate dry
 
-# each probe in its own pot, soaked through and drained for 24 hours
-.venv/bin/python -m greenthumb.hardware.soil_sensors --calibrate wet
-
 .venv/bin/python -m greenthumb.hardware.soil_sensors --show-calibration
 ```
+
+**Field capacity is measured in the app**, under Plants and Soil → Soils. Pick
+the mix, pick which pot's probe to read it with, and press Measure. There is no
+CLI pass for it, because it has to be attached to a soil entry and the CLI has
+no notion of one.
+
+A pot that disagrees with the rest can measure its own on its card, which
+overrides the mix's figure for that pot only. Assigning a *different* mix to
+that pot drops the override, since a reading taken in coir says nothing about
+cactus mix.
 
 > **Field capacity means soaked and then left alone for 24 hours.** Water until
 > it runs from the bottom, let it drain, and come back a day later. Measuring
@@ -129,11 +139,28 @@ cd /opt/greenthumb
 > the PCB or the connector end destroys the sensor.
 
 Results are written to `data/state.json`, which is gitignored and survives both
-restarts and `git pull`. Each endpoint is stored separately, so the wet pass can
-be redone without losing the dry one, and a sensor with only one endpoint
-measured uses the `.env` default for the other.
+restarts and `git pull`. The two ends are stored separately — dry under
+`moisture_calibration` by address, field capacity on the soil and on the pot —
+so either can be redone without losing the other.
 
-Both passes can also be run from the web UI, which is the same code path.
+**Only the dry end falls back.** A probe with no measured dry point uses
+`MOISTURE_RAW_DRY`, which is defensible because dry is the floor: being wrong
+about it compresses a reading rather than inventing a ceiling. A pot with no
+field capacity has no scale at all and reads **-1**, the same value an
+unplugged probe gives — and -1 is never watered. That is deliberate. A
+configured placeholder there would hand a never-measured pot a plausible
+percentage against a number nobody took, and nothing downstream could tell it
+from a real one.
+
+Two consequences worth knowing:
+
+- **A fresh install waters nothing until a field capacity is measured.** The
+  status bar says so, naming the mixes and the pots waiting on them.
+- **A span can be too narrow to use.** The mix's figure is taken on one probe
+  and used by the others, so a pot whose own dry point sits close to it has no
+  usable range. That pot reads -1 rather than being clamped to 0% or 100% —
+  the 100% end of such a clamp reads as "just watered" and would stop watering
+  for ever. Measure that pot's own field capacity on its card.
 
 ### Which wet endpoint
 

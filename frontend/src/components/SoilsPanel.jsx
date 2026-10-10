@@ -7,14 +7,65 @@ import { API_BASE } from '../api'
 // Settings, a tab away from the plant cards, and self-fetched a second list
 // that the dashboard was already holding for the soil dropdown -- so the two
 // could disagree until something reloaded.
-export function SoilsPanel({ soils, onRefresh }) {
+const SAMPLE_SECONDS = 20
+
+export function SoilsPanel({ soils, plants, onRefresh }) {
   const [name, setName] = useState('')
   const [capacity, setCapacity] = useState('')
   const [wilting, setWilting] = useState('')
   const [notes, setNotes] = useState('')
   const [message, setMessage] = useState('')
 
+  // Which probe each mix will be measured with. One figure per mix is enough:
+  // probes of the same kind read closely enough that a good reading from any
+  // of them beats four nobody got round to taking. A pot that wants better
+  // measures its own, on its card.
+  const [probe, setProbe] = useState({})
+  const [measuring, setMeasuring] = useState('')
+
   const list = soils ?? []
+  const pots = plants ?? []
+
+  const measure = async (soilName) => {
+    const plantId = probe[soilName] || pots[0]?.plant_id
+    if (!plantId) return
+    setMessage('')
+    setMeasuring(soilName)
+    try {
+      const response = await fetch(
+        `${API_BASE}/soils/${encodeURIComponent(soilName)}/field-capacity`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plant_id: plantId, seconds: SAMPLE_SECONDS }),
+        },
+      )
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setMessage(
+          data.detail || data.error || `Could not measure (HTTP ${response.status})`,
+        )
+        return
+      }
+      if (!data.written) {
+        setMessage(`Not stored — ${data.reason}`)
+        return
+      }
+      const applied = data.inherited_by ?? []
+      setMessage(
+        `${soilName} reads ${data.value} at field capacity, measured with ` +
+          `${data.measured_with}. ` +
+          (applied.length
+            ? `Applied to ${applied.join(', ')}.`
+            : 'No pot is filled with it yet, so nothing changed.'),
+      )
+      onRefresh?.()
+    } catch (error) {
+      setMessage(`Could not measure: ${error.message}`)
+    } finally {
+      setMeasuring('')
+    }
+  }
 
   const save = async () => {
     setMessage('')
@@ -87,7 +138,47 @@ export function SoilsPanel({ soils, onRefresh }) {
                       field capacity {soil.field_capacity_vwc}% &middot; wilting{' '}
                       {soil.wilting_point_vwc}% &middot; {soil.available_points} pts usable
                     </small>
+                    {soil.field_capacity_raw != null ? (
+                      <small>
+                        reads {soil.field_capacity_raw} at field capacity
+                        {soil.field_capacity_measured_at
+                          ? `, measured ${soil.field_capacity_measured_at.slice(0, 10)}`
+                          : ''}
+                      </small>
+                    ) : (
+                      <small className="warning">
+                        not measured — pots of this mix read nothing and are never
+                        watered automatically
+                      </small>
+                    )}
                     {soil.notes && <small>{soil.notes}</small>}
+                    <span className="soil-capacity">
+                      <select
+                        aria-label={`Probe to measure ${soil.name} with`}
+                        value={probe[soil.name] ?? pots[0]?.plant_id ?? ''}
+                        onChange={(event) =>
+                          setProbe((current) => ({
+                            ...current,
+                            [soil.name]: event.target.value,
+                          }))
+                        }
+                      >
+                        {pots.map((pot) => (
+                          <option key={pot.plant_id} value={pot.plant_id}>
+                            {pot.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={Boolean(measuring) || !pots.length}
+                        onClick={() => measure(soil.name)}
+                      >
+                        {measuring === soil.name
+                          ? 'Measuring…'
+                          : 'Measure field capacity'}
+                      </button>
+                    </span>
                   </span>
                   <button type="button" onClick={() => remove(soil.name)}>
                     Remove
@@ -162,11 +253,18 @@ export function SoilsPanel({ soils, onRefresh }) {
         <div className="field-row">
           <p className="field-hint">
             Saving replaces any soil of the same name. Only the <em>ratio</em>
-            {' '}of these two leaves this table usefully — it is dimensionless, so
-            a published figure applies to any pot of that mix, and it is what
-            fixes the bottom of the moisture scale. The absolute figures do
-            not convert into sensor readings, which is why field capacity is
-            still measured per pot by the wet calibration.
+            {' '}of these two percentages leaves this table usefully — it is
+            dimensionless, so a published figure applies to any pot of that mix,
+            and it is what fixes the bottom of the moisture scale.
+          </p>
+          <p className="field-hint">
+            The percentages do not convert into sensor readings, which is why
+            each mix also needs <strong>field capacity measured once</strong>,
+            above. Soak a pot of it through, let it drain 24 hours, pick the
+            probe sitting in that pot, and measure. That figure is copied onto
+            every pot filled with the mix, and gives the top of their scale.
+            Re-measure after a repot: mixes lose capacity as they age and
+            compact.
           </p>
           <p className="field-hint">
             To measure your own: weigh the pot soaked and drained 24 hours,

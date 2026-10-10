@@ -32,7 +32,11 @@ DEFAULT_STATE_PATH = Path(__file__).resolve().parent.parent / "data" / "state.js
 
 # Bumped only when a reader needs to tell old layouts apart. Unknown versions are
 # loaded on a best-effort basis rather than discarded.
-SCHEMA_VERSION = 1
+# 2 since field capacity moved off the per-address calibration and onto the
+# soil and the pot. The marker is what lets a later reader tell "no field
+# capacity because this file predates the change" from "nobody has measured
+# one yet" -- which look identical otherwise and want different advice.
+SCHEMA_VERSION = 2
 
 CALIBRATION_KEY = "moisture_calibration"
 PROFILES_KEY = "plant_profiles"
@@ -84,6 +88,21 @@ PROFILE_FIELDS = (
 SOIL_FIELDS = (
     "field_capacity_vwc",
     "wilting_point_vwc",
+    # Field capacity again, this time as a raw sensor count, measured in a real
+    # pot of this mix with one probe. This is the half that could not be looked
+    # up: the VWC figures above give the *shape* of the usable window, and this
+    # gives its position on the scale a probe actually reports.
+    #
+    # Measured once per mix rather than once per pot, because probes of the
+    # same kind read closely enough that one good figure beats four nobody got
+    # round to taking. A pot that wants better can measure its own, which
+    # overrides this.
+    "field_capacity_raw",
+    "field_capacity_samples",
+    "field_capacity_measured_at",
+    # Which probe took it, so the figure can be reported with its provenance
+    # and so a cross-probe span can be sanity-checked.
+    "field_capacity_address",
     # Where the figures came from, and how much to trust them. The library
     # ships this text for its own mixes; before this field existed it was
     # written in soil_library.py and thrown away on install.
@@ -204,11 +223,17 @@ def _parse_address(key: Any) -> int | None:
 
 
 def load_calibration(path: str | Path | None = None) -> dict[int, dict[str, int]]:
-    """Per-address {"dry": int, "wet": int}, skipping anything unusable.
+    """Per-address {"dry": int}, skipping anything unusable.
 
-    Either endpoint may be absent: calibrating dry and calibrating wet are
-    separate passes, and a half-calibrated sensor should keep using the global
-    default for the endpoint it has not measured yet.
+    Dry only. The wet endpoint used to live here too, measured per probe -- but
+    it is field capacity, which is a property of the mix in the pot rather than
+    of the probe, and it now lives on the soil and the plant.
+
+    Files written before that change still carry "wet" keys. They are left
+    where they are, because they record a real measurement and merging state
+    rather than replacing it means removing them needs code not worth writing.
+    They are simply never read: this iterates ("dry",) so nothing can pick one
+    up by accident, and save_calibration_point refuses to write one.
     """
     stored = load_state(path).get(CALIBRATION_KEY)
     if not isinstance(stored, dict):
@@ -222,7 +247,7 @@ def load_calibration(path: str | Path | None = None) -> dict[int, dict[str, int]
             continue
 
         entry: dict[str, int] = {}
-        for endpoint in ("dry", "wet"):
+        for endpoint in ("dry",):
             raw = value.get(endpoint)
             if isinstance(raw, bool) or not isinstance(raw, (int, float)):
                 continue
@@ -240,9 +265,17 @@ def save_calibration_point(
     measured_at: str | None = None,
     path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Record one endpoint for one sensor, leaving the other one alone."""
-    if endpoint not in ("dry", "wet"):
-        raise ValueError(f"endpoint must be 'dry' or 'wet', not {endpoint!r}")
+    """Record the dry point for one sensor.
+
+    Dry is the only endpoint that belongs to a probe. Field capacity is a
+    property of the mix and is written to the soil or the plant instead, so
+    this refuses it rather than leaving a second, stale copy here.
+    """
+    if endpoint != "dry":
+        raise ValueError(
+            f"endpoint must be 'dry', not {endpoint!r}. Field capacity belongs "
+            "to the soil or the pot, not to the probe."
+        )
 
     data = load_state(path)
     stored = data.get(CALIBRATION_KEY)
@@ -267,7 +300,12 @@ def save_calibration_point(
 
 
 def clear_calibration(path: str | Path | None = None) -> None:
-    """Drop all calibration, returning every sensor to the global defaults."""
+    """Drop the dry calibration, returning every sensor to the configured dry.
+
+    Field capacity is untouched: it lives on the soils and the pots, and the
+    two are no longer reset together. That separation is the point -- re-doing
+    a dry pass should not throw away a measurement of somebody's potting mix.
+    """
     data = load_state(path)
     if CALIBRATION_KEY in data:
         del data[CALIBRATION_KEY]
@@ -332,8 +370,17 @@ def _save_named(
     name: str,
     settings: dict[str, Any],
     path: str | Path | None = None,
+    merge: bool = False,
 ) -> dict[str, Any]:
-    """Upsert one entry, replacing any of the same name."""
+    """Upsert one entry, replacing any of the same name.
+
+    `merge` carries forward whitelisted fields the caller did not supply,
+    instead of dropping them. Without it, a caller that knows about some of an
+    entry's fields silently deletes the rest -- which is how editing a soil's
+    two VWC figures would have thrown away the field capacity somebody
+    measured in a pot. Handled here rather than in that one caller, or the next
+    caller reopens the same hole.
+    """
     clean = str(name).strip()
     if not clean:
         raise ValueError(f"A {noun} needs a name")
@@ -341,7 +388,6 @@ def _save_named(
     entry = {field: settings[field] for field in fields if field in settings}
     if not entry:
         raise ValueError(f"Nothing to save: no recognised {noun} settings given")
-    entry["saved_at"] = datetime.now().isoformat(timespec="seconds")
 
     data = load_state(path)
     stored = data.get(key)
@@ -352,7 +398,16 @@ def _save_named(
     # capitalisation renames the entry instead of duplicating it.
     previous = _match_name(stored, clean)
     if previous is not None:
+        if merge and isinstance(stored[previous], dict):
+            kept = {
+                field: stored[previous][field]
+                for field in fields
+                if field in stored[previous]
+            }
+            entry = {**kept, **entry}
         del stored[previous]
+
+    entry["saved_at"] = datetime.now().isoformat(timespec="seconds")
 
     stored[clean] = entry
     data[key] = stored
@@ -407,10 +462,19 @@ def load_soils(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
 
 
 def save_soil(
-    name: str, settings: dict[str, Any], path: str | Path | None = None
+    name: str,
+    settings: dict[str, Any],
+    path: str | Path | None = None,
+    merge: bool = True,
 ) -> dict[str, Any]:
-    """Upsert one soil, replacing any entry of the same name."""
-    return _save_named(SOILS_KEY, SOIL_FIELDS, "soil", name, settings, path)
+    """Upsert one soil, keeping fields the caller did not mention.
+
+    Merging by default, unlike saved plants. A soil is written from two
+    directions -- the editor supplies the VWC figures and a note, a calibration
+    supplies the measured field capacity -- and neither knows about the other's
+    fields. Replacing wholesale means whichever saved last wipes the rest.
+    """
+    return _save_named(SOILS_KEY, SOIL_FIELDS, "soil", name, settings, path, merge)
 
 
 def delete_soil(name: str, path: str | Path | None = None) -> bool:

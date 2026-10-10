@@ -53,17 +53,26 @@ class SoilSensorHub:
         self,
         addresses: list[int] | None = None,
         raw_dry: int = 320,
-        raw_wet: int = 1020,
         calibration: dict[int, dict[str, int]] | None = None,
+        field_capacity: dict[int, int] | None = None,
     ) -> None:
         self.addresses = addresses or [0x36, 0x37, 0x38, 0x39]
         self.raw_dry = raw_dry
-        self.raw_wet = raw_wet
-        # Per-address endpoints measured by --calibrate, overriding raw_dry and
-        # raw_wet for the sensors that have them. Sensors read meaningfully
-        # differently from each other in identical conditions, so one global
-        # span puts that spread straight into the reported percentage.
+        # Per-address dry points measured by --calibrate, overriding raw_dry for
+        # the sensors that have them. Sensors read meaningfully differently from
+        # each other in identical conditions, so one global figure puts that
+        # spread straight into the reported percentage.
         self.calibration = calibration or {}
+        # The other end of the scale, per address, and it is kept separately
+        # because it is a different kind of fact. A dry reading is a property of
+        # the probe -- prongs in open air. Field capacity is a property of the
+        # *mix*, measured in a pot, and the same mix in another pot gives
+        # roughly the same figure. So it hangs off the plant rather than the
+        # probe, and the automation layer syncs this map from the plants.
+        #
+        # There is deliberately no fallback. A pot with nothing here reads -1,
+        # not a percentage against a number nobody measured.
+        self.field_capacity = field_capacity or {}
         self.bus: smbus2.SMBus | None = None
         self._initialized_sensors: set[int] = set()
 
@@ -133,26 +142,57 @@ class SoilSensorHub:
         raw[0] &= 0x3F  # high bits are status flags, not part of the fixed-point value
         return struct.unpack(">I", bytes(raw))[0] / 65536.0
 
-    def endpoints_for(self, address: int | None) -> tuple[int, int]:
-        """Calibrated dry/wet for one address, falling back per endpoint.
+    def dry_for(self, address: int | None) -> int:
+        """This probe's dry point, or the configured default.
 
-        Each endpoint falls back independently, because calibrating dry and
-        calibrating wet are separate passes: a sensor with only its dry point
-        measured should use that and the global default for wet, not revert
-        both.
+        The default is defensible here in a way it is not for the other end:
+        dry is the floor of the scale, so being wrong about it compresses a
+        reading rather than inventing a ceiling for it.
         """
         entry = self.calibration.get(address) if address is not None else None
-        if not entry:
-            return self.raw_dry, self.raw_wet
-        return (
-            int(entry.get("dry", self.raw_dry)),
-            int(entry.get("wet", self.raw_wet)),
-        )
+        if entry and "dry" in entry:
+            return int(entry["dry"])
+        return self.raw_dry
+
+    def span_for(self, address: int | None) -> tuple[int, int] | None:
+        """The two ends of this probe's scale, or None if they are unusable.
+
+        Renamed from endpoints_for rather than re-pointed, on purpose. The old
+        name always returned a pair, so every caller would have gone on
+        compiling against a function that had quietly changed what it means.
+
+        None in two cases, and both have to stay distinguishable from a real
+        reading:
+
+        * No field capacity for this pot. Nothing has been measured, so there
+          is no top of the scale.
+        * The two ends are too close together. Field capacity is measured once
+          per mix on one probe and then used by the others, so a pot whose own
+          dry point sits near that figure produces a span that would read as a
+          permanent 0% or 100%. The old code clamped, and the 100% end of that
+          clamp reads as "just watered" and stops watering for ever.
+        """
+        capacity = self.field_capacity.get(address) if address is not None else None
+        if capacity is None:
+            return None
+
+        dry = self.dry_for(address)
+        if int(capacity) - dry < MIN_CALIBRATION_SPAN:
+            return None
+        return dry, int(capacity)
 
     def raw_to_percent(self, raw: float, address: int | None = None) -> float:
-        dry, wet = self.endpoints_for(address)
-        span = max(wet - dry, 1)
-        percent = (raw - dry) / span * 100.0
+        """A raw count as a percentage of field capacity, or -1 for cannot say.
+
+        -1 is the same sentinel an unreadable probe gives, and that is the
+        point: both mean "no judgement available", and everything downstream
+        already refuses to water on it.
+        """
+        span = self.span_for(address)
+        if span is None:
+            return -1.0
+        dry, capacity = span
+        percent = (raw - dry) / (capacity - dry) * 100.0
         return round(max(0.0, min(percent, 100.0)), 1)
 
     def read_all(self) -> list[SensorSample]:
@@ -198,21 +238,28 @@ def _collect(
     seconds: int,
     interval: float,
     progress: bool = True,
+    addresses: list[int] | None = None,
 ) -> dict[int, dict]:
-    """Read every address repeatedly, returning per-address reads/errors/values.
+    """Read addresses repeatedly, returning per-address reads/errors/values.
 
     Shared by the soak test and by calibration: both want many samples per
     address over a fixed window, and differ only in what they do with them.
+
+    `addresses` narrows it to a subset. Field capacity is measured on one probe
+    at a time, and without this it would sample all four and then pick -- which
+    takes four times as long on a bus that is the slow part, and reports reads
+    against sensors nobody asked about.
     """
+    targets = list(addresses) if addresses else list(hub.addresses)
     stats: dict[int, dict] = {
-        address: {"reads": 0, "errors": 0, "values": []} for address in hub.addresses
+        address: {"reads": 0, "errors": 0, "values": []} for address in targets
     }
     started = time.monotonic()
     deadline = started + seconds
     next_report = started + 10
 
     while time.monotonic() < deadline:
-        for address in hub.addresses:
+        for address in targets:
             sample = hub.read_one(address)
             entry = stats[address]
             entry["reads"] += 1
@@ -330,133 +377,154 @@ def sample_quality(values: list[float]) -> dict[str, int]:
     }
 
 
-def calibrate(
+def measure_endpoint(
     hub: SoilSensorHub,
-    endpoint: str,
+    address: int,
     seconds: int = 20,
     interval: float = 0.2,
-    state_path=None,
-) -> dict[int, dict[str, object]]:
-    """Sample every sensor and record one calibration endpoint for each.
+    opposite: int | None = None,
+    expect: str = "above",
+    opposite_label: str = "the other end of the scale",
+) -> dict[str, object]:
+    """Sample one probe and decide whether the figure is worth keeping.
 
-    `endpoint` is "dry" (probe in open air) or "wet" (probe in its own pot,
-    soaked and drained to field capacity). The two are separate passes so either
-    can be redone without losing the other.
+    **Writes nothing.** The caller stores the value if `written` comes back
+    true, and that separation is the point: the same sampling and the same
+    three rejection rules now feed three destinations -- a probe's dry point, a
+    soil's field capacity, and one pot's override. Keeping the write out here
+    also means "a rejected run stores nothing" is testable against the state
+    file rather than against a return value.
 
-    Field capacity rather than plain water. Plain water is not a soil state --
-    it holds far more than saturated mix -- so it put the top of the scale
-    somewhere the soil could never reach, which made every reading a fraction
-    of an unreachable number. Field capacity is the wettest a pot actually
-    gets, and it is a state you can create.
-
-    It follows that the wet endpoint belongs to the *mix* as much as to the
-    probe: two pots of different soil need separate passes even with identical
-    sensors.
+    `opposite` is the count at the other end of this probe's scale, and
+    `expect` says which side of it the new figure should land on. None skips
+    that check, for the case where the other end has not been measured yet.
 
     The median is used rather than the mean: it ignores a single outlier read,
     and with hundreds of samples there is no reason to be sensitive to one.
     """
-    if endpoint not in ("dry", "wet"):
-        raise ValueError(f"endpoint must be 'dry' or 'wet', not {endpoint!r}")
+    stats = _collect(hub, seconds, interval, progress=False, addresses=[address])
+    entry = stats[address]
+    values = entry["values"]
+    outcome: dict[str, object] = {
+        "address": address,
+        "reads": entry["reads"],
+        "errors": entry["errors"],
+    }
 
-    existing = state.load_calibration(state_path)
-    stats = _collect(hub, seconds, interval, progress=False)
-    measured_at = datetime.utcnow().isoformat(timespec="seconds")
-
-    results: dict[int, dict[str, object]] = {}
-    for address, entry in stats.items():
-        values = entry["values"]
-        outcome: dict[str, object] = {
-            "address": address,
-            "reads": entry["reads"],
-            "errors": entry["errors"],
-        }
-
-        if not values:
-            outcome.update(
-                written=False,
-                reason=(
-                    "No sensor answered at this address. Check it is plugged "
-                    "into the hub and set to the address it is configured for."
-                ),
-            )
-            results[address] = outcome
-            continue
-
-        quality = sample_quality(values)
-        value = quality["value"]
-        outcome.update(samples=len(values), **quality)
-        # Kept under its old name so the CLI table and the web panel, which
-        # both print a "spread" column, keep working.
-        outcome["spread"] = quality["band"]
-
-        if quality["drift"] > quality["drift_allowed"]:
-            outcome.update(
-                written=False,
-                reason=(
-                    f"Reading moved {quality['drift']} points from the start of the "
-                    f"run to the end, more than the {quality['drift_allowed']} expected "
-                    f"of a settled sensor at this level. It is still taking up water "
-                    "or coming to temperature. Leave it in place for a minute, then "
-                    "run this again."
-                ),
-            )
-            results[address] = outcome
-            continue
-
-        if quality["band"] > quality["band_allowed"]:
-            outcome.update(
-                written=False,
-                reason=(
-                    f"Readings are jumping around by {quality['band']} points, more "
-                    f"than the {quality['band_allowed']} expected at this level. Check "
-                    "the sensor is held still and not touching the side of the "
-                    "container, and run the bus soak test if it persists."
-                ),
-            )
-            results[address] = outcome
-            continue
-
-        # Guard against the obvious operator error: running the wet pass with
-        # the sensors still in air, or the dry pass with them still wet. Either
-        # produces a span that makes the percentage meaningless.
-        other = existing.get(address, {})
-        if endpoint == "wet" and "dry" in other:
-            if value - other["dry"] < MIN_CALIBRATION_SPAN:
-                outcome.update(
-                    written=False,
-                    reason=(
-                        f"Wet reading {value} is only {value - other['dry']} points "
-                        f"above this sensor's dry point of {other['dry']}, and at least "
-                        f"{MIN_CALIBRATION_SPAN} is expected. Is this sensor actually "
-                        "in the water?"
-                    ),
-                )
-                results[address] = outcome
-                continue
-        if endpoint == "dry" and "wet" in other:
-            if other["wet"] - value < MIN_CALIBRATION_SPAN:
-                outcome.update(
-                    written=False,
-                    reason=(
-                        f"Dry reading {value} is only {other['wet'] - value} points "
-                        f"below this sensor's wet point of {other['wet']}, and at least "
-                        f"{MIN_CALIBRATION_SPAN} is expected. Is this sensor dry and "
-                        "out in the air?"
-                    ),
-                )
-                results[address] = outcome
-                continue
-
-        state.save_calibration_point(
-            address,
-            endpoint,
-            value,
-            samples=len(values),
-            measured_at=measured_at,
-            path=state_path,
+    if not values:
+        outcome.update(
+            written=False,
+            reason=(
+                "No sensor answered at this address. Check it is plugged "
+                "into the hub and set to the address it is configured for."
+            ),
         )
-        outcome["written"] = True
+        return outcome
+
+    quality = sample_quality(values)
+    value = quality["value"]
+    outcome.update(samples=len(values), **quality)
+    # Kept under its old name so the CLI table and the web panel, which both
+    # print a "spread" column, keep working.
+    outcome["spread"] = quality["band"]
+
+    if quality["drift"] > quality["drift_allowed"]:
+        outcome.update(
+            written=False,
+            reason=(
+                f"Reading moved {quality['drift']} points from the start of the "
+                f"run to the end, more than the {quality['drift_allowed']} expected "
+                f"of a settled sensor at this level. It is still taking up water "
+                "or coming to temperature. Leave it in place for a minute, then "
+                "run this again."
+            ),
+        )
+        return outcome
+
+    if quality["band"] > quality["band_allowed"]:
+        outcome.update(
+            written=False,
+            reason=(
+                f"Readings are jumping around by {quality['band']} points, more "
+                f"than the {quality['band_allowed']} expected at this level. Check "
+                "the sensor is held still and not touching the side of the "
+                "container, and run the bus soak test if it persists."
+            ),
+        )
+        return outcome
+
+    # The obvious operator error: capturing field capacity with the probe still
+    # in air, or the dry point with it still in wet soil. Either produces a
+    # span that makes every later percentage meaningless.
+    if opposite is not None:
+        gap = value - opposite if expect == "above" else opposite - value
+        if gap < MIN_CALIBRATION_SPAN:
+            outcome.update(
+                written=False,
+                reason=(
+                    f"Reading {value} is only {gap} points {expect} "
+                    f"{opposite_label} of {opposite}, and at least "
+                    f"{MIN_CALIBRATION_SPAN} is expected. Is the probe where you "
+                    "think it is?"
+                ),
+            )
+            return outcome
+
+    outcome["written"] = True
+    return outcome
+
+
+def calibrate(
+    hub: SoilSensorHub,
+    endpoint: str = "dry",
+    seconds: int = 20,
+    interval: float = 0.2,
+    state_path=None,
+) -> dict[int, dict[str, object]]:
+    """Sample every sensor and record its dry point.
+
+    Dry only, and the probe should be in open air. The other end of the scale
+    is field capacity, which is a property of the *mix* rather than of the
+    probe -- two pots of different soil want different figures with identical
+    sensors -- so it is measured per mix and stored on the soil and the pot,
+    not here. The endpoint argument stays so a stale caller gets a readable
+    refusal rather than silently calibrating the wrong thing.
+
+    All four at once, because the probes are in the air together: there is no
+    per-pot state involved, unlike field capacity.
+    """
+    if endpoint != "dry":
+        raise ValueError(
+            f"endpoint must be 'dry', not {endpoint!r}. Field capacity is "
+            "measured per soil mix, not per probe."
+        )
+
+    measured_at = datetime.utcnow().isoformat(timespec="seconds")
+    results: dict[int, dict[str, object]] = {}
+
+    for address in hub.addresses:
+        # The opposite end comes from the hub's field-capacity map, which the
+        # automation layer syncs from the pots. Absent for a pot that has not
+        # been measured, in which case the span check is skipped -- the same
+        # shape as the old "wet not measured yet" path.
+        outcome = measure_endpoint(
+            hub,
+            address,
+            seconds=seconds,
+            interval=interval,
+            opposite=hub.field_capacity.get(address),
+            expect="below",
+            opposite_label="this pot's field capacity",
+        )
+        if outcome.get("written"):
+            state.save_calibration_point(
+                address,
+                "dry",
+                outcome["value"],
+                samples=outcome.get("samples"),
+                measured_at=measured_at,
+                path=state_path,
+            )
         results[address] = outcome
 
     # Apply immediately so a running process reflects the new calibration
@@ -466,23 +534,54 @@ def calibrate(
 
 
 def _print_calibration(hub: SoilSensorHub, state_path=None) -> int:
+    """Both ends of every probe's scale, and where each one came from.
+
+    The two halves no longer come from the same place: dry is measured per
+    probe and lives in moisture_calibration, field capacity is measured per
+    mix and reaches the hub from the pots. Printing them side by side with
+    their provenance is the only way to see a pot that has one and not the
+    other -- which reads as -1 rather than as a percentage.
+    """
     stored = state.load_calibration(state_path)
-    print(f"{'sensor':<20} {'dry':>6} {'wet':>6} {'span':>6}  source")
+    plants = {
+        plant.get("sensor_address"): plant
+        for plant in (state.load_state(state_path).get("plants") or [])
+        if isinstance(plant, dict)
+    }
+
+    print(f"{'sensor':<20} {'dry':>6} {'source':<16} {'capacity':>9} {'span':>6}  from")
     for address in hub.addresses:
-        entry = stored.get(address, {})
-        dry, wet = hub.endpoints_for(address)
-        if not entry:
-            source = "global default"
-        elif "dry" in entry and "wet" in entry:
-            source = "calibrated"
+        dry = hub.dry_for(address)
+        dry_source = "calibrated" if "dry" in stored.get(address, {}) else "MOISTURE_RAW_DRY"
+
+        capacity = hub.field_capacity.get(address)
+        span = hub.span_for(address)
+        if capacity is None:
+            shown, width, origin = "-", "-", "not measured"
         else:
-            missing = "wet" if "dry" in entry else "dry"
-            source = f"half calibrated, {missing} still default"
-        print(f"{label_for(address, state_path=state_path):<20} {dry:>6} {wet:>6} {wet - dry:>6}  {source}")
-    if not stored:
+            shown = str(capacity)
+            width = str(capacity - dry) if span else "too narrow"
+            entry = plants.get(address) or {}
+            source = entry.get("field_capacity_source")
+            if source == "pot":
+                origin = "measured in this pot"
+            elif source == "soil":
+                origin = f"soil {entry.get('field_capacity_soil') or '?'!r}"
+            else:
+                origin = "unknown"
+
         print(
-            "\nNothing calibrated yet. Every sensor is using "
-            "MOISTURE_RAW_DRY/MOISTURE_RAW_WET from .env."
+            f"{label_for(address, state_path=state_path):<20} {dry:>6} "
+            f"{dry_source:<16} {shown:>9} {width:>6}  {origin}"
+        )
+
+    if not stored:
+        print("\nNo dry point measured yet. Every probe is using MOISTURE_RAW_DRY.")
+    if not hub.field_capacity:
+        print(
+            "\nNo field capacity anywhere, so every pot reads -1 and nothing is "
+            "watered automatically. Measure it per soil mix under Plants and "
+            "Soil in the app."
         )
     return 0
 
@@ -507,11 +606,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--calibrate",
-        choices=("dry", "wet"),
+        choices=("dry",),
         help=(
-            "record one calibration endpoint for every sensor. 'dry' with the "
-            "sensors in open air, 'wet' with the prongs in water -- only the "
-            "prongs, up to the marked line, these boards are not waterproof"
+            "record the dry point for every sensor, with the probes in open "
+            "air. The other end of the scale is field capacity, which belongs "
+            "to the soil mix rather than the probe -- measure that under "
+            "Plants and Soil in the app"
         ),
     )
     parser.add_argument(
@@ -539,8 +639,19 @@ if __name__ == "__main__":
     hub = SoilSensorHub(
         addresses=settings.moisture_sensor_addresses_list,
         raw_dry=settings.moisture_raw_dry,
-        raw_wet=settings.moisture_raw_wet,
         calibration=state.load_calibration(),
+        # Taken from the pots, the same way the running service syncs it. The
+        # CLI has no automation instance, so it reads the stored plants
+        # directly -- without this, --show-calibration would report no field
+        # capacity on a planter that has plenty.
+        field_capacity={
+            plant["sensor_address"]: int(plant["field_capacity_raw"])
+            for plant in (state.load_state().get("plants") or [])
+            if isinstance(plant, dict)
+            and isinstance(plant.get("sensor_address"), int)
+            and isinstance(plant.get("field_capacity_raw"), (int, float))
+            and not isinstance(plant.get("field_capacity_raw"), bool)
+        },
     )
 
     if args.show_calibration:
@@ -550,28 +661,10 @@ if __name__ == "__main__":
         sys.exit(_soak(hub, args.soak, args.interval))
 
     if args.calibrate:
-        where = (
-            "in open air"
-            if args.calibrate == "dry"
-            else "in their pots, soaked and drained 24h"
-        )
         print(
-            f"Calibrating the {args.calibrate.upper()} point over {args.seconds}s. "
-            f"All {len(hub.addresses)} sensors should be {where}."
+            f"Calibrating the DRY point over {args.seconds}s. All "
+            f"{len(hub.addresses)} sensors should be in open air."
         )
-        if args.calibrate == "wet":
-            print(
-                """Field capacity, not a glass of water: soak the pot
-through, let it drain for 24h, then run this with the probe where it
-normally sits. That is the wettest the soil actually gets.
-
-Water in a glass holds far more than soil can, and calibrating against it
-puts the top of the scale somewhere the pot can never reach.
-
-This endpoint belongs to the soil mix as much as to the probe, so run it
-again after repotting into something different.
-"""
-            )
         results = calibrate(hub, args.calibrate, args.seconds, args.interval)
 
         print(f"\n{'sensor':<20} {'value':>6} {'spread':>7} {'samples':>8}  result")
@@ -580,7 +673,7 @@ again after repotting into something different.
             if outcome.get("written"):
                 print(
                     f"{label_for(address):<20} {outcome['value']:>6} {outcome['spread']:>7} "
-                    f"{outcome['samples']:>8}  stored as {args.calibrate}"
+                    f"{outcome['samples']:>8}  stored as dry"
                 )
             else:
                 failures += 1

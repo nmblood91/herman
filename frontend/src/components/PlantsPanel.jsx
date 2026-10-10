@@ -110,6 +110,8 @@ export function PlantsPanel({
   profiles,
   onLoadProfile,
   soils,
+  onMeasureFieldCapacity,
+  onClearFieldCapacity,
 }) {
   const [drafts, setDrafts] = useState({})
   // Which saved plant each card has picked, keyed by plant so one card's
@@ -389,6 +391,51 @@ export function PlantsPanel({
                       <button type="button" onClick={() => capturePosition(plant)}>
                         Use current position for {plant.name}
                       </button>
+                      <p className="field-hint">
+                        {plant.field_capacity_raw != null ? (
+                          <>
+                            Field capacity reads{' '}
+                            <strong>{plant.field_capacity_raw}</strong> here
+                            {plant.field_capacity_source === 'pot'
+                              ? ', measured in this pot'
+                              : plant.field_capacity_soil
+                                ? `, from ${plant.field_capacity_soil}`
+                                : ''}
+                            . That is the top of this pot's moisture scale.
+                          </>
+                        ) : (
+                          <span className="warning">
+                            No field capacity, so this pot reads nothing and is
+                            never watered automatically. Measure it for the mix
+                            in the Soils panel below, or for this pot alone
+                            here.
+                          </span>
+                        )}
+                      </p>
+                      <div className="motion-grid two-up">
+                        <button
+                          type="button"
+                          onClick={() => onMeasureFieldCapacity(plant.plant_id)}
+                        >
+                          Measure this pot (20s)
+                        </button>
+                        {plant.field_capacity_source === 'pot' && (
+                          <button
+                            type="button"
+                            onClick={() => onClearFieldCapacity(plant.plant_id)}
+                          >
+                            Use the mix's figure instead
+                          </button>
+                        )}
+                      </div>
+                      <p className="field-hint">
+                        Only worth doing if this pot disagrees with the rest.
+                        The mix's figure is measured once and shared, because
+                        probes of the same kind read closely enough that one
+                        good reading beats four nobody took. Soak the pot
+                        through and let it drain 24 hours first.
+                      </p>
+
                       <p className="field-hint">
                         LEDs {plant.led_start_index}–{plant.led_end_index} of the
                         strip light this pot. Shared out evenly by the app from

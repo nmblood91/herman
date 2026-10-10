@@ -11,6 +11,11 @@ from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyErr
 
 settings.auto_watering_enabled = True
 
+# The top of the scale, matching what give_every_plant_soil measures. This was
+# settings.moisture_raw_wet, which no longer exists: field capacity is measured
+# per soil mix now rather than configured per probe.
+FIELD_CAPACITY = 800
+
 
 class FakeHub:
     # Borrows the real conversion rather than copying it. The copy that used to
@@ -19,9 +24,10 @@ class FakeHub:
     # divide-by-zero guard -- meaning these tests were exercising the test's
     # arithmetic instead of the shipped function.
     raw_dry = settings.moisture_raw_dry
-    raw_wet = settings.moisture_raw_wet
-    calibration = {}
-    endpoints_for = SoilSensorHub.endpoints_for
+    calibration: dict = {}
+    field_capacity: dict = {}
+    dry_for = SoilSensorHub.dry_for
+    span_for = SoilSensorHub.span_for
     raw_to_percent = SoilSensorHub.raw_to_percent
 
     def __init__(self, raw):
@@ -101,21 +107,21 @@ assert len(pump.calls) == 2, f"expected watering after cooldown, got {pump.calls
 print("ok: waters again once cooldown expires")
 
 # 4. wet soil never waters
-auto, pump = build(settings.moisture_raw_wet)
+auto, pump = build(FIELD_CAPACITY)
 for _ in range(15):
     auto.tick()
 assert pump.calls == [], f"watered wet soil: {pump.calls}"
-assert auto.smoothed_percent(0x36) == 100.0
+assert auto.percent_for_plant(auto.plant_for_address(0x36)) == 100.0
 print("ok: saturated soil is left alone")
 
 # 5. averaging reflects the window, not the last read
 auto, pump = build(settings.moisture_raw_dry)
 for _ in range(5):
     auto.tick()
-auto.sensor_hub.raw = settings.moisture_raw_wet
+auto.sensor_hub.raw = FIELD_CAPACITY
 for _ in range(5):
     auto.tick()
-avg = auto.smoothed_percent(0x36)
+avg = auto.percent_for_plant(auto.plant_for_address(0x36))
 assert 45 < avg < 55, f"expected mid-range average, got {avg}"
 print(f"ok: rolling average smooths a step change -> {avg}%")
 
@@ -139,7 +145,7 @@ assert len(auto._history[0x36]) == 0, "tick polled while hardware was busy"
 print("ok: tick skips instead of blocking")
 
 # 8. missing sensors never enter the average or trigger watering
-assert auto.smoothed_percent(0x37) == -1.0
+assert auto.percent_for_plant(auto.plant_for_address(0x37)) == -1.0
 print("ok: absent sensor reports -1 and is excluded")
 
 # 9. a sensor read that raises must not kill the loop

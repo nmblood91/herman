@@ -250,8 +250,9 @@ content. **Only their ratio transfers**: it is dimensionless, so a published
 figure applies to any pot of that mix, and it is what says where the bottom of
 the usable range sits. The absolute figures do *not* convert into raw sensor
 counts — that needs a response curve for the specific medium — which is why
-`--calibrate wet` still measures field capacity in the actual pot. The library
-supplies the *shape* of the window, calibration supplies its *position*.
+field capacity is also **measured** per mix, in raw sensor counts, from a real
+pot. The published figures supply the *shape* of the usable window; the
+measurement supplies its *position* on the scale a probe reports.
 
 | Mix | Field capacity | Wilting point | Usable |
 |---|---|---|---|
@@ -268,8 +269,39 @@ loam's. Wettest on paper is not most forgiving in practice.
 Two caveats. Mineral-soil figures come from standard tensions and are settled;
 container substrates are not, varying by manufacturer and by how firmly they
 were packed. And mixes **lose capacity as they age and compact** — unused peat
-holds measurably more than the same mix after a season — so re-run
-`--calibrate wet` after a repot rather than trusting the old endpoint.
+holds measurably more than the same mix after a season — so re-measure after a
+repot rather than trusting the old figure.
+
+### Measuring a mix's field capacity
+
+Plants and Soil → Soils. Soak a pot of the mix through, let it drain 24 hours,
+pick which pot's probe to read it with, and press Measure.
+
+```bash
+curl -X POST http://herman.local/api/v1/soils/Coco%20coir/field-capacity \
+  -H 'Content-Type: application/json' -d '{"plant_id":"plant_2","seconds":20}'
+```
+
+**Once per mix, not once per pot.** Probes of the same kind read closely enough
+that one good figure beats four nobody got round to taking, so the result is
+copied onto every pot filled with that mix. A pot that disagrees can measure
+its own on its card, which overrides the mix's for that pot; assigning a
+different mix drops the override, since a reading taken in coir says nothing
+about cactus mix.
+
+**This moved off the probe, and the old per-address wet endpoint is gone.** It
+recorded a wet reading with no note of which mix it was taken against, so two
+pots of different soil wanted different figures and there was nowhere to put
+them. Files written by older builds keep their `wet` keys; they are never read
+and never rewritten. Nothing is migrated, because there is no honest derivation
+— the old figure could have been taken in any mix, and the pot may have been
+repotted since.
+
+**A pot with no field capacity reads -1 and is never watered automatically**,
+the same as an unplugged probe. The status bar names the mixes and pots waiting
+on a measurement. There is deliberately no fallback: a placeholder would give
+an unmeasured pot a plausible percentage against a number nobody took, which is
+the one error in this system that nothing downstream can catch.
 
 An unknown soil name is refused rather than stored, since a mix that is not in
 the library supplies no ratio and would read as "set" while behaving exactly

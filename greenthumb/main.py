@@ -434,6 +434,11 @@ async def list_plants() -> list[dict[str, object]]:
             "watering_mode": plant.watering_mode,
             "sweep_min_mm": plant.sweep_min_mm,
             "sweep_max_mm": plant.sweep_max_mm,
+            "notes": plant.notes,
+            "field_capacity_raw": plant.field_capacity_raw,
+            "field_capacity_source": plant.field_capacity_source,
+            "field_capacity_soil": plant.field_capacity_soil,
+            "field_capacity_measured_at": plant.field_capacity_measured_at,
             "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
             "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
             "moisture_target": plant.moisture_target,
@@ -491,6 +496,32 @@ def save_soil(payload: dict[str, object] = Body(default_factory=dict)) -> dict[s
         f"{result['soil']['field_capacity_vwc']}% VWC, wilting point "
         f"{result['soil']['wilting_point_vwc']}%"
     )
+    return result
+
+
+@app.post(f"{settings.api_prefix}/soils/{{name}}/field-capacity")
+def calibrate_soil_field_capacity(
+    name: str, payload: dict[str, object] = Body(default_factory=dict)
+) -> dict[str, object]:
+    """Measure a mix's field capacity using one pot's probe.
+
+    Expects {"plant_id": "plant_2", "seconds": 20}. plant_id names only which
+    probe to read -- the figure lands on the mix, and is copied onto every pot
+    filled with it that has not measured its own.
+    """
+    result = automation.calibrate_soil_field_capacity(
+        name,
+        str(payload.get("plant_id", "")),
+        int(payload.get("seconds", 20) or 20),
+    )
+    if result.get("written"):
+        log_event(
+            f"Field capacity for {result['soil']} is {result['value']}, measured "
+            f"on {result['measured_with']}, applied to "
+            f"{len(result.get('inherited_by') or [])} pot(s)"
+        )
+    else:
+        log_event(f"Field capacity for {name} not stored: {result.get('reason')}")
     return result
 
 
@@ -605,6 +636,29 @@ async def set_plant_position(plant_id: str, payload: dict[str, float] = Body(def
     position_mm = float(payload.get("position_mm", 0.0))
     result = automation.set_plant_position(plant_id, position_mm)
     log_event(f"Plant {plant_id} position set to {position_mm} mm")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/field-capacity")
+def calibrate_plant_field_capacity(
+    plant_id: str, payload: dict[str, object] = Body(default_factory=dict)
+) -> dict[str, object]:
+    """Measure field capacity for one pot, overriding what it inherited."""
+    result = automation.calibrate_plant_field_capacity(
+        plant_id, int(payload.get("seconds", 20) or 20)
+    )
+    if result.get("written"):
+        log_event(f"Field capacity for {plant_id} is {result['value']}, measured in the pot")
+    else:
+        log_event(f"Field capacity for {plant_id} not stored: {result.get('reason')}")
+    return result
+
+
+@app.delete(f"{settings.api_prefix}/plants/{{plant_id}}/field-capacity")
+def clear_plant_field_capacity(plant_id: str) -> dict[str, object]:
+    """Drop a pot's own figure and go back to inheriting from its mix."""
+    result = automation.clear_plant_field_capacity(plant_id)
+    log_event(f"Cleared the measured field capacity on {plant_id}")
     return result
 
 
