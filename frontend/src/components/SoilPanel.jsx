@@ -23,22 +23,25 @@ export function SoilPanel({ soils, plants, onRefresh }) {
   // the plant editor, and for the same reason: there was no way to edit an
   // existing mix's figures short of retyping its name exactly and hoping the
   // overwrite landed on the right one.
+  //
+  // There is also no standing list of every mix any more, same as the plant
+  // editor has none of every plant: this is a single-entity editor, and
+  // "what exists" is the dropdown's job.
   const [mode, setMode] = useState('new')
   const [picked, setPicked] = useState('')
   const [form, setForm] = useState(BLANK)
   const [message, setMessage] = useState('')
 
-  // Which probe each mix will be measured with. One figure per mix is enough:
-  // probes of the same kind read closely enough that a good reading from any
-  // of them beats four nobody got round to taking. A pot that wants better
-  // measures its own, on its card. Per-list-item rather than part of the
-  // edit form below: measuring is a hardware action against whichever mix
-  // needs it, not a field you fill in and save.
-  const [probe, setProbe] = useState({})
-  const [measuring, setMeasuring] = useState('')
+  // Which pot's probe to measure the picked mix with. Not keyed by name --
+  // only one mix is ever in view at a time now -- and defaulting to the
+  // first pot rather than forcing a pick, the way the field capacity button
+  // on a pot's own card does.
+  const [probe, setProbe] = useState('')
+  const [measuring, setMeasuring] = useState(false)
 
   const list = soils ?? []
   const pots = plants ?? []
+  const pickedSoil = list.find((soil) => soil.name === picked)
 
   // The list already carries every field, so the form fills from the prop
   // rather than fetching the entry again. Synced during render, not in an
@@ -46,14 +49,13 @@ export function SoilPanel({ soils, plants, onRefresh }) {
   const [syncedPick, setSyncedPick] = useState('')
   if (picked !== syncedPick) {
     setSyncedPick(picked)
-    const entry = list.find((soil) => soil.name === picked)
     setForm(
-      entry
+      pickedSoil
         ? {
-            name: entry.name,
-            capacity: String(entry.field_capacity_vwc ?? ''),
-            wilting: String(entry.wilting_point_vwc ?? ''),
-            notes: entry.notes ?? '',
+            name: pickedSoil.name,
+            capacity: String(pickedSoil.field_capacity_vwc ?? ''),
+            wilting: String(pickedSoil.wilting_point_vwc ?? ''),
+            notes: pickedSoil.notes ?? '',
           }
         : BLANK,
     )
@@ -82,14 +84,14 @@ export function SoilPanel({ soils, plants, onRefresh }) {
     setMessage('')
   }
 
-  const measure = async (soilName) => {
-    const plantId = probe[soilName] || pots[0]?.plant_id
+  const measure = async () => {
+    const plantId = probe || pots[0]?.plant_id
     if (!plantId) return
     setMessage('')
-    setMeasuring(soilName)
+    setMeasuring(true)
     try {
       const response = await fetch(
-        `${API_BASE}/soils/${encodeURIComponent(soilName)}/field-capacity`,
+        `${API_BASE}/soils/${encodeURIComponent(picked)}/field-capacity`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -109,7 +111,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
       }
       const applied = data.inherited_by ?? []
       setMessage(
-        `${soilName} reads ${data.value} at field capacity, measured with ` +
+        `${picked} reads ${data.value} at field capacity, measured with ` +
           `${data.measured_with}. ` +
           (applied.length
             ? `Applied to ${applied.join(', ')}.`
@@ -119,7 +121,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
     } catch (error) {
       setMessage(`Could not measure: ${error.message}`)
     } finally {
-      setMeasuring('')
+      setMeasuring(false)
     }
   }
 
@@ -201,72 +203,6 @@ export function SoilPanel({ soils, plants, onRefresh }) {
 
       <div className="general-settings-form">
         <div className="field-row">
-          {list.length ? (
-            <ul className="soil-list">
-              {list.map((soil) => (
-                <li key={soil.name}>
-                  <span>
-                    <strong>{soil.name}</strong>
-                    <small>
-                      field capacity {soil.field_capacity_vwc}% &middot; wilting{' '}
-                      {soil.wilting_point_vwc}% &middot; {soil.available_points} pts usable
-                    </small>
-                    {soil.field_capacity_raw != null ? (
-                      <small>
-                        reads {soil.field_capacity_raw} at field capacity
-                        {soil.field_capacity_measured_at
-                          ? `, measured ${soil.field_capacity_measured_at.slice(0, 10)}`
-                          : ''}
-                      </small>
-                    ) : (
-                      <small className="warning">
-                        not measured — pots of this mix read nothing and are never
-                        watered automatically
-                      </small>
-                    )}
-                    {soil.notes && <small>{soil.notes}</small>}
-                    <span className="soil-capacity">
-                      <select
-                        aria-label={`Probe to measure ${soil.name} with`}
-                        value={probe[soil.name] ?? pots[0]?.plant_id ?? ''}
-                        onChange={(event) =>
-                          setProbe((current) => ({
-                            ...current,
-                            [soil.name]: event.target.value,
-                          }))
-                        }
-                      >
-                        {pots.map((pot) => (
-                          <option key={pot.plant_id} value={pot.plant_id}>
-                            {pot.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        disabled={Boolean(measuring) || !pots.length}
-                        onClick={() => measure(soil.name)}
-                      >
-                        {measuring === soil.name
-                          ? 'Measuring…'
-                          : 'Measure field capacity'}
-                      </button>
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="field-hint warning">
-              No mixes. The installer adds a starting set, so this means they
-              were all removed — add your own below, or put the set back with{' '}
-              <code>python -m greenthumb.soil_library --install</code> on the
-              Pi. Until a pot has a soil it is never watered automatically.
-            </p>
-          )}
-        </div>
-
-        <div className="field-row">
           <div className="plant-editor-mode">
             <button
               type="button"
@@ -284,6 +220,14 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               Saved Soil
             </button>
           </div>
+          {!list.length && (
+            <p className="field-hint warning">
+              No mixes. The installer adds a starting set, so this means they
+              were all removed — add your own below, or put the set back with{' '}
+              <code>python -m greenthumb.soil_library --install</code> on the
+              Pi. Until a pot has a soil it is never watered automatically.
+            </p>
+          )}
         </div>
 
         <div className="field-row">
@@ -336,6 +280,45 @@ export function SoilPanel({ soils, plants, onRefresh }) {
             </label>
           </div>
         </div>
+
+        {/* Measured, not typed -- so it lives beside the picker rather than
+            inside the field grid above, the same way a pot's own field
+            capacity sits apart from the care settings on its card. Only
+            shown once a mix is picked: a brand new one has nothing in the
+            database yet to attach a measurement to. */}
+        {mode === 'existing' && picked && (
+          <div className="field-row">
+            <p className={pickedSoil?.field_capacity_raw != null ? 'field-hint' : 'field-hint warning'}>
+              {pickedSoil?.field_capacity_raw != null ? (
+                <>
+                  Field capacity reads <strong>{pickedSoil.field_capacity_raw}</strong>
+                  {pickedSoil.field_capacity_measured_at
+                    ? `, measured ${pickedSoil.field_capacity_measured_at.slice(0, 10)}`
+                    : ''}
+                  .
+                </>
+              ) : (
+                'Not measured. Pots of this mix read nothing and are never watered automatically.'
+              )}
+            </p>
+            <div className="soil-capacity">
+              <select
+                aria-label={`Probe to measure ${picked} with`}
+                value={probe || pots[0]?.plant_id || ''}
+                onChange={(event) => setProbe(event.target.value)}
+              >
+                {pots.map((pot) => (
+                  <option key={pot.plant_id} value={pot.plant_id}>
+                    {pot.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" disabled={measuring || !pots.length} onClick={measure}>
+                {measuring ? 'Measuring…' : 'Measure field capacity'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="field-row">
           <label>
