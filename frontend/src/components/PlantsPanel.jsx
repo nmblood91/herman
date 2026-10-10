@@ -12,6 +12,23 @@ const draftFrom = (plant) => ({
   sweep_max_mm: plant.sweep_max_mm ?? 0,
 })
 
+// "Plant 2: Basil" rather than "Basil". Everything physical about a card is
+// per pot -- the probe address, the LED range, the rail coordinate -- so the
+// header has to say which pot before it says what is growing in it, or there
+// is nothing tying the card to the planter in front of you.
+//
+// The number comes from plant_id rather than the array index. Identical today,
+// but the id is the identity the API and the state file key on, so a reordered
+// list cannot relabel a pot.
+const cardTitle = (plant) => {
+  const matched = /(\d+)$/.exec(plant.plant_id ?? '')
+  const pot = matched ? `Plant ${matched[1]}` : plant.plant_id || 'Plant'
+  const name = (plant.name ?? '').trim()
+  // A pot nobody has renamed is already called "Plant 1", and "Plant 1: Plant
+  // 1" reads as a bug rather than as a pot awaiting a name.
+  return !name || name === pot ? pot : `${pot}: ${name}`
+}
+
 // Mirrors greenthumb.sweep.MIN_SPAN_MM, and only for the hint below: the
 // planter refuses a narrower span itself, so this number being stale would
 // show a misleading warning rather than let a bad span through.
@@ -221,7 +238,7 @@ export function PlantsPanel({
                 onClick={() => togglePlantExpanded(plant.plant_id)}
                 aria-expanded={isExpanded}
               >
-                <span>{plant.name}</span>
+                <span>{cardTitle(plant)}</span>
                 <span className="plant-reading">
                   <strong className={reading.warn ? 'warn' : reading.dry ? 'dry' : undefined}>
                     {reading.text}
