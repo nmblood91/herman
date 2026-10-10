@@ -13,6 +13,7 @@ import { LedStripPanel } from './components/LedStripPanel'
 import { LogsPanel } from './components/LogsPanel'
 import './App.css'
 import { API_BASE } from './api'
+import { formatClock } from './time'
 
 const fetchJson = async (path, options = {}) => {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -209,8 +210,9 @@ function App() {
       // everything describing the pot itself stays put.
       setStatus(
         `Loaded ${result.name}: waters at ${result.moisture_target}, ` +
-          `${result.watering_volume_ml} mL, lights ${result.light_start_time}` +
-          `–${result.light_stop_time}. The pot keeps its location ` +
+          `${result.watering_volume_ml} mL, lights ` +
+          `${formatClock(result.light_start_time)}–` +
+          `${formatClock(result.light_stop_time)}. The pot keeps its location ` +
           `(${result.position_mm} mm) and its soil ` +
           `(${result.soil || 'not set'}).`,
       )
