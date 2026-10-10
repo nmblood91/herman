@@ -518,13 +518,14 @@ export function PlantsPanel({
                       ) : (
                         <>
                           <p className="field-hint warning">
-                            Not set. This pot is never watered automatically.
+                            Not set. This soil needs to have Field Capacity set
+                            to be watered automatically.
                           </p>
-                          <ol className="field-hint steps">
-                            <li>Water until it drains from the bottom.</li>
-                            <li>Wait 24 hours.</li>
-                            <li>Calibrate.</li>
-                          </ol>
+                          <p className="field-hint">
+                            To find Field Capacity, soak planter until it
+                            drains from the bottom. Wait 24 hours and calibrate
+                            using button below.
+                          </p>
                           <div className="motion-grid">
                             <button
                               type="button"
