@@ -153,33 +153,17 @@ def gcode_for(steps: list[tuple[float, int, int]]) -> str:
     return "\n".join(lines)
 
 
-def estimated_seconds(steps: list[tuple[float, int, int]], start_mm: float = 0.0) -> float:
-    """Roughly how long a routine takes, for the UI to say so before running.
+def catalogue() -> list[dict]:
+    """Every routine, with what it does.
 
-    Distance over feedrate, ignoring acceleration, so it reads slightly short
-    on the snappier routines. Close enough to set an expectation.
+    Names and descriptions only, so this needs neither the rail length nor the
+    plant positions: the routines are the same list whatever the rail measures.
     """
-    total = 0.0
-    here = start_mm
-    for position, feedrate, dwell_ms in steps:
-        total += abs(position - here) / (feedrate / 60.0)
-        total += dwell_ms / 1000.0
-        here = position
-    return round(total, 1)
-
-
-def catalogue(travel_mm: float, plant_positions: list[float] | None = None) -> list[dict]:
-    """Every routine, with what it does and how long it takes."""
-    entries = []
-    for name in DEFAULT_ORDER:
-        dance = DANCES[name]
-        steps = steps_for(name, travel_mm, plant_positions)
-        entries.append(
-            {
-                "name": name,
-                "title": dance.title,
-                "description": dance.description,
-                "estimated_seconds": estimated_seconds(steps),
-            }
-        )
-    return entries
+    return [
+        {
+            "name": name,
+            "title": DANCES[name].title,
+            "description": DANCES[name].description,
+        }
+        for name in DEFAULT_ORDER
+    ]

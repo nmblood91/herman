@@ -167,7 +167,7 @@ export function ControlsPanel({
 
   const runDance = async (dance) => {
     setDancing(dance.name)
-    setDanceStatus(`${dance.title}, about ${Math.round(dance.estimated_seconds)}s...`)
+    setDanceStatus(`${dance.title}...`)
     try {
       const response = await fetch(`${API_BASE}/dances/run/${dance.name}`, { method: 'POST' })
       const data = await response.json().catch(() => ({}))
@@ -234,7 +234,6 @@ export function ControlsPanel({
                 onClick={() => runDance(dance)}
               >
                 {dance.title}
-                <small> · {Math.round(dance.estimated_seconds)}s</small>
               </button>
             ))}
           </div>

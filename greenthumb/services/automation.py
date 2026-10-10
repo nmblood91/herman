@@ -1829,7 +1829,6 @@ class GreenThumbAutomation:
         steps = dances.steps_for(
             name, self.usable_travel_mm(), [plant.position_mm for plant in self.plants]
         )
-        seconds = dances.estimated_seconds(steps)
 
         with self._exclusive(f"Dance {name}"):
             status = self.klipper.status()
@@ -1857,7 +1856,7 @@ class GreenThumbAutomation:
         # A routine you asked for also resets the clock, so pressing the
         # button does not get followed by an automatic one a minute later.
         self._last_idle_motion = datetime.now()
-        return {"ok": True, "dance": name, "seconds": seconds}
+        return {"ok": True, "dance": name}
 
     def _maybe_home_on_startup(self) -> None:
         """Home once, the first time the loop gets a chance.
@@ -1972,10 +1971,9 @@ class GreenThumbAutomation:
         }
 
     def dance_catalogue(self) -> list[dict]:
-        """The routines, with durations. Asks Klipper for the rail length."""
-        return dances.catalogue(
-            self.usable_travel_mm(), [plant.position_mm for plant in self.plants]
-        )
+        """The routines and what they do. No Klipper round trip -- the list
+        does not depend on the rail length."""
+        return dances.catalogue()
 
     def home_gantry(self) -> dict[str, object]:
         with self._exclusive("Homing gantry"):
