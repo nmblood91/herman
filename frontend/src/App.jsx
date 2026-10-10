@@ -2,10 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TopBar } from './components/TopBar'
 import { TabBar } from './components/TabBar'
 import { ControlsPanel } from './components/ControlsPanel'
-import { SettingsPanel } from './components/SettingsPanel'
+import { AutomationPanel } from './components/AutomationPanel'
 import { PlantsPanel } from './components/PlantsPanel'
+import { SoilsPanel } from './components/SoilsPanel'
 import { HistoryPanel } from './components/HistoryPanel'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
+import { CalibrationPanel } from './components/CalibrationPanel'
+import { LedStripPanel } from './components/LedStripPanel'
+import { LogsPanel } from './components/LogsPanel'
 import './App.css'
 import { API_BASE } from './api'
 
@@ -323,11 +327,9 @@ function App() {
             soils={soils}
             bands={bands}
           />
-          {/* Below the cards on purpose. The cards carry each plant's current
-              reading and are what you act on; the chart is the trend you
-              consult afterwards. It also fetches its own data, so changing a
-              range does not reload the cards. */}
-          <HistoryPanel />
+          {/* Below the cards, because a mix is picked from the dropdown on a
+              card: the library and the pots that use it belong on one tab. */}
+          <SoilsPanel soils={soils} onRefresh={loadDashboard} />
         </>
       )}
 
@@ -346,11 +348,27 @@ function App() {
         />
       )}
 
-      {activeTab === 'diagnostics' && <DiagnosticsPanel />}
-
-      {activeTab === 'settings' && (
-        <SettingsPanel overview={overview} onRefresh={loadDashboard} />
+      {activeTab === 'automation' && (
+        <AutomationPanel overview={overview} onRefresh={loadDashboard} />
       )}
+
+      {/* Checks first, then the three calibrations, then the log. All of these
+          fetch their own data, so running one does not reload the rest of the
+          dashboard -- which is why they can be mounted side by side here
+          rather than nested inside one another as Calibration and Logs were. */}
+      {activeTab === 'calibration' && (
+        <>
+          <DiagnosticsPanel />
+          <CalibrationPanel />
+          <LedStripPanel overview={overview} />
+          <LogsPanel />
+        </>
+      )}
+
+      {/* Its own tab now. It was below the plant cards, but that tab also
+          carries the soil library and the cards themselves, and the chart is
+          the thing you consult afterwards rather than act on. */}
+      {activeTab === 'history' && <HistoryPanel />}
     </div>
   )
 

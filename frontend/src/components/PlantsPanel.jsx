@@ -279,13 +279,14 @@ export function PlantsPanel({
                   </div>
 
                   <p className="field-hint">
-                    Saving stores these settings under the plant name, replacing
-                    anything saved under that name already. Loading copies a
-                    saved plant onto this one — <strong>not</strong> its
-                    watering location, which belongs to the pot rather than to
-                    the plant.
+                    Saving stores <em>This plant</em> under the plant name,
+                    replacing anything saved under that name already. Loading
+                    copies a saved plant onto this one. Everything under{' '}
+                    <em>This pot</em> stays where it is — those describe the pot
+                    and the rail, so a saved plant cannot carry them.
                   </p>
 
+                  <h4 className="card-group-title">This plant</h4>
                   <div className="field-grid">
                     <label>
                       Plant name
@@ -338,6 +339,29 @@ export function PlantsPanel({
                         }
                       />
                     </label>
+                  </div>
+
+                  <h4 className="card-group-title">This pot</h4>
+                  <div className="field-grid">
+                    <label>
+                      Soil
+                      <select
+                        value={draft.soil}
+                        onChange={(event) => updateDraft(plant.plant_id, 'soil', event.target.value)}
+                      >
+                        <option value="">
+                          {soilList.length ? 'Not set' : 'No soils installed'}
+                        </option>
+                        {soilList.map((soil) => (
+                          <option key={soil.name} value={soil.name}>
+                            {soil.name}
+                            {soil.available_points != null
+                              ? ` — ${soil.available_points} pts usable`
+                              : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <label>
                       Watering location (mm)
                       <input
@@ -360,25 +384,6 @@ export function PlantsPanel({
                         <option value="sweep">
                           Sweep back and forth across a span
                         </option>
-                      </select>
-                    </label>
-                    <label>
-                      Soil
-                      <select
-                        value={draft.soil}
-                        onChange={(event) => updateDraft(plant.plant_id, 'soil', event.target.value)}
-                      >
-                        <option value="">
-                          {soilList.length ? 'Not set' : 'No soils installed'}
-                        </option>
-                        {soilList.map((soil) => (
-                          <option key={soil.name} value={soil.name}>
-                            {soil.name}
-                            {soil.available_points != null
-                              ? ` — ${soil.available_points} pts usable`
-                              : ''}
-                          </option>
-                        ))}
                       </select>
                     </label>
 
@@ -433,6 +438,11 @@ export function PlantsPanel({
                       <button type="button" onClick={() => capturePosition(plant)}>
                         Use current position for {plant.name}
                       </button>
+                      <p className="field-hint">
+                        LEDs {plant.led_start_index}–{plant.led_end_index} of the
+                        strip light this pot. Shared out evenly by the app from
+                        the strip length, so there is nothing to set.
+                      </p>
                       <p className="field-hint">
                         Jog the carriage until the nozzle is over this pot, then
                         press. Fills the field above — nothing is stored until

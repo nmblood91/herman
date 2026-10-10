@@ -290,7 +290,7 @@ everything, but it will not run the pump on its own until someone deliberately
 enables it. Everything described above is what happens *once it's on*.
 
 Turn it on with **Water plants automatically**, the first control in the
-Settings tab. The choice is saved on the planter and survives a restart, so it
+Automation tab. The choice is saved on the planter and survives a restart, so it
 only has to be made once. While it is off the status bar says *"Watching only.
 Automatic watering is switched off."* — which is how you tell that state apart
 from quiet hours or a snooze, both of which read as *paused* instead.

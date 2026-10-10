@@ -246,7 +246,7 @@ An unknown soil name is refused rather than stored, since a mix that is not in
 the library supplies no ratio and would read as "set" while behaving exactly
 like "not set".
 
-**Add your own mix** in the Soils group on the Settings tab, or over the API:
+**Add your own mix** in the Soils panel on the Plants and Soil tab, or over the API:
 
 ```bash
 curl -X POST http://herman.local/api/v1/soils -H 'Content-Type: application/json'   -d '{"name":"My potting mix","field_capacity_vwc":30,"wilting_point_vwc":14}'
@@ -412,7 +412,7 @@ and `spidev`, so they run on a development machine with no hardware attached.
 | Camera | API only — Camera Module 3 Wide via rpicam-vid, MJPEG over HTTP. An optional add-on, with no UI and no timelapse |
 
 Automatic watering is disabled by default. Turn it on with **Water plants
-automatically** in the Settings tab; the choice persists across restarts.
+automatically** in the Automation tab; the choice persists across restarts.
 `AUTO_WATERING_ENABLED` only sets the value a planter starts life with, and a
 saved choice overrides it.
 
@@ -421,7 +421,7 @@ converts a requested volume into a pump run time.
 
 ### Measuring the pump flow rate
 
-Diagnostics → Pump. Press **Run calibration**, weigh what comes out, and type
+Calibration → Pump. Press **Run calibration**, weigh what comes out, and type
 the millilitres in; the planter divides by the run it timed itself. This is the
 only control in the app that runs the pump directly -- watering a plant asks for
 a measured volume, so it stays on the Controls tab.

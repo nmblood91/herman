@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
-import { CalibrationPanel } from './CalibrationPanel'
-import { LogsPanel } from './LogsPanel'
 
-// Everything you reach for when something looks wrong, in one place rather
-// than spread across Settings and the old Sensors tab.
+// The checks you run when something looks wrong: the home switch, the clock,
+// the running version, and the pump's flow rate.
 //
-// Ordered as checks you run, then references you read: the switch test and the
-// version first, then the two calibrations -- pump flow and the moisture
-// probes -- and the log last.
+// Mounted first on the Calibration tab, ahead of the moisture probes, the LED
+// strip and the log. Those are siblings now rather than children of this
+// panel -- each fetches its own data, so nesting them bought nothing and hid
+// where they lived.
 export function DiagnosticsPanel() {
   // Home switch. Not polled on mount: reading it takes the gantry lock, so a
   // background poll would collide with the control loop and with every
@@ -259,7 +258,7 @@ export function DiagnosticsPanel() {
   return (
     <>
       <section className="panel-section">
-        <h2>Diagnostics</h2>
+        <h2>Hardware checks</h2>
 
         <div className="general-settings-form">
           <div className="field-row">
@@ -465,10 +464,6 @@ export function DiagnosticsPanel() {
         </div>
       </section>
 
-      {/* Both fetch their own data, so running a calibration does not reload
-          the rest of the dashboard. */}
-      <CalibrationPanel />
-      <LogsPanel />
     </>
   )
 }

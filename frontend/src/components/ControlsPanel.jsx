@@ -328,8 +328,9 @@ export function ControlsPanel({
           )}
 
           <p className="field-hint">
-            Lighting applies as you change it. Strip type and colour order are in
-            Settings.
+            Lighting applies as you change it. Strip type and colour order are
+            under Calibration — they are facts about the strip you soldered on,
+            not things you change day to day.
           </p>
 
           {lighting && lighting.spi_ready === false && (

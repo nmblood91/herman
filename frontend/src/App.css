@@ -433,6 +433,22 @@ option {
   width: min(220px, 100%);
 }
 
+/* Splits the expanded card into what a saved plant carries and what stays
+   with the pot. Nothing on screen said which was which, so there was no way to
+   tell that loading a saved plant would not move the nozzle. */
+.card-group-title {
+  margin: 18px 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8bcf9f;
+}
+
+.plant-card .card-group-title:first-of-type {
+  margin-top: 4px;
+}
+
 /* The two ends of a sweep, side by side so the span reads as one thing. */
 .sweep-fields {
   display: grid;

@@ -958,7 +958,7 @@ answered). Unknown is deliberately distinct from a failure: "we did not look" an
 
 ## Wiring the LED Strip
 
-Supported strips, selectable as **LED strip type** in the Settings tab:
+Supported strips, selectable as **LED strip type** in the Calibration tab:
 
 All 12V. A 5V strip is deliberately not supported: sixty 5V pixels pull about
 3.6A, well past what the 12V-to-5V converter can give on top of the Pi.
@@ -1117,7 +1117,7 @@ almost none. So:
 
 ### Testing it from the UI
 
-The Settings tab has a **Test home switch** control that reads the switch and
+The Calibration tab has a **Test home switch** control that reads the switch and
 interprets the reading, which saves going to `QUERY_ENDSTOPS` by hand. Its
 **Watch for 20s** mode polls once a second so you can press the switch and see
 the reading follow.
