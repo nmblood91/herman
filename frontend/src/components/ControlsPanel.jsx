@@ -5,6 +5,23 @@ import { API_BASE } from '../api'
 // rather than behind a save button, so the writes are coalesced instead.
 const APPLY_DEBOUNCE_MS = 250
 
+// Three of the rows below are built from a list the API supplies, so when the
+// API does not answer they render as a heading with nothing under it -- which
+// reads as a UI that has lost those controls rather than a planter that has
+// not answered yet. The jog buttons above have the better behaviour: they stay
+// where they are and grey out. These do the same, with a disabled placeholder
+// holding the row open and a hint saying what is missing.
+const WAITING_HINT =
+  'Waiting on the planter for this list. If the bar at the top says the ' +
+  'connection failed, these fill themselves in once it answers.'
+
+// Both plant rows come from the same list, so the reason is given once rather
+// than identically under each of them.
+const NO_PLANTS_HINT =
+  'Waiting on the planter for the plant list, so this row and Water Plant ' +
+  'below have nothing to name. If the bar at the top says the connection ' +
+  'failed, both fill themselves in once it answers.'
+
 const UI_MODE_BY_BACKEND = {
   schedule: 'schedule',
   manual: 'on',
@@ -58,6 +75,11 @@ export function ControlsPanel({
   const movement = overview?.movement
   const boardDown = movement?.ok === false
   const motionReady = !boardDown && movement?.homed === true
+
+  // Defaulted here rather than at each use: a failed dashboard load leaves the
+  // prop an empty array today, but a crash on undefined would take the whole
+  // panel down, jog buttons included.
+  const plantList = plants ?? []
 
   const [ledMode, setLedMode] = useState('schedule')
   const [brightness, setBrightness] = useState(75)
@@ -225,51 +247,65 @@ export function ControlsPanel({
         <div className="subsection">
           <h3>Dances</h3>
           <div className="plant-actions-grid">
-            {dances.map((dance) => (
-              <button
-                key={dance.name}
-                title={dance.description}
-                className={dancing === dance.name ? 'working' : undefined}
-                disabled={Boolean(dancing)}
-                onClick={() => runDance(dance)}
-              >
-                {dance.title}
-              </button>
-            ))}
+            {dances.length ? (
+              dances.map((dance) => (
+                <button
+                  key={dance.name}
+                  title={dance.description}
+                  className={dancing === dance.name ? 'working' : undefined}
+                  disabled={Boolean(dancing)}
+                  onClick={() => runDance(dance)}
+                >
+                  {dance.title}
+                </button>
+              ))
+            ) : (
+              <button disabled>No routines loaded</button>
+            )}
           </div>
           <p className="field-hint">
             Homes first if the arm has lost its place, then runs the routine and
             parks back at 0. {danceStatus}
           </p>
+          {!dances.length && <p className="field-hint warning">{WAITING_HINT}</p>}
         </div>
 
         <div className="subsection">
           <h3>Move to Plant</h3>
           <div className="plant-actions-grid">
-            {plants.map((plant) => (
-              <button
-                key={plant.plant_id}
-                disabled={!motionReady}
-                onClick={() => onMoveToPlant(plant.plant_id)}
-              >
-                {plant.name}
-              </button>
-            ))}
+            {plantList.length ? (
+              plantList.map((plant) => (
+                <button
+                  key={plant.plant_id}
+                  disabled={!motionReady}
+                  onClick={() => onMoveToPlant(plant.plant_id)}
+                >
+                  {plant.name}
+                </button>
+              ))
+            ) : (
+              <button disabled>No plants loaded</button>
+            )}
           </div>
+          {!plantList.length && <p className="field-hint warning">{NO_PLANTS_HINT}</p>}
         </div>
 
         <div className="subsection">
           <h3>Water Plant</h3>
           <div className="plant-actions-grid">
-            {plants.map((plant) => (
-              <button
-                key={plant.plant_id}
-                disabled={!motionReady}
-                onClick={() => onWaterPlant(plant.plant_id)}
-              >
-                {plant.name}
-              </button>
-            ))}
+            {plantList.length ? (
+              plantList.map((plant) => (
+                <button
+                  key={plant.plant_id}
+                  disabled={!motionReady}
+                  onClick={() => onWaterPlant(plant.plant_id)}
+                >
+                  {plant.name}
+                </button>
+              ))
+            ) : (
+              <button disabled>No plants loaded</button>
+            )}
           </div>
           <p className="field-hint">
             Moves to the plant and doses its saved volume. Takes about a minute;
