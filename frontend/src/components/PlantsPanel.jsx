@@ -229,7 +229,7 @@ export function PlantsPanel({
 
   return (
     <section className="panel-section">
-      <h2>Plant Settings</h2>
+      <h2>Active Plants</h2>
       <div className="cards">
         {plants.map((plant) => {
           const draft = drafts[plant.plant_id] || draftFrom(plant)
@@ -328,7 +328,7 @@ export function PlantsPanel({
                         onChange={(event) => updateDraft(plant.plant_id, 'soil', event.target.value)}
                       >
                         <option value="">
-                          {soilList.length ? 'Not set' : 'No soils installed'}
+                          {soilList.length ? 'Not set' : 'No mixes installed'}
                         </option>
                         {soilList.map((soil) => (
                           <option key={soil.name} value={soil.name}>
@@ -432,7 +432,7 @@ export function PlantsPanel({
                           <span className="warning">
                             No field capacity, so this pot reads nothing and is
                             never watered automatically. Measure it for the mix
-                            in the Soils panel below, or for this pot alone
+                            in the Soil panel below, or for this pot alone
                             here.
                           </span>
                         )}

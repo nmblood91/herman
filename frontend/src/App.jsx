@@ -5,7 +5,7 @@ import { ControlsPanel } from './components/ControlsPanel'
 import { AutomationPanel } from './components/AutomationPanel'
 import { PlantsPanel } from './components/PlantsPanel'
 import { PlantEditorPanel } from './components/PlantEditorPanel'
-import { SoilsPanel } from './components/SoilsPanel'
+import { SoilPanel } from './components/SoilPanel'
 import { HistoryPanel } from './components/HistoryPanel'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
 import { CalibrationPanel } from './components/CalibrationPanel'
@@ -348,7 +348,7 @@ function App() {
             bands={bands}
             onRefresh={loadDashboard}
           />
-          <SoilsPanel soils={soils} plants={plants} onRefresh={loadDashboard} />
+          <SoilPanel soils={soils} plants={plants} onRefresh={loadDashboard} />
         </>
       )}
 

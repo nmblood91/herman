@@ -1,8 +1,8 @@
 # GreenThumb web UI
 
-React + Vite single-page app. It is the control surface for the planter: plant
-moisture and watering, gantry jogging, lighting, history charts, sensor
-calibration and settings.
+React + Vite single-page app. It is the control surface for the planter: pot
+moisture and watering, the plant and soil libraries, gantry jogging, lighting,
+automation, calibration and history charts.
 It talks to the FastAPI backend under `/api/v1`.
 
 ## Layout
@@ -11,14 +11,19 @@ It talks to the FastAPI backend under `/api/v1`.
 - `src/components/TopBar.jsx` — header
 - `src/components/TabBar.jsx` — tab switching
 
-Four tabs, one component each unless noted:
+Five tabs, in the order `TabBar.jsx` lists them. There is no Settings tab: each
+of its groups now sits with the thing it governs.
 
 | Tab | Components |
 |---|---|
-| Controls | `ControlsPanel.jsx` — gantry homing and jogging, dances, move-to-plant, water-a-plant, lighting, pump |
-| Plants | `PlantsPanel.jsx` — per-plant current moisture, plus an expandable settings form for name, light window, target, dose volume and rail position |
-| Sensors | `HistoryPanel.jsx` + `Chart.jsx` for the chart, `CalibrationPanel.jsx` for per-sensor calibration |
-| Settings | `SettingsPanel.jsx` — automatic watering, idle motion, quiet hours, LED strip type and colour order, planter clock; `LogsPanel.jsx` renders below it |
+| Plants and Soil | `PlantsPanel.jsx` — a card per pot, with its moisture and an expandable form for the pot's mix, rail position and watering mode; `PlantEditorPanel.jsx` — the saved-plant library; `SoilPanel.jsx` — the soil library. Both libraries sit below the cards, which pick from them |
+| Controls | `ControlsPanel.jsx` — gantry homing and jogging, dances, move-to-plant, water-a-plant, lighting, quiet snooze |
+| Automation | `AutomationPanel.jsx` — automatic watering, auto-home, quiet hours |
+| Calibration | `DiagnosticsPanel.jsx` (checks and pump flow), `CalibrationPanel.jsx` (the probes’ dry point), `LedStripPanel.jsx` (strip type and colour order), `LogsPanel.jsx`, mounted side by side |
+| History | `HistoryPanel.jsx` + `Chart.jsx` |
+
+Field capacity is not here: it is measured per mix on the Plants and Soil tab,
+which is why the Calibration tab only covers the dry point.
 
 ## Local development
 

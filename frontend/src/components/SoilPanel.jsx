@@ -9,7 +9,7 @@ import { API_BASE } from '../api'
 // could disagree until something reloaded.
 const SAMPLE_SECONDS = 20
 
-export function SoilsPanel({ soils, plants, onRefresh }) {
+export function SoilPanel({ soils, plants, onRefresh }) {
   const [name, setName] = useState('')
   const [capacity, setCapacity] = useState('')
   const [wilting, setWilting] = useState('')
@@ -124,7 +124,7 @@ export function SoilsPanel({ soils, plants, onRefresh }) {
 
   return (
     <section className="panel-section">
-      <h2>Soils</h2>
+      <h2>Soil</h2>
 
       <div className="general-settings-form">
         <div className="field-row">
@@ -188,7 +188,7 @@ export function SoilsPanel({ soils, plants, onRefresh }) {
             </ul>
           ) : (
             <p className="field-hint warning">
-              No soils. The installer adds a starting set, so this means they
+              No mixes. The installer adds a starting set, so this means they
               were all removed — add your own below, or put the set back with{' '}
               <code>python -m greenthumb.soil_library --install</code> on the
               Pi. Until a pot has a soil it is never watered automatically.

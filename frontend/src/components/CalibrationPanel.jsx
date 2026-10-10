@@ -106,7 +106,7 @@ export function CalibrationPanel() {
       await fetch(`${API_BASE}/sensors/calibration/reset`, { method: 'POST' })
       setMessage(
         'Dry points cleared. Every sensor is back on MOISTURE_RAW_DRY. Field ' +
-          'capacity is untouched — it belongs to the soils and the pots.',
+          'capacity is untouched — it belongs to the mixes and the pots.',
       )
       await load()
     } catch (error) {
