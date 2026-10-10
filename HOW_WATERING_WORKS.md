@@ -85,12 +85,12 @@ Only then does the pump run.
 
 ## Two ways to lay the dose down
 
-Each pot chooses one, on its card under **How to water**.
+Each pot chooses one, on its card under **Watering mode**.
 
-**One spot** is the original behaviour: the arm goes to the pot's watering
-location and the whole dose goes in there.
+**Fixed Position** is the original behaviour: the arm goes to the pot's
+watering location and the whole dose goes in there.
 
-**Sweep back and forth** walks the nozzle between a left edge and a right edge
+**Sweep Range** walks the nozzle between a left edge and a right edge
 for as long as the pump runs, so the same volume arrives spread across the pot
 instead of into one place. This is for a wide pot, where a dose landing on one
 spot runs straight down through one column of soil and out of the bottom while

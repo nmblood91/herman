@@ -24,9 +24,9 @@ const draftFrom = (plant) => ({
 // has to say which pot before it says what is growing in it, or there is
 // nothing tying the card to the planter in front of you.
 //
-// Pot rather than Plant for the half that does not move: the blocks inside the
-// card are already "This plant" and "This pot", and a header that said "Plant
-// 2" would be naming the pot with the word the card uses for its contents.
+// Pot rather than Plant for the half that does not move: the card is already
+// split into "Plant Info" and "Pot Info", and a header that said "Plant 2"
+// would be naming the pot with the word the card uses for its contents.
 //
 // The number comes from plant_id rather than the array index. Identical today,
 // but the id is the identity the API and the state file key on, so a reordered
@@ -70,7 +70,8 @@ const describeSweep = (draft) => {
     return {
       text:
         `${Math.round(span)} mm is too narrow to sweep — it needs at least ` +
-        `${MIN_SWEEP_SPAN_MM} mm. Use One spot for a pot narrower than that.`,
+        `${MIN_SWEEP_SPAN_MM} mm. Use Fixed Position for a pot narrower ` +
+        'than that.',
       warn: true,
     }
   }
@@ -79,7 +80,8 @@ const describeSweep = (draft) => {
       `Sweeping ${Math.round(span)} mm. The dose does not change: the same ` +
       'volume is laid along the span instead of into one place, so the nozzle ' +
       'moves for exactly as long as the pump runs. A dose too small to cross ' +
-      'the span waters at the spot above instead, rather than over-watering.',
+      "the span waters at the pot's fixed position instead, rather than " +
+      'over-watering.',
   }
 }
 
@@ -98,7 +100,11 @@ const reasonToHold = (draft) => {
   // without this, clearing the box to retype would park the watering spot
   // there the moment the debounce fired.
   if (String(draft.position_mm).trim() === '' || !Number.isFinite(Number(draft.position_mm))) {
-    return 'Watering location is blank, so nothing has been saved. Type a number.'
+    return (
+      'Watering location is blank, so nothing has been saved. It is under ' +
+      'Fixed Position, and a sweep still falls back to it when a dose is too ' +
+      'small to cross the span.'
+    )
   }
   if (draft.watering_mode === 'sweep') {
     const summary = describeSweep(draft)
@@ -332,10 +338,22 @@ export function PlantsPanel({
 
               {isExpanded && (
                 <>
-                  {/* At the top of the card rather than the foot: on a phone
-                      the fields push Save below the fold, and Load belongs
-                      beside it because loading then saving is the normal
-                      sequence. */}
+                  {/* Read-only: what this pot is currently set up to want.
+                      It is edited in the plant editor below, which keeps one
+                      place for a plant and one for a pot. */}
+                  <h4 className="card-group-title">Plant Info</h4>
+                  <p className="field-hint">
+                    <strong>{plant.name}</strong> — waters{' '}
+                    {plant.watering_volume_ml} mL at {plant.moisture_target}{' '}
+                    moisture reading. Lights on{' '}
+                    {formatClock(plant.light_start_time)}–
+                    {formatClock(plant.light_stop_time)}
+                  </p>
+                  {plant.notes && <p className="field-hint">Notes: {plant.notes}</p>}
+
+                  {/* Directly under Plant Info because that is the block it
+                      replaces: loading a saved plant rewrites those three
+                      lines and touches nothing below. */}
                   <div className="plant-actions-row">
                     <div className="load-profile-row">
                       <select
@@ -366,68 +384,40 @@ export function PlantsPanel({
                       </button>
                     </div>
                   </div>
-                  {/* Read-only: what this pot is currently set up to want. It
-                      is edited in the plant editor below, which keeps one
-                      place for a plant and one for a pot. */}
-                  <h4 className="card-group-title">Plant Info</h4>
-                  <p className="field-hint">
-                    <strong>{plant.name}</strong> — waters at{' '}
-                    {plant.moisture_target}, {plant.watering_volume_ml} mL,
-                    lights {formatClock(plant.light_start_time)}–
-                    {formatClock(plant.light_stop_time)}
-                  </p>
-                  {plant.notes && <p className="field-hint">Notes: {plant.notes}</p>}
 
-                  <h4 className="card-group-title">This pot</h4>
-                  <p className="field-hint">
-                    These save themselves a moment after you stop typing — the
-                    status bar at the top says when. A blank location or an
-                    unfinished sweep span is held back, and says so below.
-                  </p>
+                  <h4 className="card-group-title">Watering</h4>
                   <div className="field-grid">
                     <label>
-                      Soil
-                      <select
-                        value={draft.soil}
-                        onChange={(event) => updateDraft(plant, 'soil', event.target.value)}
-                      >
-                        <option value="">
-                          {soilList.length ? 'Not set' : 'No mixes installed'}
-                        </option>
-                        {soilList.map((soil) => (
-                          <option key={soil.name} value={soil.name}>
-                            {soil.name}
-                            {soil.available_points != null
-                              ? ` — ${soil.available_points} pts usable`
-                              : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Watering location (mm)
-                      <input
-                        type="number"
-                        value={draft.position_mm}
-                        onChange={(event) => updateDraft(plant, 'position_mm', event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      How to water
+                      Watering mode
                       <select
                         value={draft.watering_mode}
                         onChange={(event) =>
                           updateDraft(plant, 'watering_mode', event.target.value)
                         }
                       >
-                        <option value="point">
-                          One spot — the whole dose at the location above
-                        </option>
-                        <option value="sweep">
-                          Sweep back and forth across a span
-                        </option>
+                        <option value="point">Fixed Position</option>
+                        <option value="sweep">Sweep Range</option>
                       </select>
                     </label>
+
+                    {draft.watering_mode === 'point' && (
+                      <label>
+                        Watering location (mm)
+                        <input
+                          type="number"
+                          value={draft.position_mm}
+                          onChange={(event) =>
+                            updateDraft(plant, 'position_mm', event.target.value)
+                          }
+                        />
+                        {/* No field argument: this one captures the watering
+                            location, and that is also the only field whose
+                            capture checks for a neighbouring pot. */}
+                        <button type="button" onClick={() => capturePosition(plant)}>
+                          Use current position
+                        </button>
+                      </label>
+                    )}
 
                     {draft.watering_mode === 'sweep' && (
                       <div className="sweep-fields">
@@ -474,12 +464,43 @@ export function PlantsPanel({
                       </div>
                     )}
 
+                    {/* Beside the capture buttons rather than at the foot of
+                        the card: it describes them, and both notes below
+                        report what they and the saves did. */}
+                    <p className="field-hint">
+                      Jog the carriage until the nozzle is over this pot, then
+                      press Use current position. It fills the field beside it
+                      and saves it, so check this is the right card first. Each
+                      sweep edge has its own button, so you can jog to either
+                      side of a wide pot and capture it there.
+                    </p>
+                    {captureNote[plant.plant_id] && (
+                      <p className="field-hint warning">{captureNote[plant.plant_id]}</p>
+                    )}
+                    {holdNote[plant.plant_id] && (
+                      <p className="field-hint warning">{holdNote[plant.plant_id]}</p>
+                    )}
+                  </div>
+
+                  <h4 className="card-group-title">Pot Info</h4>
+                  <div className="field-grid">
+                    <label>
+                      Soil
+                      <select
+                        value={draft.soil}
+                        onChange={(event) => updateDraft(plant, 'soil', event.target.value)}
+                      >
+                        <option value="">
+                          {soilList.length ? 'Not set' : 'No mixes installed'}
+                        </option>
+                        {soilList.map((soil) => (
+                          <option key={soil.name} value={soil.name}>
+                            {soil.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <div>
-                      {/* Names the plant on the button itself: the whole risk
-                          here is pressing this on the wrong card. */}
-                      <button type="button" onClick={() => capturePosition(plant)}>
-                        Use current position for {plant.name}
-                      </button>
                       <p className="field-hint">
                         {plant.field_capacity_raw != null ? (
                           <>
@@ -530,19 +551,6 @@ export function PlantsPanel({
                         strip light this pot. Shared out evenly by the app from
                         the strip length, so there is nothing to set.
                       </p>
-                      <p className="field-hint">
-                        Jog the carriage until the nozzle is over this pot,
-                        then press. Fills the field above and saves it, so
-                        check the card is the right one first. The sweep edges
-                        have their own buttons, so you can jog to each side of
-                        a wide pot and capture it there.
-                      </p>
-                      {captureNote[plant.plant_id] && (
-                        <p className="field-hint warning">{captureNote[plant.plant_id]}</p>
-                      )}
-                      {holdNote[plant.plant_id] && (
-                        <p className="field-hint warning">{holdNote[plant.plant_id]}</p>
-                      )}
                     </div>
                   </div>
 
