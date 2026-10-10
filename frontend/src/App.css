@@ -556,11 +556,11 @@ option {
   gap: 8px;
 }
 
+/* One child now that Remove moved off the row -- see the soil editor's
+   hold-to-remove button -- so this no longer needs to space two apart. */
 .soil-list li {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   padding: 10px 12px;
   background: rgba(14, 24, 18, 0.95);
   border: 1px solid #2a4737;
@@ -570,6 +570,7 @@ option {
 .soil-list span {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-width: 0;
 }
 
