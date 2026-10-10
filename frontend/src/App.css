@@ -147,6 +147,15 @@
   grid-template-columns: repeat(2, minmax(180px, 1fr));
 }
 
+/* Two labels on one row inside a .field-grid, which otherwise stacks
+   everything in a single column. Spans the full row so the grid above and
+   below it still lines up at one field per row. */
+.field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 button {
   background: #2e7d4b;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -593,6 +602,10 @@ input[type='color'] {
   }
 
   .motion-grid.two-up {
+    grid-template-columns: 1fr;
+  }
+
+  .field-pair {
     grid-template-columns: 1fr;
   }
 

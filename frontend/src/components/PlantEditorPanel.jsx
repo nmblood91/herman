@@ -12,11 +12,7 @@ const BLANK = {
 
 // The library of saved plants, edited in its own right.
 //
-// Until this existed the only way to write a saved plant was to snapshot a
-// pot, so fixing one meant loading it onto a spare pot, editing, and saving
-// back -- changing what the planter is actually running in order to edit
-// something it is not.
-//
+// 
 // Nothing here touches a pot. A plant becomes real on a pot when you load it
 // from that pot's card, which is the same direction the whole pot/plant split
 // runs in: this names what a plant wants, the card says where it lives.
@@ -169,22 +165,24 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
               onChange={(event) => update('name', event.target.value)}
             />
           </label>
-          <label>
-            Light start
-            <input
-              type="time"
-              value={form.light_start_time}
-              onChange={(event) => update('light_start_time', event.target.value)}
-            />
-          </label>
-          <label>
-            Light stop
-            <input
-              type="time"
-              value={form.light_stop_time}
-              onChange={(event) => update('light_stop_time', event.target.value)}
-            />
-          </label>
+          <div className="field-pair">
+            <label>
+              Light start
+              <input
+                type="time"
+                value={form.light_start_time}
+                onChange={(event) => update('light_start_time', event.target.value)}
+              />
+            </label>
+            <label>
+              Light stop
+              <input
+                type="time"
+                value={form.light_stop_time}
+                onChange={(event) => update('light_stop_time', event.target.value)}
+              />
+            </label>
+          </div>
           <label>
             Water when it reaches
             <select
@@ -194,13 +192,12 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
               {bandList.map((band) => (
                 <option key={band.name} value={band.name}>
                   {band.name}
-                  {band.description ? ` — ${band.description}` : ''}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Watering volume (mL)
+            Watering Volume (mL)
             <input
               type="number"
               min="0"
@@ -217,15 +214,10 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
             <textarea
               rows="3"
               value={form.notes}
-              placeholder="Why this plant is set up this way."
+              placeholder="Write notes about the plant here"
               onChange={(event) => update('notes', event.target.value)}
             />
           </label>
-          <p className="field-hint">
-            The only field here the planter never acts on. The rest say what it
-            does; this says why, for whoever reads it next — including you in a
-            season's time.
-          </p>
         </div>
 
         <div className="field-row">
