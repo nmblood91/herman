@@ -75,14 +75,7 @@ const describeSweep = (draft) => {
       warn: true,
     }
   }
-  return {
-    text:
-      `Sweeping ${Math.round(span)} mm. The dose does not change: the same ` +
-      'volume is laid along the span instead of into one place, so the nozzle ' +
-      'moves for exactly as long as the pump runs. A dose too small to cross ' +
-      "the span waters at the pot's fixed position instead, rather than " +
-      'over-watering.',
-  }
+  return { text: `Sweeping ${Math.round(span)} mm.` }
 }
 
 // How long to wait after the last edit before writing a pot field. Three of
@@ -100,11 +93,7 @@ const reasonToHold = (draft) => {
   // without this, clearing the box to retype would park the watering spot
   // there the moment the debounce fired.
   if (String(draft.position_mm).trim() === '' || !Number.isFinite(Number(draft.position_mm))) {
-    return (
-      'Watering location is blank, so nothing has been saved. It is under ' +
-      'Fixed Position, and a sweep still falls back to it when a dose is too ' +
-      'small to cross the span.'
-    )
+    return 'Watering location is blank, so nothing has been saved.'
   }
   if (draft.watering_mode === 'sweep') {
     const summary = describeSweep(draft)
@@ -341,7 +330,7 @@ export function PlantsPanel({
                   {/* Read-only: what this pot is currently set up to want.
                       It is edited in the plant editor below, which keeps one
                       place for a plant and one for a pot. */}
-                  <h4 className="card-group-title">Plant Info</h4>
+                  <h3 className="card-group-title">Plant Info</h3>
                   <p className="field-hint">
                     <strong>{plant.name}</strong> — waters{' '}
                     {plant.watering_volume_ml} mL at {plant.moisture_target}{' '}
@@ -385,7 +374,7 @@ export function PlantsPanel({
                     </div>
                   </div>
 
-                  <h4 className="card-group-title">Watering</h4>
+                  <h3 className="card-group-title">Watering</h3>
                   <div className="field-grid">
                     <label>
                       Watering mode
@@ -464,16 +453,9 @@ export function PlantsPanel({
                       </div>
                     )}
 
-                    {/* Beside the capture buttons rather than at the foot of
-                        the card: it describes them, and both notes below
-                        report what they and the saves did. */}
-                    <p className="field-hint">
-                      Jog the carriage until the nozzle is over this pot, then
-                      press Use current position. It fills the field beside it
-                      and saves it, so check this is the right card first. Each
-                      sweep edge has its own button, so you can jog to either
-                      side of a wide pot and capture it there.
-                    </p>
+                    {/* What the capture buttons and the saves actually did.
+                        Kept here, beside the buttons, because unlike the
+                        how-to these change with what just happened. */}
                     {captureNote[plant.plant_id] && (
                       <p className="field-hint warning">{captureNote[plant.plant_id]}</p>
                     )}
@@ -482,7 +464,7 @@ export function PlantsPanel({
                     )}
                   </div>
 
-                  <h4 className="card-group-title">Pot Info</h4>
+                  <h3 className="card-group-title">Pot Info</h3>
                   <div className="field-grid">
                     <label>
                       Soil
@@ -538,18 +520,11 @@ export function PlantsPanel({
                           </button>
                         )}
                       </div>
+                      {/* The range itself is per-pot and readable
+                          nowhere else, so the fact stays and the explanation
+                          of how it is assigned does not. */}
                       <p className="field-hint">
-                        Only worth doing if this pot disagrees with the rest.
-                        The mix's figure is measured once and shared, because
-                        probes of the same kind read closely enough that one
-                        good reading beats four nobody took. Soak the pot
-                        through and let it drain 24 hours first.
-                      </p>
-
-                      <p className="field-hint">
-                        LEDs {plant.led_start_index}–{plant.led_end_index} of the
-                        strip light this pot. Shared out evenly by the app from
-                        the strip length, so there is nothing to set.
+                        LEDs {plant.led_start_index}–{plant.led_end_index} light this pot.
                       </p>
                     </div>
                   </div>

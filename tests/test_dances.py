@@ -176,7 +176,17 @@ print(f"ok: it cycles through all of them -> {', '.join(seen)}")
 
 auto, klip = build()
 auto.set_idle_motion(True, 60)
-auto.set_quiet_hours(True, "00:00", "23:59")
+# Anchored to the clock rather than written as 00:00-23:59. within_window
+# treats a non-wrapping window as start <= now < stop, so that one leaves the
+# minute 23:59 outside itself -- and this test failed for that minute every
+# day. A window that wraps past midnight has no such gap: a start five minutes
+# ago and a stop an hour ahead contains now whatever the time is.
+_now = datetime.now()
+auto.set_quiet_hours(
+    True,
+    (_now - timedelta(minutes=5)).time().isoformat(timespec="minutes"),
+    (_now + timedelta(hours=1)).time().isoformat(timespec="minutes"),
+)
 auto._last_idle_motion = datetime.now() - timedelta(minutes=61)
 auto.tick()
 assert klip.gcode == [], "danced during quiet hours"
