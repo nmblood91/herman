@@ -156,6 +156,14 @@
   gap: 12px;
 }
 
+/* New Plant / Saved Plant. Reuses .tab/.tab active rather than inventing a
+   second "selected" look, since this is the same kind of control: pick one
+   of two views, not an action. */
+.plant-editor-mode {
+  display: flex;
+  gap: 8px;
+}
+
 button {
   background: #2e7d4b;
   border: 1px solid rgba(255, 255, 255, 0.08);

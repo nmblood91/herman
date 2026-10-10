@@ -17,6 +17,10 @@ const BLANK = {
 // from that pot's card, which is the same direction the whole pot/plant split
 // runs in: this names what a plant wants, the card says where it lives.
 export function PlantEditorPanel({ profiles, bands, onRefresh }) {
+  // 'new' types a free name below; 'existing' turns that field into a picker
+  // over the list. Picked is only ever non-empty in 'existing' mode -- every
+  // path back to 'new' clears it, so the two stay in lockstep.
+  const [mode, setMode] = useState('new')
   const [picked, setPicked] = useState('')
   const [form, setForm] = useState(BLANK)
   const [message, setMessage] = useState('')
@@ -51,6 +55,29 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
 
+  // A no-op on the already-active mode, like a tab: clicking New Plant again
+  // does not discard a half-typed draft.
+  const startNewPlant = () => {
+    if (mode === 'new') return
+    setMode('new')
+    setPicked('')
+    setSyncedPick('')
+    setForm(BLANK)
+    setConfirmDelete(false)
+    setMessage('')
+  }
+
+  const browseSavedPlants = () => {
+    if (mode === 'existing') return
+    setMode('existing')
+    // Picked is always '' on the way in here (startNewPlant clears it, and
+    // it starts '' on mount), so the picker opens on its placeholder. Blank
+    // the rest too, rather than showing a new-plant draft's leftover fields
+    // under a dropdown that says nothing is chosen yet.
+    setForm(BLANK)
+    setMessage('')
+  }
+
   const save = async () => {
     setMessage('')
     try {
@@ -67,16 +94,8 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
         setMessage(data.detail || data.error || `Save failed (HTTP ${response.status})`)
         return
       }
-      // Renaming writes a new entry rather than moving the old one, because
-      // the name is the key. Saying so beats leaving someone to find the
-      // original still in the list.
-      const renamed = picked && picked !== data.name
-      setMessage(
-        renamed
-          ? `Saved ${data.name}. ${picked} is still there — the name is the key, ` +
-            'so this made a second plant rather than renaming the first.'
-          : `Saved ${data.name}. Load it onto a pot from that pot's card.`,
-      )
+      setMessage(`Saved ${data.name}. Load it onto a pot from that pot's card.`)
+      setMode('existing')
       setPicked(data.name)
       setSyncedPick(data.name)
       onRefresh?.()
@@ -114,36 +133,22 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
 
       <div className="general-settings-form">
         <div className="field-row">
-          <div className="load-profile-row">
-            <select
-              aria-label="Saved plant to edit"
-              value={picked}
-              onChange={(event) => setPicked(event.target.value)}
+          <div className="plant-editor-mode">
+            <button
+              type="button"
+              className={mode === 'new' ? 'tab active' : 'tab'}
+              onClick={startNewPlant}
             >
-              <option value="">
-                {list.length ? 'New plant…' : 'No saved plants yet — add one below'}
-              </option>
-              {list.map((profile) => (
-                <option key={profile.name} value={profile.name}>
-                  {profile.name}
-                </option>
-              ))}
-            </select>
-            {picked && !confirmDelete && (
-              <button type="button" onClick={() => setConfirmDelete(true)}>
-                Delete
-              </button>
-            )}
-            {picked && confirmDelete && (
-              <>
-                <button type="button" onClick={remove}>
-                  Delete {picked}
-                </button>
-                <button type="button" onClick={() => setConfirmDelete(false)}>
-                  Cancel
-                </button>
-              </>
-            )}
+              New Plant
+            </button>
+            <button
+              type="button"
+              className={mode === 'existing' ? 'tab active' : 'tab'}
+              disabled={!list.length}
+              onClick={browseSavedPlants}
+            >
+              Saved Plant
+            </button>
           </div>
           {!list.length && (
             <p className="field-hint warning">
@@ -157,14 +162,32 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
         </div>
 
         <div className="field-grid">
-          <label>
-            Plant name
-            <input
-              value={form.name}
-              placeholder="Basil"
-              onChange={(event) => update('name', event.target.value)}
-            />
-          </label>
+          {mode === 'existing' ? (
+            <label>
+              Plant name
+              <select
+                aria-label="Saved plant to edit"
+                value={picked}
+                onChange={(event) => setPicked(event.target.value)}
+              >
+                <option value="">Choose a plant…</option>
+                {list.map((profile) => (
+                  <option key={profile.name} value={profile.name}>
+                    {profile.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              Plant name
+              <input
+                value={form.name}
+                placeholder="Basil"
+                onChange={(event) => update('name', event.target.value)}
+              />
+            </label>
+          )}
           <div className="field-pair">
             <label>
               Light start
@@ -184,7 +207,7 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
             </label>
           </div>
           <label>
-            Water when it reaches
+            Water when soil is
             <select
               value={form.moisture_target}
               onChange={(event) => update('moisture_target', event.target.value)}
@@ -208,6 +231,25 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
           </label>
         </div>
 
+        {mode === 'existing' && picked && (
+          <div className="field-row">
+            {!confirmDelete ? (
+              <button type="button" onClick={() => setConfirmDelete(true)}>
+                Delete {picked}
+              </button>
+            ) : (
+              <>
+                <button type="button" onClick={remove}>
+                  Delete {picked}
+                </button>
+                <button type="button" onClick={() => setConfirmDelete(false)}>
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="field-row">
           <label>
             Notes
@@ -230,11 +272,6 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
             Save plant
           </button>
           {message && <p className="field-hint">{message}</p>}
-          <p className="field-hint">
-            The name is the key, so saving replaces any plant of that name
-            rather than making a second one. Nothing here changes a pot —
-            load the plant from a pot's card for that.
-          </p>
         </div>
       </div>
     </section>
