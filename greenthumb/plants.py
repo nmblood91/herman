@@ -22,7 +22,7 @@ def default_plants() -> list[PlantSpec]:
     """Fresh PlantSpec instances, so callers cannot mutate a shared default."""
     # Positions are placeholders scaled to fit the measured 890 mm of travel.
     # Plant 4 used to sit at 900, which the carriage can no longer reach. Set
-    # each properly once the pots are placed; the Plants tab writes them to
+    # each properly once the pots are placed; the Plants and Soil tab writes them to
     # data/state.json and they persist from then on.
     return [
         PlantSpec(name="Plant 1", plant_id="plant_1", sensor_address=0x36, moisture_target="dry", watering_volume_ml=100, light_start_time=time(8, 0), light_stop_time=time(20, 0), position_mm=130),

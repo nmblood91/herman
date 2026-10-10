@@ -237,6 +237,7 @@ works the same way as the saved plants — name as the key, overwrite on save:
 ```bash
 python -m greenthumb.soil_library              # read them and the figures
 python -m greenthumb.soil_library --install    # add them to the library
+python -m greenthumb.soil_library --install --overwrite   # and discard your edits
 ```
 
 **Why the soil is recorded at all is a sensor argument before an agronomic

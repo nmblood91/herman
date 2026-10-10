@@ -83,8 +83,8 @@ PROFILE_FIELDS = (
 # published figure applies to any pot of that mix. The absolute values do not
 # transfer to raw sensor counts -- converting water content into a reading needs
 # a response curve for that specific medium -- which is why field capacity is
-# still measured per pot by --calibrate wet, and why this supplies the shape of
-# the window rather than its position.
+# also measured, per mix, in raw counts alongside these -- and why these supply
+# the shape of the window rather than its position.
 SOIL_FIELDS = (
     "field_capacity_vwc",
     "wilting_point_vwc",

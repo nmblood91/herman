@@ -198,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     kept = sum(1 for result in outcome.values() if result == "kept")
     if kept:
         print(f"\n{kept} left as they were. Re-run with --overwrite to replace them.")
-    print("\nLoad any of them onto a pot from the Plants tab.")
+    print("\nLoad any of them onto a pot under Plants and Soil.")
     return 0
 
 

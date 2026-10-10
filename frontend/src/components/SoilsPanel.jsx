@@ -188,10 +188,10 @@ export function SoilsPanel({ soils, plants, onRefresh }) {
             </ul>
           ) : (
             <p className="field-hint warning">
-              No soils yet. Install the starting set on the Pi with{' '}
-              <code>python -m greenthumb.soil_library --install</code>, or add
-              your own below. Until a pot has a soil it is never watered
-              automatically.
+              No soils. The installer adds a starting set, so this means they
+              were all removed — add your own below, or put the set back with{' '}
+              <code>python -m greenthumb.soil_library --install</code> on the
+              Pi. Until a pot has a soil it is never watered automatically.
             </p>
           )}
         </div>

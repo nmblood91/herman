@@ -152,6 +152,25 @@ pip install -r requirements.txt
 # effect without reinstalling.
 pip install -e .
 
+# Seed the starter libraries.
+#
+# Not optional, and this is the fix for a real gap: a pot takes its care
+# settings by loading a saved plant, and it is only watered automatically once
+# its mix is known. With neither library present a fresh planter has nothing to
+# load and waters nothing -- and the only advice the UI could give was to come
+# back here and run these two commands by hand.
+#
+# Safe to run unconditionally rather than guarded on first install: both keep
+# any entry already there, so re-running the installer never replaces a mix or
+# a plant somebody has tuned. Pass --overwrite by hand to go back to the
+# published figures.
+#
+# Runs as root here, like the venv above; the chown below hands the state file
+# it writes back to pi.
+echo "Installing the starter soil and plant libraries..."
+python -m greenthumb.soil_library --install
+python -m greenthumb.plant_library --install
+
 cd /opt/greenthumb/frontend
 # install rather than ci: the committed lockfile is generated on Windows and
 # lacks the ARM Rollup binary, which ci would faithfully omit and then fail to
@@ -284,6 +303,16 @@ fi
 printf "\nGreenThumb install complete.\n"
 printf "Open: http://$(hostname -I | awk '{print $1}')\n"
 printf "API docs: http://$(hostname -I | awk '{print $1}')/docs\n"
+
+# The two things no installer can do, because both need the hardware in a
+# particular state. Said here rather than left to be discovered as a planter
+# that quietly waters nothing.
+printf "\nStill to do by hand, and watering stays off until both are done:\n"
+printf "  1. Dry-calibrate the probes, in open air:\n"
+printf "     cd /opt/greenthumb && .venv/bin/python -m greenthumb.hardware.soil_sensors --calibrate dry\n"
+printf "  2. Measure each mix's field capacity, in the app under Plants and Soil.\n"
+printf "     Soak a pot of it through, let it drain 24h, then press Measure.\n"
+printf "\nThen set a soil on each pot, and measure the pump's flow rate under Calibration.\n"
 
 if [ "$REBOOT_NEEDED" -eq 1 ]; then
   printf "\n⚠️  Reboot required to finish enabling I2C/SPI, then re-run this script.\n"

@@ -151,10 +151,11 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
           </div>
           {!list.length && (
             <p className="field-hint warning">
-              Nothing saved yet. Install the starter set on the Pi with{' '}
-              <code>python -m greenthumb.plant_library --install</code>, or fill
-              the form below. A pot takes its care settings by loading one of
-              these, so until there is at least one there is nothing to load.
+              No saved plants. The installer adds a starter set, so this means
+              they were all deleted — fill the form below, or put the set back
+              with <code>python -m greenthumb.plant_library --install</code> on
+              the Pi. A pot takes its care settings by loading one of these, so
+              until there is at least one there is nothing to load.
             </p>
           )}
         </div>

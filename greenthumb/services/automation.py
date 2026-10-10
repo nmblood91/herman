@@ -956,7 +956,7 @@ class GreenThumbAutomation:
             return state(
                 "attention",
                 f"No soil set on {', '.join(unset)}, so watering is held there. "
-                f"Set it on the Plants tab.",
+                f"Set it under Plants and Soil.",
             )
 
         # A pot with a mix but no measured field capacity cannot be judged at

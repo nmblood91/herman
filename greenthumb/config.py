@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # can put on the floor.
     pump_max_run_seconds: int = 60
     # Strip chip: sets the bit timing and the usual channel order. Selectable in
-    # the Settings tab. All 12V: WS2815 and GS8208 are one pixel per LED, WS2811
+    # the Calibration tab. All 12V: WS2815 and GS8208 are one pixel per LED, WS2811
     # drives three LEDs per pixel so led_count is LEDs/3 for it. No 5V chip is
     # offered -- sixty 5V pixels would pull about 3.6A, past what the DC-DC can
     # give on top of the Pi.
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     moisture_window_size: int = 10
 
     # Fallback endpoints for sensors that have not been calibrated. Real values
-    # are measured per sensor by `--calibrate dry` / `--calibrate wet` and kept
+    # the dry end is measured per sensor by `--calibrate dry` and kept
     # in data/state.json, which overrides these; probes do read measurably
     # differently from one another, so a shared pair puts that spread straight
     # into the reported percentage.
@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     # watered.
     moisture_raw_dry: int = 320
 
-    # Off by default, and only the starting value: the Settings tab owns this
+    # Off by default, and only the starting value: the Automation tab owns this
     # switch and persists any change to data/state.json, which wins over this
     # on the next start.
     #
@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     # default -- the re-home is worth having whether or not anyone enjoys the
     # dance, because an open-loop stepper has no other way to notice that the
     # carriage is not where Klipper thinks it is. Starting values only; the
-    # Settings tab owns both and persists them.
+    # Automation tab owns both and persists them.
     idle_motion_enabled: bool = True
     idle_motion_minutes: int = 60
 

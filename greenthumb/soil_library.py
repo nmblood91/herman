@@ -11,9 +11,9 @@ published figure applies to any pot of that mix. The absolute water contents do
 *not* convert into raw sensor counts -- a capacitive probe reads dielectric
 permittivity, and that relationship depends on texture, organic matter, bulk
 density and salinity, so turning water content into a reading needs a response
-curve for that specific medium. Which is why `--calibrate wet` still measures
-field capacity in the actual pot: this table supplies the *shape* of the usable
-window, calibration supplies its *position*.
+curve for that specific medium. Which is why field capacity is also *measured*,
+once per mix in a real pot: this table supplies the *shape* of the usable
+window, the measurement supplies its *position*.
 
 That same soil-dependence is the reason recording the mix matters at all. Two
 identical probes in two different mixes will disagree, and without the mix
@@ -25,8 +25,8 @@ settled. Container substrates are not: they are mostly organic, far more
 porous, release water at lower tensions, and vary by manufacturer and by how
 firmly they were packed. And they **change with use** -- unused peat holds
 measurably more water than the same mix after a season, as it compacts and
-breaks down. So re-run `--calibrate wet` after a repot rather than assuming the
-entry still describes the pot.
+breaks down. So re-measure after a repot rather than assuming the entry still
+describes the pot.
 """
 
 from __future__ import annotations
@@ -155,8 +155,8 @@ def main(argv: list[str] | None = None) -> int:
         description="Starting entries for the soil library.",
         epilog=(
             "Only the wilting-point-to-field-capacity ratio transfers between "
-            "pots. Field capacity itself is measured per pot by "
-            "--calibrate wet, and must be re-measured after a repot."
+            "pots. Field capacity itself is measured per mix in the app, under "
+            "Plants and Soil, and must be re-measured after a repot."
         ),
     )
     parser.add_argument(
@@ -188,7 +188,11 @@ def main(argv: list[str] | None = None) -> int:
     kept = sum(1 for result in outcome.values() if result == "kept")
     if kept:
         print(f"\n{kept} left as they were. Re-run with --overwrite to replace them.")
-    print("\nSet a soil on each plant from the Plants tab.")
+    print(
+        "\nSet a soil on each pot under Plants and Soil, then measure each "
+        "mix's field capacity there. A pot is not watered automatically until "
+        "both are done."
+    )
     return 0
 
 

@@ -86,6 +86,29 @@ For a clean installation with the latest OS, start here:
    ```
    This will take 10-15 minutes. Watch for "GreenThumb install complete" at the end.
 
+   It also seeds the **starter soil and plant libraries**. Both keep anything
+   already there, so re-running the installer never replaces a mix or a plant
+   you have tuned — pass `--overwrite` by hand to go back to the published
+   figures. They are seeded rather than left to you because a pot takes its
+   care settings by loading a saved plant, and is only watered once its mix is
+   known: with neither library present a fresh planter has nothing to load and
+   waters nothing.
+
+   **Two things the installer cannot do**, because both need the hardware in a
+   particular state, and watering stays off until they are done. The script
+   prints them again at the end:
+
+   ```bash
+   # 1. the probes' dry point, all four in open air
+   cd /opt/greenthumb && .venv/bin/python -m greenthumb.hardware.soil_sensors --calibrate dry
+   ```
+
+   2. Each mix's **field capacity**, in the app under Plants and Soil. Soak a
+      pot of the mix through, let it drain 24 hours, pick which pot's probe to
+      read it with, and press Measure. A pot with no field capacity reads `-1`
+      and is never watered automatically — the status bar names the mixes it is
+      waiting on.
+
 6. **Configure Klipper** (if SKR board is connected):
    - If auto-detected: ✓ Already configured
    - If not detected: See **Configure Klipper** section below
