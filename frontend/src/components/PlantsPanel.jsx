@@ -520,12 +520,6 @@ export function PlantsPanel({
                           </button>
                         )}
                       </div>
-                      {/* The range itself is per-pot and readable
-                          nowhere else, so the fact stays and the explanation
-                          of how it is assigned does not. */}
-                      <p className="field-hint">
-                        LEDs {plant.led_start_index}–{plant.led_end_index} light this pot.
-                      </p>
                     </div>
                   </div>
 
