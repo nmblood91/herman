@@ -154,9 +154,16 @@ a test asserting they agree field for field, since two editors that validate
 differently would fill the library with entries that load badly.
 
 A plant card no longer edits care settings at all. It picks a saved plant and
-loads it, picks a soil, and sets the pot's own geometry. **Save pot** stores
-that geometry and nothing else — it used to also write a profile as a side
-effect, so you could not store a rail coordinate without saving a plant.
+loads it, picks a soil, and sets the pot's own geometry. Those pot fields
+**save themselves** a moment after the last edit, so the card stores geometry
+and nothing else — saving used to also write a profile as a side effect, so you
+could not store a rail coordinate without saving a plant.
+
+Two kinds of edit are deliberately held back rather than sent: a blank watering
+location, because an empty box reads as 0 mm and would park the nozzle at the
+left end of the rail; and a sweep whose span is not yet wide enough to be one,
+because the API refuses it and the card is usually still being filled in. Both
+say so on the card.
 
 Each saved plant and each soil also carries **notes**: free text, and the only
 field the planter never acts on. The numbers say what it does; the note says

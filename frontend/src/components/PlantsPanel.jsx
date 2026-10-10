@@ -1,9 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { formatClock } from '../time'
 
 // Pot fields only. A card no longer edits what a plant wants -- that is the
 // plant editor's job, and a pot takes those settings by loading a saved plant.
 // Keeping both here meant "Save Plant" wrote a profile as a side effect of
 // saving a rail coordinate, so you could not touch one without the other.
+//
+// These are no longer a form waiting on a button: each field writes itself a
+// moment after the last edit, so the draft is a debounce buffer rather than a
+// pending change. What that costs is below -- resync has to leave a card that
+// is mid-edit alone, and two states of a draft have to be held back rather
+// than sent.
 const draftFrom = (plant) => ({
   soil: plant.soil ?? '',
   position_mm: plant.position_mm ?? 0,
@@ -76,6 +83,32 @@ const describeSweep = (draft) => {
   }
 }
 
+// How long to wait after the last edit before writing a pot field. Three of
+// them are number inputs, so a save per keystroke would write 3, then 35, then
+// 355 -- and 3 mm is a coordinate the gantry would happily accept. Short
+// enough that nobody walks away from a card they think they have finished.
+const SAVE_DEBOUNCE_MS = 700
+
+// Which drafts are not worth sending yet, and what to say instead. There is no
+// Save button any more, so an edit either reaches the planter or says why it
+// did not: a draft that sits unsaved and unmentioned is the one failure this
+// has to avoid.
+const reasonToHold = (draft) => {
+  // Number('') is 0, which is finite and is also the left end of the rail, so
+  // without this, clearing the box to retype would park the watering spot
+  // there the moment the debounce fired.
+  if (String(draft.position_mm).trim() === '' || !Number.isFinite(Number(draft.position_mm))) {
+    return 'Watering location is blank, so nothing has been saved. Type a number.'
+  }
+  if (draft.watering_mode === 'sweep') {
+    const summary = describeSweep(draft)
+    // The API refuses a sweep whose span is too narrow to be one, so sending
+    // this would be a red error for a card the user is still filling in.
+    if (summary.warn) return `${summary.text} Not saved yet.`
+  }
+  return ''
+}
+
 // -1 is "no reading", not dry. The backend uses it for a probe that is
 // unplugged or unreadable, and showing that as 0% would read as "bone dry" and
 // invite watering a plant whose sensor simply fell out.
@@ -146,13 +179,41 @@ export function PlantsPanel({
   // Keyed by plant so a warning about one card cannot appear under another.
   const [captureNote, setCaptureNote] = useState({})
 
+  // Why this pot's save has not gone out, kept apart from captureNote above:
+  // they are written by different things at different times, and sharing one
+  // slot had the save clearing the capture button's clash warning 700ms after
+  // it was raised.
+  const [holdNote, setHoldNote] = useState({})
+
+  // One pending save per pot, keyed the same way: editing two cards at once
+  // must not have one card's timer cancel the other's write.
+  const saveTimers = useRef({})
+  useEffect(() => {
+    const timers = saveTimers.current
+    return () => Object.values(timers).forEach(clearTimeout)
+  }, [])
+
+  const scheduleSave = (plant, draft) => {
+    clearTimeout(saveTimers.current[plant.plant_id])
+    saveTimers.current[plant.plant_id] = setTimeout(() => {
+      // Cleared before the write rather than after it, so a keystroke that
+      // lands while the request is in flight registers as pending again and
+      // the refresh below cannot overwrite it.
+      delete saveTimers.current[plant.plant_id]
+      const held = reasonToHold(draft)
+      setHoldNote((current) => ({ ...current, [plant.plant_id]: held }))
+      if (!held) onSave({ ...plant, ...draft })
+    }, SAVE_DEBOUNCE_MS)
+  }
+
   const capturePosition = (plant, field = 'position_mm') => {
-    const note = (text) => setCaptureNote((current) => ({ ...current, [plant.plant_id]: text }))
+    const say = (text) =>
+      setCaptureNote((current) => ({ ...current, [plant.plant_id]: text }))
 
     // An unhomed axis reports a position relative to wherever it happened to
     // power up, which is a meaningless number that looks like a real one.
     if (!movement?.homed) {
-      note('Home the gantry first — until then its position is not a real measurement.')
+      say('Home the gantry first — until then its position is not a real measurement.')
       return
     }
     // Checked before converting: Number(null) is 0, which is finite, so a
@@ -160,13 +221,13 @@ export function PlantsPanel({
     // set the plant's position to the left end of the rail.
     const raw = movement.position
     if (raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw))) {
-      note('No position reported. Is the motion board connected?')
+      say('No position reported. Is the motion board connected?')
       return
     }
     const here = Number(raw)
     const limit = Number(movement.max_x)
     if (Number.isFinite(limit) && (here < 0 || here > limit)) {
-      note(`${here} mm is outside the usable rail (0 to ${limit} mm).`)
+      say(`${here} mm is outside the usable rail (0 to ${limit} mm).`)
       return
     }
 
@@ -186,24 +247,38 @@ export function PlantsPanel({
           )
         : null
     const what = CAPTURE_LABELS[field]
-    updateDraft(plant.plant_id, field, String(Math.round(here)))
-    note(
+    updateDraft(plant, field, String(Math.round(here)))
+    say(
       clash
-        ? `Set the ${what} for ${plant.name} to ${Math.round(here)} mm — but ` +
-          `that is within ${CONFUSION_MARGIN_MM} mm of ${clash.name}. Check ` +
-          'you are over the right pot before saving.'
+        ? `Set the ${what} for ${plant.name} to ${Math.round(here)} mm and ` +
+          `saving it — but that is within ${CONFUSION_MARGIN_MM} mm of ` +
+          `${clash.name}, so check this is the right card. Jog over the right ` +
+          'pot and press again to correct it.'
         : `Set the ${what} for ${plant.name} to ${Math.round(here)} mm. ` +
-          'Save to keep it.',
+          'Saving it now.',
     )
   }
 
   // Drafts mirror the plants prop, and resyncing them during render rather than
   // in an effect means the inputs never paint one frame of stale values after
   // a save. React re-runs this component immediately, before touching the DOM.
+  //
+  // A card with a save still pending keeps its draft. Every save ends in a
+  // dashboard refresh, which lands a moment later: taking the server's copy
+  // then would delete whatever was typed in the meantime.
   const [syncedPlants, setSyncedPlants] = useState(null)
   if (plants !== syncedPlants) {
     setSyncedPlants(plants)
-    setDrafts(Object.fromEntries(plants.map((plant) => [plant.plant_id, draftFrom(plant)])))
+    setDrafts((current) =>
+      Object.fromEntries(
+        plants.map((plant) => [
+          plant.plant_id,
+          saveTimers.current[plant.plant_id]
+            ? current[plant.plant_id] ?? draftFrom(plant)
+            : draftFrom(plant),
+        ]),
+      ),
+    )
   }
 
   const profileNames = (profiles ?? []).map((profile) => profile.name)
@@ -217,14 +292,13 @@ export function PlantsPanel({
     )
   }
 
-  const updateDraft = (plantId, field, value) => {
-    setDrafts((current) => ({
-      ...current,
-      [plantId]: {
-        ...current[plantId],
-        [field]: value,
-      },
-    }))
+  // Takes the whole plant rather than its id: saving needs the pot's other
+  // fields, and reading them back off the plants prop at write time would use
+  // whatever the last refresh brought instead of what is on screen.
+  const updateDraft = (plant, field, value) => {
+    const next = { ...(drafts[plant.plant_id] ?? draftFrom(plant)), [field]: value }
+    setDrafts((current) => ({ ...current, [plant.plant_id]: next }))
+    scheduleSave(plant, next)
   }
 
   return (
@@ -263,13 +337,6 @@ export function PlantsPanel({
                       beside it because loading then saving is the normal
                       sequence. */}
                   <div className="plant-actions-row">
-                    <button
-                      className="primary"
-                      onClick={() => onSave({ ...plant, ...draft })}
-                    >
-                      Save pot
-                    </button>
-
                     <div className="load-profile-row">
                       <select
                         aria-label={`Saved plant to load onto ${plant.name}`}
@@ -299,33 +366,30 @@ export function PlantsPanel({
                       </button>
                     </div>
                   </div>
-
-                  <p className="field-hint">
-                    Loading copies a saved plant's care settings onto this pot.
-                    Everything under <em>This pot</em> stays where it is — those
-                    describe the pot and the rail, so a saved plant cannot carry
-                    them, and <strong>Save pot</strong> is what stores them.
-                  </p>
-
                   {/* Read-only: what this pot is currently set up to want. It
                       is edited in the plant editor below, which keeps one
                       place for a plant and one for a pot. */}
-                  <h4 className="card-group-title">This plant</h4>
+                  <h4 className="card-group-title">Plant Info</h4>
                   <p className="field-hint">
                     <strong>{plant.name}</strong> — waters at{' '}
                     {plant.moisture_target}, {plant.watering_volume_ml} mL,
-                    lights {plant.light_start_time}–{plant.light_stop_time}.
-                    Change these in the plant editor below, then load it here.
+                    lights {formatClock(plant.light_start_time)}–
+                    {formatClock(plant.light_stop_time)}
                   </p>
-                  {plant.notes && <p className="field-hint">{plant.notes}</p>}
+                  {plant.notes && <p className="field-hint">Notes: {plant.notes}</p>}
 
                   <h4 className="card-group-title">This pot</h4>
+                  <p className="field-hint">
+                    These save themselves a moment after you stop typing — the
+                    status bar at the top says when. A blank location or an
+                    unfinished sweep span is held back, and says so below.
+                  </p>
                   <div className="field-grid">
                     <label>
                       Soil
                       <select
                         value={draft.soil}
-                        onChange={(event) => updateDraft(plant.plant_id, 'soil', event.target.value)}
+                        onChange={(event) => updateDraft(plant, 'soil', event.target.value)}
                       >
                         <option value="">
                           {soilList.length ? 'Not set' : 'No mixes installed'}
@@ -345,7 +409,7 @@ export function PlantsPanel({
                       <input
                         type="number"
                         value={draft.position_mm}
-                        onChange={(event) => updateDraft(plant.plant_id, 'position_mm', event.target.value)}
+                        onChange={(event) => updateDraft(plant, 'position_mm', event.target.value)}
                       />
                     </label>
                     <label>
@@ -353,7 +417,7 @@ export function PlantsPanel({
                       <select
                         value={draft.watering_mode}
                         onChange={(event) =>
-                          updateDraft(plant.plant_id, 'watering_mode', event.target.value)
+                          updateDraft(plant, 'watering_mode', event.target.value)
                         }
                       >
                         <option value="point">
@@ -373,7 +437,7 @@ export function PlantsPanel({
                             type="number"
                             value={draft.sweep_min_mm}
                             onChange={(event) =>
-                              updateDraft(plant.plant_id, 'sweep_min_mm', event.target.value)
+                              updateDraft(plant, 'sweep_min_mm', event.target.value)
                             }
                           />
                           <button
@@ -389,7 +453,7 @@ export function PlantsPanel({
                             type="number"
                             value={draft.sweep_max_mm}
                             onChange={(event) =>
-                              updateDraft(plant.plant_id, 'sweep_max_mm', event.target.value)
+                              updateDraft(plant, 'sweep_max_mm', event.target.value)
                             }
                           />
                           <button
@@ -467,13 +531,17 @@ export function PlantsPanel({
                         the strip length, so there is nothing to set.
                       </p>
                       <p className="field-hint">
-                        Jog the carriage until the nozzle is over this pot, then
-                        press. Fills the field above — nothing is stored until
-                        you Save. The sweep edges have their own buttons, so you
-                        can jog to each side of a wide pot and capture it there.
+                        Jog the carriage until the nozzle is over this pot,
+                        then press. Fills the field above and saves it, so
+                        check the card is the right one first. The sweep edges
+                        have their own buttons, so you can jog to each side of
+                        a wide pot and capture it there.
                       </p>
                       {captureNote[plant.plant_id] && (
                         <p className="field-hint warning">{captureNote[plant.plant_id]}</p>
+                      )}
+                      {holdNote[plant.plant_id] && (
+                        <p className="field-hint warning">{holdNote[plant.plant_id]}</p>
                       )}
                     </div>
                   </div>
