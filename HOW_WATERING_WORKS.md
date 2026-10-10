@@ -70,8 +70,16 @@ must be yes** or it moves on and tries again next minute.
    its own target, because a fern and a succulent don't want the same thing.
 4. **Has it been at least 30 minutes since I last watered this pot?** See below.
 5. **Did the arm actually reach the pot?** If the arm can't move — it isn't
-   calibrated, something is in the way — the planter refuses to run the pump.
+   homed, something is in the way — the planter refuses to run the pump.
    Watering the wrong spot is worse than not watering.
+
+On that last one: the planter homes itself shortly after it comes up, so this
+clears on its own within a minute of a restart. Until it homes, the board
+reports a position relative to wherever the arm happened to be when the power
+went on, which is a meaningless number that looks like a real one. If the
+planter boots during quiet hours the home waits for the window to close, since
+the arm is one of the two loud parts. Both of those are switchable under
+Automation.
 
 Only then does the pump run.
 

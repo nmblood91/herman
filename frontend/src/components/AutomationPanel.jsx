@@ -17,6 +17,7 @@ export function AutomationPanel({ overview, onRefresh }) {
   const idle = overview?.idle_motion
   const [idleOn, setIdleOn] = useState(true)
   const [idleMinutes, setIdleMinutes] = useState(60)
+  const [homeOnStartup, setHomeOnStartup] = useState(true)
   const [idleMsg, setIdleMsg] = useState('')
 
   const quiet = overview?.quiet
@@ -33,6 +34,7 @@ export function AutomationPanel({ overview, onRefresh }) {
     setAutoOn(watering?.auto_watering_enabled ?? autoOn)
     setIdleOn(idle?.enabled ?? idleOn)
     setIdleMinutes(idle?.minutes ?? idleMinutes)
+    setHomeOnStartup(idle?.home_on_startup ?? homeOnStartup)
     setQuietOn(quiet?.quiet_hours_enabled ?? quietOn)
     setQuietStart(quiet?.quiet_hours_start ?? quietStart)
     setQuietStop(quiet?.quiet_hours_stop ?? quietStop)
@@ -77,7 +79,11 @@ export function AutomationPanel({ overview, onRefresh }) {
       const response = await fetch(`${API_BASE}/dances/auto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: idleOn, minutes: Number(idleMinutes) }),
+        body: JSON.stringify({
+          enabled: idleOn,
+          minutes: Number(idleMinutes),
+          home_on_startup: homeOnStartup,
+        }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -151,6 +157,22 @@ export function AutomationPanel({ overview, onRefresh }) {
           <h3>Auto-home</h3>
 
           <div className="field-row">
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={homeOnStartup}
+                onChange={(event) => setHomeOnStartup(event.target.checked)}
+              />
+              Re-home on startup
+            </label>
+            <p className="field-hint">
+              Homes once, shortly after the planter comes up. Until it homes,
+              the board reports a position relative to wherever the arm happened
+              to be when the power went on — so every saved plant coordinate is
+              wrong by an unknown amount and watering is refused outright.
+              Deferred, not skipped, if the planter boots inside quiet hours.
+            </p>
+
             <label className="checkbox-row">
               <input
                 type="checkbox"

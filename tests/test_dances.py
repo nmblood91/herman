@@ -139,6 +139,9 @@ finally:
 # --- the hourly cycle ---
 
 auto, klip = build()
+# Off, so the home counted below is the routine's own. The startup home has
+# its own section at the end of this file.
+auto.home_on_startup = False
 auto.set_idle_motion(True, 60)
 auto.tick()
 assert klip.gcode == [], "danced on the first tick after startup"
@@ -235,5 +238,90 @@ auto.run_dance("shuffle")
 auto.tick()
 assert len(klip.gcode) == 1, "an automatic routine followed a manual one"
 print("ok: a manual routine resets the interval")
+
+
+# --- the startup home ---
+#
+# Until the arm is homed Klipper reports a position relative to wherever the
+# carriage happened to power up, so every saved plant coordinate is wrong by an
+# unknown amount and watering is refused outright. Without this the first home
+# is up to a whole idle-motion interval away.
+
+auto, klip = build(klip=Klip(homed=False))
+auto.set_idle_motion(False)
+assert klip.homes == 0, "homed during construction, before anything held the lock"
+print("ok: nothing homes while the service is still starting up")
+
+auto.tick()
+assert klip.homes == 1, klip.homes
+assert klip.gcode == [], "ran a routine as well as homing"
+print("ok: the first tick homes, and only homes")
+
+for _ in range(5):
+    auto.tick()
+assert klip.homes == 1, f"homed {klip.homes} times, so it is homing every tick"
+print("ok: and does not home again on every tick after that")
+
+# Off means off.
+auto, klip = build(klip=Klip(homed=False))
+auto.set_idle_motion(False, home_on_startup=False)
+for _ in range(3):
+    auto.tick()
+assert klip.homes == 0, klip.homes
+print("ok: switched off, it never homes by itself")
+
+# Held during quiet hours like every other unattended movement -- the arm is
+# the noisy part whether or not it was asked nicely.
+auto, klip = build(klip=Klip(homed=False))
+auto.set_idle_motion(False)
+auto.snooze_watering(2)
+auto.tick()
+assert klip.homes == 0, "homed through a snooze"
+print("ok: a snooze defers the startup home")
+
+# And the deferral is not a cancellation: the flag is left clear so the next
+# tick after the window closes does it, rather than waiting for a restart.
+auto.cancel_snooze()
+auto.tick()
+assert klip.homes == 1, klip.homes
+print("ok: once the snooze lifts it homes, rather than waiting for a restart")
+
+
+# --- a board that cannot home ---
+#
+# Retrying every second would fill the log and hold the lock against real work,
+# and a board that cannot home will not start being able to on the next tick.
+
+class Broken(Klip):
+    def home_gantry(self):
+        self.homes += 1
+        raise RuntimeError("no endstop")
+
+
+broken = Broken(homed=False)
+auto = GreenThumbAutomation(
+    Hub(), broken, Nul(), Nul(), history=temp_store(), state_path=temp_state()
+)
+auto.set_idle_motion(False)
+for _ in range(4):
+    auto.tick()
+assert broken.homes == 1, f"retried a failing home {broken.homes} times"
+print("ok: a home that raises is tried once, not every tick")
+
+
+# --- the choice persists ---
+
+shared = temp_state()
+auto = GreenThumbAutomation(
+    Hub(), Klip(), Nul(), Nul(), history=temp_store(), state_path=shared
+)
+auto.set_idle_motion(True, 60, home_on_startup=False)
+again = GreenThumbAutomation(
+    Hub(), Klip(), Nul(), Nul(), history=temp_store(), state_path=shared
+)
+assert again.home_on_startup is False
+assert again.idle_motion_status()["home_on_startup"] is False
+print("ok: the startup-home choice survives a restart")
+
 
 print("\nall idle motion checks passed")

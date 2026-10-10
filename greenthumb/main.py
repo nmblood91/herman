@@ -212,14 +212,23 @@ def run_dance(name: str) -> dict[str, object]:
 
 @app.post(f"{settings.api_prefix}/dances/auto")
 def set_idle_motion(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-    """Turn the periodic re-home and routine on or off, and set its interval."""
+    """Turn the periodic re-home and routine on or off, and set its interval.
+
+    Also carries home_on_startup, which is the other half of automatic homing:
+    the interval covers belts slipping during operation, and that covers the
+    arm having been moved while the planter was off.
+    """
     minutes = payload.get("minutes")
+    on_startup = payload.get("home_on_startup")
     result = automation.set_idle_motion(
         enabled=bool(payload.get("enabled", False)),
         minutes=int(minutes) if minutes is not None else None,
+        home_on_startup=bool(on_startup) if on_startup is not None else None,
     )
     log_event(
-        f"Idle motion {'on' if result['enabled'] else 'off'}, every {result['minutes']} min"
+        f"Idle motion {'on' if result['enabled'] else 'off'}, every "
+        f"{result['minutes']} min, home on startup "
+        f"{'on' if result['home_on_startup'] else 'off'}"
     )
     return result
 

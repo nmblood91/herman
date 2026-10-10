@@ -123,6 +123,10 @@ class GreenThumbAutomation:
         # tank. Seeded from history at startup so a reboot does not forget that
         # the reservoir is empty.
         self._delivery_failures = 0
+        # Cleared once the startup home has actually run, so it happens once
+        # per process rather than once per tick.
+        self._homed_at_startup = False
+        self.home_on_startup = settings.home_on_startup
         self._pump_timer: threading.Timer | None = None
         self._pump_lock_held = False
         # How long the last manual run actually lasted, which is the
@@ -253,6 +257,8 @@ class GreenThumbAutomation:
             minutes = idle.get("minutes")
             if isinstance(minutes, int) and not isinstance(minutes, bool) and minutes > 0:
                 self.idle_motion_minutes = minutes
+            if isinstance(idle.get("home_on_startup"), bool):
+                self.home_on_startup = idle["home_on_startup"]
             nxt = idle.get("next")
             if isinstance(nxt, int) and not isinstance(nxt, bool):
                 # Keeps the rotation going across a restart instead of always
@@ -381,6 +387,7 @@ class GreenThumbAutomation:
                 "enabled": self.idle_motion_enabled,
                 "minutes": self.idle_motion_minutes,
                 "next": self.idle_motion_next,
+                "home_on_startup": self.home_on_startup,
             },
             "quiet": {
                 "enabled": self.quiet_hours_enabled,
@@ -687,9 +694,11 @@ class GreenThumbAutomation:
             # silently end all polling.
             logger.exception("Control loop tick failed")
 
-        # Outside the block above so it takes the lock on its own terms: a
-        # dance is the lowest-priority thing this machine does and should
-        # never be the reason a watering cycle was skipped.
+        # Both outside the block above so they take the lock on their own
+        # terms: neither should ever be the reason a watering cycle was
+        # skipped. The startup home comes first -- until the arm is homed,
+        # watering is refused anyway, so it is the one that unblocks the rest.
+        self._maybe_home_on_startup()
         self._maybe_idle_motion()
 
     def _apply_lighting(self) -> None:
@@ -1557,6 +1566,45 @@ class GreenThumbAutomation:
         self._last_idle_motion = datetime.now()
         return {"ok": True, "dance": name, "seconds": seconds}
 
+    def _maybe_home_on_startup(self) -> None:
+        """Home once, the first time the loop gets a chance.
+
+        Not in the lifespan hook, where it would hold the API down for the
+        length of the travel before serving anything. Not in __init__ either,
+        for the same reason and because nothing has the hardware lock yet.
+
+        Held during quiet hours like every other unattended movement -- the arm
+        is the noisy part whether or not it was asked nicely. The flag is not
+        set in that case, so it homes as soon as the window closes rather than
+        waiting for the next restart.
+        """
+        if self._homed_at_startup or not self.home_on_startup:
+            return
+
+        held = self.watering_suppressed()
+        if held:
+            logger.debug("Deferring the startup home, %s", held)
+            return
+
+        try:
+            result = self.home_gantry()
+        except HardwareBusyError:
+            logger.debug("Deferring the startup home, hardware is busy")
+            return
+        except Exception:
+            # Marked done regardless: a board that cannot home will not start
+            # being able to on the next tick, and retrying every second would
+            # fill the log and hold the lock against real work.
+            self._homed_at_startup = True
+            logger.exception("Startup home failed")
+            return
+
+        self._homed_at_startup = True
+        if result.get("ok"):
+            logger.info("Homed on startup")
+        else:
+            logger.warning("Startup home did not run: %s", result.get("error"))
+
     def _maybe_idle_motion(self) -> None:
         """Called every tick. Runs at most one routine per interval."""
         if not self.idle_motion_enabled:
@@ -1596,11 +1644,18 @@ class GreenThumbAutomation:
             logger.warning("Idle motion did not run: %s", result.get("error"))
         self._persist()
 
-    def set_idle_motion(self, enabled: bool, minutes: int | None = None) -> dict[str, object]:
+    def set_idle_motion(
+        self,
+        enabled: bool,
+        minutes: int | None = None,
+        home_on_startup: bool | None = None,
+    ) -> dict[str, object]:
         if minutes is not None:
             if not 5 <= int(minutes) <= 1440:
                 raise ValueError("Interval must be between 5 minutes and 24 hours")
             self.idle_motion_minutes = int(minutes)
+        if home_on_startup is not None:
+            self.home_on_startup = bool(home_on_startup)
         self.idle_motion_enabled = bool(enabled)
         self._persist()
         return self.idle_motion_status()
@@ -1611,6 +1666,8 @@ class GreenThumbAutomation:
             "status": "ok",
             "enabled": self.idle_motion_enabled,
             "minutes": self.idle_motion_minutes,
+            "home_on_startup": self.home_on_startup,
+            "homed_at_startup": self._homed_at_startup,
             "next_dance": dances.DEFAULT_ORDER[
                 self.idle_motion_next % len(dances.DEFAULT_ORDER)
             ],

@@ -15,6 +15,7 @@ export function LedStripPanel({ overview }) {
   const [chip, setChip] = useState('WS2811')
   const [colorOrder, setColorOrder] = useState('GRB')
   const [status, setStatus] = useState('')
+  const [testing, setTesting] = useState('')
 
   const [syncedOverview, setSyncedOverview] = useState(null)
   if (overview !== syncedOverview) {
@@ -47,6 +48,34 @@ export function LedStripPanel({ overview }) {
       setStatus('Saved.')
     } catch (error) {
       setStatus(`Save failed: ${error.message}`)
+    }
+  }
+
+  // Lights the whole strip one primary at a time, which is the only way to
+  // check the colour order above: if red comes out green, the order is wrong.
+  // Deliberately the existing colour endpoint rather than a test mode of its
+  // own -- a "test" that drove the strip differently from normal use would
+  // prove the test path works, not the strip.
+  const show = async (name, rgb) => {
+    setTesting('')
+    try {
+      const response = await fetch(`${API_BASE}/lights/color`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rgb),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setTesting(data.error || `Could not set the strip (HTTP ${response.status})`)
+        return
+      }
+      setTesting(
+        `Strip set to ${name}. If that is not the colour you see, the colour ` +
+          'order above is wrong. This leaves the lights on manually — set the ' +
+          'mode back to Schedule under Controls when you are done.',
+      )
+    } catch (error) {
+      setTesting(`Could not set the strip: ${error.message}`)
     }
   }
 
@@ -94,6 +123,22 @@ export function LedStripPanel({ overview }) {
           Save LED strip
         </button>
         {status && <p className="field-hint warning">{status}</p>}
+
+        <div className="field-row">
+          <label>Test the colour order</label>
+          <div className="motion-grid">
+            <button type="button" onClick={() => show('red', { r: 255, g: 0, b: 0 })}>
+              Red
+            </button>
+            <button type="button" onClick={() => show('green', { r: 0, g: 255, b: 0 })}>
+              Green
+            </button>
+            <button type="button" onClick={() => show('blue', { r: 0, g: 0, b: 255 })}>
+              Blue
+            </button>
+          </div>
+          {testing && <p className="field-hint">{testing}</p>}
+        </div>
       </div>
     </section>
   )

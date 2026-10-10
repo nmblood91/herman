@@ -110,6 +110,15 @@ class Settings(BaseSettings):
     # watering only: a dose you asked for by pressing a button still runs,
     # because you are standing there and already know the noise is coming.
     # Defaults here; the UI persists any change to data/state.json.
+    # Home once when the service comes up. Until it homes, Klipper reports a
+    # position relative to wherever the carriage happened to be powered on at,
+    # so every saved plant coordinate is wrong by an unknown amount and
+    # watering is refused outright. Without this the first home is up to
+    # idle_motion_minutes away.
+    #
+    # Only the value a planter starts life with; the stored choice wins.
+    home_on_startup: bool = True
+
     quiet_hours_enabled: bool = False
     quiet_hours_start: str = "21:00"
     quiet_hours_stop: str = "08:00"
