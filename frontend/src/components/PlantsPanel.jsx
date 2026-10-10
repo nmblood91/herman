@@ -464,10 +464,10 @@ export function PlantsPanel({
                     )}
                   </div>
 
-                  <h3 className="card-group-title">Pot Info</h3>
+                  <h3 className="card-group-title">Soil Info</h3>
                   <div className="field-grid">
                     <label>
-                      Soil
+                      Type
                       <select
                         value={draft.soil}
                         onChange={(event) => updateDraft(plant, 'soil', event.target.value)}
@@ -482,44 +482,59 @@ export function PlantsPanel({
                         ))}
                       </select>
                     </label>
+                    <label>Field Capacity</label>
                     <div>
-                      <p className="field-hint">
-                        {plant.field_capacity_raw != null ? (
-                          <>
-                            Field capacity reads{' '}
-                            <strong>{plant.field_capacity_raw}</strong> here
+                      {plant.field_capacity_raw != null ? (
+                        <>
+                          <p className="field-hint">
+                            Set: <strong>{plant.field_capacity_raw}</strong>
                             {plant.field_capacity_source === 'pot'
-                              ? ', measured in this pot'
+                              ? ' — measured in this pot'
                               : plant.field_capacity_soil
-                                ? `, from ${plant.field_capacity_soil}`
+                                ? ` — from ${plant.field_capacity_soil}`
                                 : ''}
-                            . That is the top of this pot's moisture scale.
-                          </>
-                        ) : (
-                          <span className="warning">
-                            No field capacity, so this pot reads nothing and is
-                            never watered automatically. Measure it for the mix
-                            in the Soil panel below, or for this pot alone
-                            here.
-                          </span>
-                        )}
-                      </p>
-                      <div className="motion-grid two-up">
-                        <button
-                          type="button"
-                          onClick={() => onMeasureFieldCapacity(plant.plant_id)}
-                        >
-                          Measure this pot (20s)
-                        </button>
-                        {plant.field_capacity_source === 'pot' && (
-                          <button
-                            type="button"
-                            onClick={() => onClearFieldCapacity(plant.plant_id)}
-                          >
-                            Use the mix's figure instead
-                          </button>
-                        )}
-                      </div>
+                            . Automatic watering is on.
+                          </p>
+                          <div className="motion-grid two-up">
+                            <button
+                              type="button"
+                              onClick={() => onMeasureFieldCapacity(plant.plant_id)}
+                            >
+                              Calibrate this pot (20s)
+                            </button>
+                            {/* Only when this pot overrides the mix: with an
+                                inherited figure there is nothing to fall back
+                                to. */}
+                            {plant.field_capacity_source === 'pot' && (
+                              <button
+                                type="button"
+                                onClick={() => onClearFieldCapacity(plant.plant_id)}
+                              >
+                                Use the mix's figure
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="field-hint warning">
+                            Not set. This pot is never watered automatically.
+                          </p>
+                          <ol className="field-hint steps">
+                            <li>Water until it drains from the bottom.</li>
+                            <li>Wait 24 hours.</li>
+                            <li>Calibrate.</li>
+                          </ol>
+                          <div className="motion-grid">
+                            <button
+                              type="button"
+                              onClick={() => onMeasureFieldCapacity(plant.plant_id)}
+                            >
+                              Calibrate this pot (20s)
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 

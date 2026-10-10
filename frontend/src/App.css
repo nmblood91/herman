@@ -388,6 +388,17 @@ option {
   color: #e6a04a;
 }
 
+/* A list inherits none of .field-hint's spacing, and loses its numbers
+   altogether without the padding -- the markers sit outside the box. */
+.field-hint.steps {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.field-hint.steps li {
+  margin: 2px 0;
+}
+
 .checkbox-row {
   display: flex;
   align-items: center;
