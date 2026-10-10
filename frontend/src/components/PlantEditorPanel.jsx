@@ -261,29 +261,31 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
               />
             </label>
           </div>
-          <label>
-            Water when soil is
-            <select
-              value={form.moisture_target}
-              onChange={(event) => update('moisture_target', event.target.value)}
-            >
-              {bandList.map((band) => (
-                <option key={band.name} value={band.name}>
-                  {band.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Watering Volume (mL)
-            <input
-              type="number"
-              min="0"
-              step="10"
-              value={form.watering_volume_ml}
-              onChange={(event) => update('watering_volume_ml', event.target.value)}
-            />
-          </label>
+          <div className="field-pair">
+            <label>
+              Water when soil is
+              <select
+                value={form.moisture_target}
+                onChange={(event) => update('moisture_target', event.target.value)}
+              >
+                {bandList.map((band) => (
+                  <option key={band.name} value={band.name}>
+                    {band.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Watering Volume (mL)
+              <input
+                type="number"
+                min="0"
+                step="10"
+                value={form.watering_volume_ml}
+                onChange={(event) => update('watering_volume_ml', event.target.value)}
+              />
+            </label>
+          </div>
         </div>
 
         <div className="field-row">
