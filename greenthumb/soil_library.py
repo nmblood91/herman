@@ -36,6 +36,7 @@ import sys
 from dataclasses import dataclass
 
 from greenthumb import state
+from greenthumb.config import settings
 
 
 @dataclass(frozen=True)
@@ -150,6 +151,56 @@ def install(overwrite: bool = False, path=None) -> dict[str, str]:
     return outcome
 
 
+# Mirrors soil_sensors.MIN_CALIBRATION_SPAN. Copied rather than imported: that
+# module imports smbus2, so importing it here would make this CLI need I2C to
+# print a table. If the two drift, this one is only ever too permissive --
+# span_for is what actually refuses a reading.
+MIN_CALIBRATION_SPAN = 50
+
+
+def set_field_capacity(name: str, raw: int, path=None) -> str:
+    """Write a mix's field capacity as a raw count, without measuring it.
+
+    Measuring is the app's job and takes a pot of the mix soaked through and
+    left to drain for a day. This is for a figure you already have: putting one
+    back after a reflash, or copying a known-good reading onto a second
+    planter. A clean Pi is this project's upgrade path, and re-soaking four
+    pots to recover a number somebody wrote down is not one.
+
+    No measurement date is written, and samples is 0. That absence is the tell:
+    the app shows a date beside a measured figure and nothing beside this one.
+    """
+    soils = state.load_soils(path)
+    key = next((k for k in soils if k.casefold() == name.strip().casefold()), None)
+    if key is None:
+        known = ", ".join(sorted(soils)) or "none installed"
+        raise ValueError(f"No soil called {name.strip()!r}. Installed: {known}")
+
+    # A figure at or below the dry floor cannot produce a reading: span_for
+    # returns None under MIN_CALIBRATION_SPAN, every pot on that mix reads -1,
+    # and nothing is ever watered. Refused here rather than stored, because
+    # from the app that state is indistinguishable from never having measured.
+    floor = settings.moisture_raw_dry + MIN_CALIBRATION_SPAN
+    if raw < floor:
+        raise ValueError(
+            f"{raw} is too low to read against: the dry floor is "
+            f"{settings.moisture_raw_dry} and a usable span needs at least "
+            f"{MIN_CALIBRATION_SPAN} counts above it, so {floor} or more."
+        )
+
+    state.save_soil(
+        key,
+        {
+            "field_capacity_raw": int(raw),
+            "field_capacity_samples": 0,
+            "field_capacity_measured_at": "",
+            "field_capacity_address": None,
+        },
+        path,
+    )
+    return key
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Starting entries for the soil library.",
@@ -167,7 +218,27 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="replace entries of the same name instead of keeping yours",
     )
+    parser.add_argument(
+        "--set-field-capacity",
+        nargs=2,
+        metavar=("SOIL", "RAW"),
+        help="write a mix's field capacity by hand, as a raw sensor count",
+    )
     args = parser.parse_args(argv)
+
+    if args.set_field_capacity:
+        name, raw = args.set_field_capacity
+        try:
+            key = set_field_capacity(name, int(raw))
+        except ValueError as error:
+            print(error)
+            return 1
+        print(f"{key}: field capacity set to {int(raw)} by hand, not measured.")
+        print(
+            "Pots already filled with it keep the figure they have -- the copy "
+            "is deliberate. Re-pick the mix on a pot's card to take this one."
+        )
+        return 0
 
     if not args.install:
         for soil in LIBRARY:

@@ -282,4 +282,69 @@ assert moisture.band_for(90, ratio) in moisture.ORDER
 print("ok: a saved soil always yields a ratio the bands can use")
 
 
+# --- a field capacity entered by hand ------------------------------------
+#
+# The measuring path needs a pot soaked and drained for a day, so the figure
+# has to be enterable from a note as well: a reflash is this project's upgrade
+# path, and re-soaking four pots to recover a number nobody lost is not one.
+
+path = temp_state()
+soil_library.install(path=path)
+
+floor = settings.moisture_raw_dry + soil_library.MIN_CALIBRATION_SPAN
+for raw, why in (
+    (floor - 1, "one count below the usable span"),
+    (settings.moisture_raw_dry, "the dry floor itself"),
+    (0, "zero"),
+):
+    try:
+        soil_library.set_field_capacity("Coco coir", raw, path=path)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted {why}: {raw}")
+    assert state.load_soils(path)["Coco coir"].get("field_capacity_raw") is None, raw
+# The refusal matters because the stored result would be indistinguishable
+# from never having measured: span_for returns None under the span, every pot
+# on the mix reads -1, and nothing is watered.
+print("ok: a figure too low to read against is refused, and nothing is stored")
+
+try:
+    soil_library.set_field_capacity("Moon dust", 700, path=path)
+except ValueError as error:
+    assert "Moon dust" in str(error), error
+else:
+    raise AssertionError("accepted a mix that is not installed")
+print("ok: an unknown mix is refused, and says what is installed")
+
+key = soil_library.set_field_capacity("coco COIR", 742, path=path)
+assert key == "Coco coir", key
+entry = state.load_soils(path)["Coco coir"]
+assert entry["field_capacity_raw"] == 742, entry
+print("ok: a hand-entered figure is written, matched on the name case-insensitively")
+
+# The absence of a date is the only thing separating this from a measurement,
+# so it has to stay absent.
+assert entry["field_capacity_measured_at"] == "", entry
+assert entry["field_capacity_samples"] == 0, entry
+print("ok: no measurement date and no samples, since nothing was measured")
+
+# The merge trap: save_soil replacing the whole entry would drop the ratio the
+# bands need, leaving a mix that looks configured and bands nothing.
+assert entry["field_capacity_vwc"] == 55, entry
+assert entry["wilting_point_vwc"] == 15, entry
+assert entry["notes"], entry
+assert state.available_water_fraction(entry) is not None, entry
+print("ok: the VWC figures and the note survive, so the mix still bands")
+
+# And a pot takes it the way it takes a measured one.
+own = build(path)
+own.update_plant_soil("plant_1", "Coco coir")
+plant = own.plants[0]
+assert plant.field_capacity_raw == 742, plant.field_capacity_raw
+assert plant.field_capacity_source == "soil", plant.field_capacity_source
+assert plant.field_capacity_soil == "Coco coir", plant.field_capacity_soil
+print("ok: a pot inherits a hand-entered figure like any other")
+
+
 print("\nall soil library checks passed")
