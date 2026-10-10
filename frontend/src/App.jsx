@@ -4,6 +4,7 @@ import { TabBar } from './components/TabBar'
 import { ControlsPanel } from './components/ControlsPanel'
 import { AutomationPanel } from './components/AutomationPanel'
 import { PlantsPanel } from './components/PlantsPanel'
+import { PlantEditorPanel } from './components/PlantEditorPanel'
 import { SoilsPanel } from './components/SoilsPanel'
 import { HistoryPanel } from './components/HistoryPanel'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
@@ -219,32 +220,12 @@ function App() {
     }
   }
 
-  const savePlant = async (plant) => {
+  // Pot fields only. This used to be nine calls ending in a profile save, so
+  // storing a rail coordinate also wrote a saved plant -- the two are edited
+  // in separate places now, and this is the pot half.
+  const savePot = async (plant) => {
     try {
-      setStatus(`Saving ${plant.name}...`, { sticky: true })
-
-      await fetchJson(`/plants/${plant.plant_id}/name`, {
-        method: 'POST',
-        body: JSON.stringify({ name: plant.name }),
-      })
-
-      await fetchJson(`/plants/${plant.plant_id}/lighting`, {
-        method: 'POST',
-        body: JSON.stringify({
-          start_time: plant.light_start_time,
-          stop_time: plant.light_stop_time,
-        }),
-      })
-
-      await fetchJson(`/plants/${plant.plant_id}/moisture`, {
-        method: 'POST',
-        body: JSON.stringify({ moisture_target: plant.moisture_target }),
-      })
-
-      await fetchJson(`/plants/${plant.plant_id}/volume`, {
-        method: 'POST',
-        body: JSON.stringify({ watering_volume_ml: Number(plant.watering_volume_ml) }),
-      })
+      setStatus(`Saving ${plant.name}'s pot...`, { sticky: true })
 
       await fetchJson(`/plants/${plant.plant_id}/position`, {
         method: 'POST',
@@ -277,13 +258,7 @@ function App() {
         body: JSON.stringify({ watering_mode: plant.watering_mode || 'point' }),
       })
 
-      // Last, and after the name: the profile is keyed on the plant's name, so
-      // this has to read the name the planter just accepted rather than the one
-      // it had before. Saving the plant and remembering it under that name are
-      // one action, which is why there is no separate button.
-      await fetchJson(`/plants/${plant.plant_id}/profile`, { method: 'POST' })
-
-      setStatus(`Saved ${plant.name}.`)
+      setStatus(`Saved ${plant.name}'s pot.`)
       await loadDashboard()
     } catch (error) {
       setStatus(`Save failed: ${error.message}`)
@@ -319,16 +294,21 @@ function App() {
         <>
           <PlantsPanel
             plants={plants}
-            onSave={savePlant}
+            onSave={savePot}
             status={overview?.plants}
             movement={overview?.movement}
             profiles={profiles}
             onLoadProfile={loadProfile}
             soils={soils}
-            bands={bands}
           />
-          {/* Below the cards, because a mix is picked from the dropdown on a
-              card: the library and the pots that use it belong on one tab. */}
+          {/* Below the cards, because both are libraries the cards pick from:
+              a plant and a mix are chosen from dropdowns up there, so editing
+              them belongs on the same tab rather than one away. */}
+          <PlantEditorPanel
+            profiles={profiles}
+            bands={bands}
+            onRefresh={loadDashboard}
+          />
           <SoilsPanel soils={soils} onRefresh={loadDashboard} />
         </>
       )}

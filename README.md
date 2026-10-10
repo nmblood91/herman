@@ -73,7 +73,7 @@ Everything is under `/api/v1`, grouped roughly as:
 |---|---|
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
 | `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
-| `/plant-profiles`, `/plants/{id}/profile` | the saved-plant library: list, save, load, delete |
+| `/plant-profiles`, `/plants/{id}/profile` | the saved-plant library: list, read one, write one from a body, snapshot a pot, load onto a pot, delete |
 | `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
 | `/moisture-bands` | the band scale, for pickers and legends |
 | `/water/{plant_id}` | move to a plant and dose it |
@@ -135,6 +135,35 @@ two saved plants. Capitalisation is not a difference — saving "basil" over
 Loading copies a saved plant onto a pot, including its name. Two pots may end
 up with the same name, which is allowed: `plant_id` is the identity and the
 name is a label, and copying one plant onto a second pot is the point.
+
+**A saved plant is edited in its own right**, in the plant editor on the Plants
+and Soil tab, or over the API:
+
+```bash
+curl -X POST http://herman.local/api/v1/plant-profiles -H 'Content-Type: application/json' \
+  -d '{"name":"Basil","moisture_target":"dry","watering_volume_ml":120,"light_start_time":"07:30","light_stop_time":"21:00","notes":"South window, dries fast in summer."}'
+curl http://herman.local/api/v1/plant-profiles/Basil
+```
+
+That is a change in direction worth knowing about. Previously the only way to
+write a saved plant was `POST /plants/{id}/profile`, which snapshots a pot — so
+fixing a saved plant meant loading it onto a spare pot, editing, and saving
+back, which changes what the planter is actually running in order to edit
+something it is not. Both paths still exist and write the same entry; there is
+a test asserting they agree field for field, since two editors that validate
+differently would fill the library with entries that load badly.
+
+A plant card no longer edits care settings at all. It picks a saved plant and
+loads it, picks a soil, and sets the pot's own geometry. **Save pot** stores
+that geometry and nothing else — it used to also write a profile as a side
+effect, so you could not store a rail coordinate without saving a plant.
+
+Each saved plant and each soil also carries **notes**: free text, and the only
+field the planter never acts on. The numbers say what it does; the note says
+why, which is the part nobody remembers a season later. The starter libraries
+have always carried this text in `plant_library.py` and `soil_library.py` — it
+was discarded on install until now, so the reasoning stayed in the source and
+never reached anyone reading the library in the app.
 
 **Nothing describing the pot is part of a saved plant** -- not the watering
 location, not the watering mode or its sweep bounds, and not the soil. A saved
@@ -251,6 +280,8 @@ like "not set".
 ```bash
 curl -X POST http://herman.local/api/v1/soils -H 'Content-Type: application/json'   -d '{"name":"My potting mix","field_capacity_vwc":30,"wilting_point_vwc":14}'
 ```
+
+A soil takes a note too, for where its figures came from.
 
 Saving replaces any soil of that name. Figures that cannot support a ratio are
 refused rather than stored: one that saved happily and then yielded no ratio

@@ -11,6 +11,7 @@ export function SoilsPanel({ soils, onRefresh }) {
   const [name, setName] = useState('')
   const [capacity, setCapacity] = useState('')
   const [wilting, setWilting] = useState('')
+  const [notes, setNotes] = useState('')
   const [message, setMessage] = useState('')
 
   const list = soils ?? []
@@ -25,6 +26,7 @@ export function SoilsPanel({ soils, onRefresh }) {
           name,
           field_capacity_vwc: Number(capacity),
           wilting_point_vwc: Number(wilting),
+          notes,
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -39,6 +41,7 @@ export function SoilsPanel({ soils, onRefresh }) {
       setName('')
       setCapacity('')
       setWilting('')
+      setNotes('')
       onRefresh?.()
     } catch (error) {
       setMessage(`Save failed: ${error.message}`)
@@ -84,6 +87,7 @@ export function SoilsPanel({ soils, onRefresh }) {
                       field capacity {soil.field_capacity_vwc}% &middot; wilting{' '}
                       {soil.wilting_point_vwc}% &middot; {soil.available_points} pts usable
                     </small>
+                    {soil.notes && <small>{soil.notes}</small>}
                   </span>
                   <button type="button" onClick={() => remove(soil.name)}>
                     Remove
@@ -141,6 +145,18 @@ export function SoilsPanel({ soils, onRefresh }) {
             Save soil
           </button>
           {message && <p className="field-hint">{message}</p>}
+        </div>
+
+        <div className="field-row">
+          <label>
+            Notes
+            <textarea
+              rows="3"
+              value={notes}
+              placeholder="Where these figures came from."
+              onChange={(event) => setNotes(event.target.value)}
+            />
+          </label>
         </div>
 
         <div className="field-row">

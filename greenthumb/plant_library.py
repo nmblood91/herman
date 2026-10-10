@@ -148,6 +148,10 @@ def install(overwrite: bool = False, path=None) -> dict[str, str]:
                 "watering_volume_ml": plant.watering_volume_ml,
                 "light_start_time": plant.light_start_time,
                 "light_stop_time": plant.light_stop_time,
+                # Why these numbers, and how far to trust them. Carried through
+                # now rather than discarded on install: the hedging is the most
+                # useful part of a looked-up profile.
+                "notes": plant.note,
             },
             path,
         )

@@ -209,6 +209,15 @@ class GreenThumbAutomation:
                 value = saved.get(text_field)
                 if isinstance(value, str) and value.strip():
                     setattr(plant, text_field, value.strip())
+            # Separately from the loop above, which skips blanks so that a
+            # cleared name cannot wipe the default. An empty note is a real
+            # value, so it is tested for being a string rather than for being
+            # truthy -- though with the dataclass default also empty, the two
+            # behave the same here. The distinction earns its keep in
+            # apply_plant_profile, where skipping an empty note would leave the
+            # previous one on the pot.
+            if isinstance(saved.get("notes"), str):
+                plant.notes = saved["notes"].strip()
             # Validated rather than taken as written, unlike the names: an
             # unknown mode would make every dose fall back to a point while the
             # card said otherwise.
@@ -350,6 +359,7 @@ class GreenThumbAutomation:
                     "sweep_min_mm": plant.sweep_min_mm,
                     "sweep_max_mm": plant.sweep_max_mm,
                     "soil": plant.soil,
+                    "notes": plant.notes,
                     "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
                     "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
                 }
@@ -1683,11 +1693,75 @@ class GreenThumbAutomation:
                 "watering_volume_ml": plant.watering_volume_ml,
                 "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
                 "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
-                "soil": plant.soil,
+                "notes": plant.notes,
             },
             self._state_path,
         )
         return {"status": "ok", "name": plant.name.strip(), "profile": entry}
+
+    def write_plant_profile(
+        self, name: str, settings: dict[str, object]
+    ) -> dict[str, object]:
+        """Create or replace a saved plant from a body, with no pot involved.
+
+        The counterpart to save_plant_profile, which can only snapshot a pot.
+        That left no way to fix a saved plant without a spare pot to load it
+        onto, edit and save back -- and that round trip changes what the
+        planter is running in order to edit something it is not.
+
+        Validated the same way apply_plant_profile validates on the way in,
+        because a profile is only worth having if loading it does something
+        sensible. An unrecognised band is the one that matters: it makes a
+        plant permanently not-thirsty, which reads as a working planter that
+        has quietly stopped watering.
+        """
+        clean = str(name).strip()
+        entry: dict[str, object] = {}
+
+        target = settings.get("moisture_target")
+        if not isinstance(target, str) or target.strip().casefold() not in moisture.BY_NAME:
+            raise ValueError(
+                "Water when it reaches must be one of: " + ", ".join(moisture.ORDER)
+            )
+        entry["moisture_target"] = target.strip().casefold()
+
+        volume = settings.get("watering_volume_ml")
+        if isinstance(volume, bool) or not isinstance(volume, (int, float)):
+            raise ValueError("Watering volume must be a number of millilitres")
+        # Clamped at zero and left unbounded above, matching
+        # update_watering_volume. An upper limit enforced only here would mean
+        # the editor refusing a dose the plant card accepts.
+        entry["watering_volume_ml"] = max(0, int(volume))
+
+        for field_name, label in (
+            ("light_start_time", "Light start"),
+            ("light_stop_time", "Light stop"),
+        ):
+            text = settings.get(field_name)
+            if not isinstance(text, str):
+                raise ValueError(f"{label} must be a time like 08:00")
+            try:
+                parsed = time.fromisoformat(text)
+            except ValueError:
+                raise ValueError(f"{label} must be a time like 08:00, not {text!r}") from None
+            entry[field_name] = parsed.isoformat(timespec="minutes")
+
+        notes = settings.get("notes", "")
+        if notes is not None and not isinstance(notes, str):
+            raise ValueError("Notes must be text")
+        entry["notes"] = (notes or "").strip()
+
+        stored = state.save_profile(clean, entry, self._state_path)
+        return {"status": "ok", "name": clean, "profile": stored}
+
+    def get_plant_profile(self, name: str) -> dict[str, object]:
+        """One saved plant, for an editor to load into its form."""
+        wanted = str(name).strip()
+        profiles = state.load_profiles(self._state_path)
+        key = next((k for k in profiles if k.casefold() == wanted.casefold()), None)
+        if key is None:
+            raise ValueError(f"No saved plant called {wanted!r}")
+        return {"status": "ok", "name": key, "profile": profiles[key]}
 
     def apply_plant_profile(self, plant_id: str, name: str) -> dict[str, object]:
         """Copy a saved plant onto a pot.
@@ -1740,11 +1814,15 @@ class GreenThumbAutomation:
             except ValueError:
                 logger.warning("Ignoring bad %s %r in profile %r", field_name, text, key)
 
+        if isinstance(entry.get("notes"), str):
+            plant.notes = entry["notes"].strip()
+
         self._persist()
         return {
             "status": "ok",
             "plant_id": plant_id,
             "name": plant.name,
+            "notes": plant.notes,
             "moisture_target": plant.moisture_target,
             "watering_volume_ml": plant.watering_volume_ml,
             "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
@@ -1837,7 +1915,11 @@ class GreenThumbAutomation:
         return entries
 
     def save_soil(
-        self, name: str, field_capacity_vwc: float, wilting_point_vwc: float
+        self,
+        name: str,
+        field_capacity_vwc: float,
+        wilting_point_vwc: float,
+        notes: str = "",
     ) -> dict[str, object]:
         """Add or replace a soil, keyed on its name like the plant library.
 
@@ -1876,6 +1958,10 @@ class GreenThumbAutomation:
                 f"Wilting point must be above 0 and below field capacity "
                 f"({capacity}% VWC), not {wilting}"
             )
+
+        if notes is not None and not isinstance(notes, str):
+            raise ValueError("Notes must be text")
+        readings["notes"] = (notes or "").strip()
 
         entry = state.save_soil(clean, readings, self._state_path)
         return {

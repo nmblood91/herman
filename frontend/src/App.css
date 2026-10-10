@@ -262,7 +262,8 @@ label {
   font-size: 0.9rem;
 }
 
-input {
+input,
+textarea {
   width: 100%;
   margin-top: 6px;
   background: rgba(17, 31, 24, 0.95);
@@ -541,6 +542,14 @@ option {
   min-width: 48px;
   text-align: right;
   font-weight: 600;
+}
+
+/* Notes fields. Resizes vertically only -- horizontal dragging breaks out of
+   the grid column it sits in. */
+textarea {
+  font: inherit;
+  resize: vertical;
+  min-height: 72px;
 }
 
 input[type='color'] {

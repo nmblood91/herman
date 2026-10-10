@@ -1,12 +1,11 @@
 import { useState } from 'react'
 
+// Pot fields only. A card no longer edits what a plant wants -- that is the
+// plant editor's job, and a pot takes those settings by loading a saved plant.
+// Keeping both here meant "Save Plant" wrote a profile as a side effect of
+// saving a rail coordinate, so you could not touch one without the other.
 const draftFrom = (plant) => ({
-  name: plant.name,
   soil: plant.soil ?? '',
-  light_start_time: plant.light_start_time ?? '08:00',
-  light_stop_time: plant.light_stop_time ?? '20:00',
-  moisture_target: plant.moisture_target ?? 'dry',
-  watering_volume_ml: plant.watering_volume_ml ?? 100,
   position_mm: plant.position_mm ?? 0,
   watering_mode: plant.watering_mode ?? 'point',
   sweep_min_mm: plant.sweep_min_mm ?? 0,
@@ -111,7 +110,6 @@ export function PlantsPanel({
   profiles,
   onLoadProfile,
   soils,
-  bands,
 }) {
   const [drafts, setDrafts] = useState({})
   // Which saved plant each card has picked, keyed by plant so one card's
@@ -183,9 +181,6 @@ export function PlantsPanel({
 
   const profileNames = (profiles ?? []).map((profile) => profile.name)
   const soilList = soils ?? []
-  // Very wet is deliberately not offered: a pot is only that just after
-  // watering, so targeting it waters on a loop.
-  const bandList = (bands ?? []).filter((band) => band.name !== 'very wet')
 
   const togglePlantExpanded = (plantId) => {
     setExpandedPlantIds((current) =>
@@ -245,7 +240,7 @@ export function PlantsPanel({
                       className="primary"
                       onClick={() => onSave({ ...plant, ...draft })}
                     >
-                      Save Plant
+                      Save pot
                     </button>
 
                     <div className="load-profile-row">
@@ -279,67 +274,23 @@ export function PlantsPanel({
                   </div>
 
                   <p className="field-hint">
-                    Saving stores <em>This plant</em> under the plant name,
-                    replacing anything saved under that name already. Loading
-                    copies a saved plant onto this one. Everything under{' '}
-                    <em>This pot</em> stays where it is — those describe the pot
-                    and the rail, so a saved plant cannot carry them.
+                    Loading copies a saved plant's care settings onto this pot.
+                    Everything under <em>This pot</em> stays where it is — those
+                    describe the pot and the rail, so a saved plant cannot carry
+                    them, and <strong>Save pot</strong> is what stores them.
                   </p>
 
+                  {/* Read-only: what this pot is currently set up to want. It
+                      is edited in the plant editor below, which keeps one
+                      place for a plant and one for a pot. */}
                   <h4 className="card-group-title">This plant</h4>
-                  <div className="field-grid">
-                    <label>
-                      Plant name
-                      <input
-                        value={draft.name}
-                        onChange={(event) => updateDraft(plant.plant_id, 'name', event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Light start
-                      <input
-                        type="time"
-                        value={draft.light_start_time}
-                        onChange={(event) => updateDraft(plant.plant_id, 'light_start_time', event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Light stop
-                      <input
-                        type="time"
-                        value={draft.light_stop_time}
-                        onChange={(event) => updateDraft(plant.plant_id, 'light_stop_time', event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Water when it reaches
-                      <select
-                        value={draft.moisture_target}
-                        onChange={(event) =>
-                          updateDraft(plant.plant_id, 'moisture_target', event.target.value)
-                        }
-                      >
-                        {bandList.map((band) => (
-                          <option key={band.name} value={band.name}>
-                            {band.name}
-                            {band.description ? ` — ${band.description}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Watering volume (mL)
-                      <input
-                        type="number"
-                        min="0"
-                        step="10"
-                        value={draft.watering_volume_ml}
-                        onChange={(event) =>
-                          updateDraft(plant.plant_id, 'watering_volume_ml', event.target.value)
-                        }
-                      />
-                    </label>
-                  </div>
+                  <p className="field-hint">
+                    <strong>{plant.name}</strong> — waters at{' '}
+                    {plant.moisture_target}, {plant.watering_volume_ml} mL,
+                    lights {plant.light_start_time}–{plant.light_stop_time}.
+                    Change these in the plant editor below, then load it here.
+                  </p>
+                  {plant.notes && <p className="field-hint">{plant.notes}</p>}
 
                   <h4 className="card-group-title">This pot</h4>
                   <div className="field-grid">

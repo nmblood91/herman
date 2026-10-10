@@ -475,6 +475,7 @@ def save_soil(payload: dict[str, object] = Body(default_factory=dict)) -> dict[s
         str(payload.get("name", "")),
         payload.get("field_capacity_vwc"),
         payload.get("wilting_point_vwc"),
+        payload.get("notes", ""),
     )
     log_event(
         f"Saved soil {result['name']}: field capacity "
@@ -504,6 +505,27 @@ def set_plant_soil(
 @app.get(f"{settings.api_prefix}/plant-profiles")
 def list_plant_profiles() -> dict[str, object]:
     return {"profiles": automation.list_plant_profiles()}
+
+
+@app.post(f"{settings.api_prefix}/plant-profiles")
+def write_plant_profile(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Create or replace a saved plant directly, with no pot involved.
+
+    Expects {"name", "moisture_target", "watering_volume_ml",
+    "light_start_time", "light_stop_time", "notes"}. Name is the key, so
+    saving replaces -- the same rule as the soil library.
+    """
+    result = automation.write_plant_profile(
+        str(payload.get("name", "")), payload
+    )
+    log_event(f"Saved plant {result['name']}")
+    return result
+
+
+@app.get(f"{settings.api_prefix}/plant-profiles/{{name}}")
+def read_plant_profile(name: str) -> dict[str, object]:
+    """One saved plant, for an editor to load into its form."""
+    return automation.get_plant_profile(name)
 
 
 @app.delete(f"{settings.api_prefix}/plant-profiles/{{name}}")

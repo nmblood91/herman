@@ -138,6 +138,11 @@ def install(overwrite: bool = False, path=None) -> dict[str, str]:
             {
                 "field_capacity_vwc": soil.field_capacity_vwc,
                 "wilting_point_vwc": soil.wilting_point_vwc,
+                # The explanation of where these figures came from, which this
+                # file has always carried and install used to discard -- so
+                # the reasoning stayed in the source and never reached anyone
+                # reading the library in the app.
+                "notes": soil.note,
             },
             path,
         )

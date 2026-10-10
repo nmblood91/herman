@@ -66,6 +66,10 @@ PROFILE_FIELDS = (
     "watering_volume_ml",
     "light_start_time",
     "light_stop_time",
+    # Why this plant is set up the way it is. Free text, and the only field here
+    # the planter never acts on -- which is the point: the numbers say what it
+    # does, and this says why, for whoever reads it next.
+    "notes",
 )
 
 # A soil holds the two water contents that bound what a plant can actually use,
@@ -80,6 +84,10 @@ PROFILE_FIELDS = (
 SOIL_FIELDS = (
     "field_capacity_vwc",
     "wilting_point_vwc",
+    # Where the figures came from, and how much to trust them. The library
+    # ships this text for its own mixes; before this field existed it was
+    # written in soil_library.py and thrown away on install.
+    "notes",
 )
 
 

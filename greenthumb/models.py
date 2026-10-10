@@ -42,6 +42,10 @@ class PlantSpec:
     # configured and behave as a point.
     sweep_min_mm: float = 0.0
     sweep_max_mm: float = 0.0
+    # Free text about this plant, saved and loaded with the rest of its care
+    # settings. A property of the plant, not the pot: the reason you water
+    # something at a given band travels with it.
+    notes: str = ""
     # Auto-managed LED segment for the global strip. This is calculated by the app,
     # not exposed to the user for manual editing.
     led_start_index: int = 0
