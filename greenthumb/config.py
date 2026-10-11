@@ -12,15 +12,16 @@ class Settings(BaseSettings):
     # Name of the [output_pin] section in printer.cfg, not a GPIO number: the
     # pump hangs off the SKR's HB MOSFET and is switched by Klipper.
     pump_pin_name: str = "pump"
-    # 100 mL/min rated, and that rating assumes no head pressure. Real delivery
-    # through lift and tubing runs lower, so measure against a real dose: this
-    # converts millilitres into a run time, and an error here scales every
+    # Measured on this build: 66 mL in 60 s after a priming run, through the
+    # real lift and tubing. The pump is rated 100 mL/min (1.67 mL/s), but that
+    # assumes no head pressure, and this plumbing delivers about a third less.
+    # This converts millilitres into a run time, so an error here scales every
     # watering by the same factor while still reporting success.
-    # The starting point only. Once the pump has been run against a scale in
-    # Diagnostics the measured figure lives in state.json and wins over this,
-    # so that a value worked out on the real plumbing is not quietly replaced
-    # by a datasheet number on the next restart.
-    pump_flow_ml_per_second: float = 1.67
+    # The starting point only. Once the pump has been run against a scale under
+    # Calibration, the measured figure lives in state.json and wins over this,
+    # so a value worked out on a unit's own plumbing is not replaced by this
+    # one on the next restart.
+    pump_flow_ml_per_second: float = 1.1
     # Dead-man limit for the manual run button, not a dosing figure. A pump left
     # running empties the reservoir onto the floor, so it stops itself at this
     # regardless of what the browser does.

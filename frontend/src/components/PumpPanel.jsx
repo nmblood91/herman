@@ -99,7 +99,7 @@ export function PumpPanel() {
       }
       setPumpStatus(
         `Flow rate is ${data.flow_ml_per_second} mL/s. A 100 mL dose now runs ` +
-          `the pump for ${data.seconds_for_100ml}s.`,
+          `the pump for ${Math.round(data.seconds_for_100ml)}s.`,
       )
       setMeasuredMl('')
       await readPump()
@@ -126,17 +126,9 @@ export function PumpPanel() {
           <label>Flow rate</label>
           <p className="field-hint">
             {pump
-              ? `${pump.flow_ml_per_second} mL/s — a 100 mL dose runs the pump for ${pump.seconds_for_100ml}s.`
+              ? `${pump.flow_ml_per_second} mL/s — a 100 mL dose runs the pump for ${Math.round(pump.seconds_for_100ml)}s.`
               : '—'}
           </p>
-          {pump && !pump.measured_at && (
-            <p className="field-hint warning">
-              Never measured. This is the pump's rated figure, which assumes no
-              lift and no tubing, so your real rate is almost certainly lower
-              and every dose is wrong by the same factor. Measure it before
-              turning automatic watering on.
-            </p>
-          )}
           {pump?.measured_at && (
             <p className="field-hint">
               Measured {new Date(pump.measured_at).toLocaleString()}. Worth

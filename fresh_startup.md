@@ -206,7 +206,8 @@ In **Plants and Soil**:
 ## 10. Measure the pump
 
 The pump's real flow rate decides how long it runs to deliver a given volume,
-and the shipped 1.67 mL/s is only the rated figure.
+and the shipped 1.1 mL/s was measured on the reference build. Your tubing and
+lift may differ, so it is worth checking.
 
 On the **Calibration** tab, under **Pump**, press **Run calibration** (60 s) with
 the nozzle over a cup on a scale, enter the millilitres that came out, and press
