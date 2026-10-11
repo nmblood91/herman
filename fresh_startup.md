@@ -208,8 +208,10 @@ In **Plants and Soil**:
 The pump's real flow rate decides how long it runs to deliver a given volume,
 and the shipped 1.67 mL/s is only the rated figure.
 
-Run the pump for the calibration length into a cup on a scale, then store the
-measured flow rate. It overrides the value in `.env`.
+On the **Calibration** tab, under **Pump**, press **Run calibration** (60 s) with
+the nozzle over a cup on a scale, enter the millilitres that came out, and press
+**Save flow rate**. Throw away the first run, since it fills the tube. The
+measurement overrides the value in `.env`.
 
 ## 11. Turn on automatic watering
 

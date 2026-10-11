@@ -7,6 +7,10 @@ import { PlantsPanel } from './components/PlantsPanel'
 import { PlantEditorPanel } from './components/PlantEditorPanel'
 import { SoilPanel } from './components/SoilPanel'
 import { HistoryPanel } from './components/HistoryPanel'
+import { HomeSwitchPanel } from './components/HomeSwitchPanel'
+import { ClockPanel } from './components/ClockPanel'
+import { VersionPanel } from './components/VersionPanel'
+import { PumpPanel } from './components/PumpPanel'
 import { CalibrationPanel } from './components/CalibrationPanel'
 import { LedStripPanel } from './components/LedStripPanel'
 import { LogsPanel } from './components/LogsPanel'
@@ -378,8 +382,12 @@ function App() {
           another as Calibration and Logs were. */}
       {activeTab === 'calibration' && (
         <>
+          <ClockPanel />
+          <HomeSwitchPanel />
+          <PumpPanel />
           <CalibrationPanel />
           <LedStripPanel overview={overview} />
+          <VersionPanel />
           <LogsPanel />
         </>
       )}

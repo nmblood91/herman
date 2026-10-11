@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
 import { HoldRing } from './HoldRing'
-import { cardTitle } from './PlantsPanel'
+import { cardTitle } from '../potLabel'
 
 // The soil library, on the same tab as the pots that use it.
 //

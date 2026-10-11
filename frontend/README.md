@@ -19,7 +19,7 @@ of its groups now sits with the thing it governs.
 | Plants and Soil | `PlantsPanel.jsx` — a card per pot, with its moisture and an expandable form for the pot's mix, rail position and watering mode; `PlantEditorPanel.jsx` — the saved-plant library; `SoilPanel.jsx` — the soil library. Both libraries sit below the cards, which pick from them |
 | Controls | `ControlsPanel.jsx` — gantry homing and jogging, dances, move-to-plant, water-a-plant, lighting, quiet snooze |
 | Automation | `AutomationPanel.jsx` — automatic watering, auto-home, quiet hours |
-| Calibration | `CalibrationPanel.jsx` (the probes’ dry point), `LedStripPanel.jsx` (strip type and colour order), `LogsPanel.jsx`, mounted side by side |
+| Calibration | `HomeSwitchPanel.jsx` (endstop test), `PumpPanel.jsx` (pump flow rate), `CalibrationPanel.jsx` (the probes’ dry point), `LedStripPanel.jsx` (strip type and colour order), `ClockPanel.jsx` (planter clock and time zone), `VersionPanel.jsx` (running and built commits), `LogsPanel.jsx`, mounted side by side |
 | History | `HistoryPanel.jsx` + `Chart.jsx` |
 
 Field capacity is not here: it is measured per mix on the Plants and Soil tab,
