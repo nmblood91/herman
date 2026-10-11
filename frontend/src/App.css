@@ -123,7 +123,7 @@
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
 }
 
-/* Several tabs stack panels -- Controls has four, Diagnostics three -- and with
+/* Several tabs stack panels -- Controls has four, Calibration three -- and with
    no margin their borders met and read as one tall box with lines across it.
    Between adjacent panels only, so the first gets no gap above it and the last
    none below, where .app-shell's padding already provides it. */
@@ -577,7 +577,7 @@ option {
 
 @media (min-width: 560px) {
   .soil-form {
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     align-items: end;
   }
 }
@@ -662,7 +662,7 @@ input[type='color'] {
   }
 }
 
-/* Phone width. Four tabs including "Diagnostics" do not fit one row at the
+/* Phone width. Five tabs including "Plants and Soil" do not fit one row at the
    default padding, and a wrapped tab bar costs a whole row of vertical space
    on the screen with least of it. */
 @media (max-width: 460px) {

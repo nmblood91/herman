@@ -31,7 +31,7 @@ const draftFrom = (plant) => ({
 // The number comes from plant_id rather than the array index. Identical today,
 // but the id is the identity the API and the state file key on, so a reordered
 // list cannot relabel a pot.
-const cardTitle = (plant) => {
+export const cardTitle = (plant) => {
   const matched = /(\d+)$/.exec(plant.plant_id ?? '')
   const number = matched?.[1]
   const pot = number ? `Pot ${number}` : plant.plant_id || 'Pot'

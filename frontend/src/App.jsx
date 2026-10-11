@@ -372,13 +372,12 @@ function App() {
         <AutomationPanel overview={overview} onRefresh={loadDashboard} />
       )}
 
-      {/* Checks first, then the three calibrations, then the log. All of these
-          fetch their own data, so running one does not reload the rest of the
-          dashboard -- which is why they can be mounted side by side here
-          rather than nested inside one another as Calibration and Logs were. */}
+      {/* The calibrations, then the log. All of these fetch their own data, so
+          running one does not reload the rest of the dashboard -- which is why
+          they can be mounted side by side here rather than nested inside one
+          another as Calibration and Logs were. */}
       {activeTab === 'calibration' && (
         <>
-          <DiagnosticsPanel />
           <CalibrationPanel />
           <LedStripPanel overview={overview} />
           <LogsPanel />

@@ -103,6 +103,14 @@ SOIL_FIELDS = (
     # Which probe took it, so the figure can be reported with its provenance
     # and so a cross-probe span can be sanity-checked.
     "field_capacity_address",
+    # Wilting point as a raw sensor count, measured the same way: one probe in a
+    # pot of this mix left to dry until the plant is at its limit. Recorded
+    # beside field capacity so both ends of the usable window exist as readings,
+    # not only as VWC percentages. Nothing derives a pot's scale from it yet.
+    "wilting_point_raw",
+    "wilting_point_samples",
+    "wilting_point_measured_at",
+    "wilting_point_address",
     # Where the figures came from, and how much to trust them. The library
     # ships this text for its own mixes; before this field existed it was
     # written in soil_library.py and thrown away on install.

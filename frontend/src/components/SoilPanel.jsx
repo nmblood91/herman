@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
 import { HoldRing } from './HoldRing'
+import { cardTitle } from './PlantsPanel'
 
 // The soil library, on the same tab as the pots that use it.
 //
@@ -37,7 +38,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
   // first pot rather than forcing a pick, the way the field capacity button
   // on a pot's own card does.
   const [probe, setProbe] = useState('')
-  const [measuring, setMeasuring] = useState(false)
+  const [measuring, setMeasuring] = useState('')
 
   const list = soils ?? []
   const pots = plants ?? []
@@ -84,14 +85,17 @@ export function SoilPanel({ soils, plants, onRefresh }) {
     setMessage('')
   }
 
-  const measure = async () => {
+  // `kind` is 'field-capacity' or 'wilting-point': the two endpoints take the
+  // same body and differ only in which end of the scale they store.
+  const measure = async (kind) => {
     const plantId = probe || pots[0]?.plant_id
     if (!plantId) return
+    const label = kind === 'wilting-point' ? 'wilting point' : 'field capacity'
     setMessage('')
-    setMeasuring(true)
+    setMeasuring(kind)
     try {
       const response = await fetch(
-        `${API_BASE}/soils/${encodeURIComponent(picked)}/field-capacity`,
+        `${API_BASE}/soils/${encodeURIComponent(picked)}/${kind}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -109,9 +113,14 @@ export function SoilPanel({ soils, plants, onRefresh }) {
         setMessage(`Not stored — ${data.reason}`)
         return
       }
+      if (kind === 'wilting-point') {
+        setMessage(`${picked} reads ${data.value} at wilting point, measured with ${data.measured_with}.`)
+        onRefresh?.()
+        return
+      }
       const applied = data.inherited_by ?? []
       setMessage(
-        `${picked} reads ${data.value} at field capacity, measured with ` +
+        `${picked} reads ${data.value} at ${label}, measured with ` +
           `${data.measured_with}. ` +
           (applied.length
             ? `Applied to ${applied.join(', ')}.`
@@ -121,7 +130,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
     } catch (error) {
       setMessage(`Could not measure: ${error.message}`)
     } finally {
-      setMeasuring(false)
+      setMeasuring('')
     }
   }
 
@@ -231,33 +240,36 @@ export function SoilPanel({ soils, plants, onRefresh }) {
         </div>
 
         <div className="field-row">
+          {mode === 'existing' ? (
+            <label>
+              Name
+              <select
+                aria-label="Saved mix to edit"
+                value={picked}
+                onChange={(event) => setPicked(event.target.value)}
+              >
+                <option value="">Choose a mix…</option>
+                {list.map((soil) => (
+                  <option key={soil.name} value={soil.name}>
+                    {soil.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              Name
+              <input
+                value={form.name}
+                placeholder="My potting mix"
+                onChange={(event) => update('name', event.target.value)}
+              />
+            </label>
+          )}
+        </div>
+
+        <div className="field-row">
           <div className="soil-form">
-            {mode === 'existing' ? (
-              <label>
-                Name
-                <select
-                  aria-label="Saved mix to edit"
-                  value={picked}
-                  onChange={(event) => setPicked(event.target.value)}
-                >
-                  <option value="">Choose a mix…</option>
-                  {list.map((soil) => (
-                    <option key={soil.name} value={soil.name}>
-                      {soil.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <label>
-                Name
-                <input
-                  value={form.name}
-                  placeholder="My potting mix"
-                  onChange={(event) => update('name', event.target.value)}
-                />
-              </label>
-            )}
             <label>
               Field capacity (% VWC)
               <input
@@ -301,7 +313,43 @@ export function SoilPanel({ soils, plants, onRefresh }) {
                 'Not measured. Pots of this mix read nothing and are never watered automatically.'
               )}
             </p>
+            {/* Not a warning when missing: nothing reads it yet, so an unmeasured
+                wilting point costs nothing and should not look like a fault. */}
+            <p className="field-hint">
+              {pickedSoil?.wilting_point_raw != null ? (
+                <>
+                  Wilting point reads <strong>{pickedSoil.wilting_point_raw}</strong>
+                  {pickedSoil.wilting_point_measured_at
+                    ? `, measured ${pickedSoil.wilting_point_measured_at.slice(0, 10)}`
+                    : ''}
+                  {pickedSoil.predicted_wilting_raw != null &&
+                    `; the percentages predict ${pickedSoil.predicted_wilting_raw}`}
+                  .
+                </>
+              ) : (
+                <>
+                  Wilting point not measured
+                  {pickedSoil?.predicted_wilting_raw != null &&
+                    `; the percentages predict ${pickedSoil.predicted_wilting_raw}`}
+                  .
+                </>
+              )}
+            </p>
             <div className="soil-capacity">
+              <button
+                type="button"
+                disabled={Boolean(measuring) || !pots.length}
+                onClick={() => measure('field-capacity')}
+              >
+                {measuring === 'field-capacity' ? 'Measuring…' : 'Measure field capacity'}
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(measuring) || !pots.length}
+                onClick={() => measure('wilting-point')}
+              >
+                {measuring === 'wilting-point' ? 'Measuring…' : 'Measure wilting point'}
+              </button>
               <select
                 aria-label={`Probe to measure ${picked} with`}
                 value={probe || pots[0]?.plant_id || ''}
@@ -309,13 +357,10 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               >
                 {pots.map((pot) => (
                   <option key={pot.plant_id} value={pot.plant_id}>
-                    {pot.name}
+                    {cardTitle(pot)}
                   </option>
                 ))}
               </select>
-              <button type="button" disabled={measuring || !pots.length} onClick={measure}>
-                {measuring ? 'Measuring…' : 'Measure field capacity'}
-              </button>
             </div>
           </div>
         )}

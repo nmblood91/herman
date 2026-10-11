@@ -1707,6 +1707,69 @@ class GreenThumbAutomation:
         )
         return outcome
 
+    def calibrate_soil_wilting_point(
+        self, soil_name: str, plant_id: str, seconds: int = 20
+    ) -> dict[str, object]:
+        """Measure a mix's wilting point as a raw reading, using one pot's probe.
+
+        Stored on the mix only. Unlike field capacity it is not copied onto
+        pots: nothing scales a pot's reading from it yet, so there is nothing
+        to inherit. It must land between the probe's dry point and the mix's
+        field capacity, when that has been measured -- a wilting reading wetter
+        than field capacity means the wrong probe or the wrong pot.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        soils = state.load_soils(self._state_path)
+        key = next((k for k in soils if k.casefold() == str(soil_name).strip().casefold()), None)
+        if key is None:
+            raise ValueError(f"No soil called {str(soil_name).strip()!r}")
+
+        bounded = max(5, min(int(seconds), 120))
+        with self._exclusive(f"Measuring wilting point on {plant.name}"):
+            outcome = measure_endpoint(
+                self.sensor_hub,
+                plant.sensor_address,
+                seconds=bounded,
+                opposite=self.sensor_hub.dry_for(plant.sensor_address),
+                expect="above",
+                opposite_label="this probe's dry point",
+            )
+        outcome["soil"] = key
+        outcome["measured_with"] = plant.name
+        if not outcome.get("written"):
+            return outcome
+
+        capacity = soils[key].get("field_capacity_raw")
+        if isinstance(capacity, (int, float)) and outcome["value"] >= capacity:
+            outcome.update(
+                written=False,
+                reason=(
+                    f"Reading {outcome['value']} is not below this mix's field "
+                    f"capacity of {int(capacity)}. Wilting point is the dry end "
+                    "of the usable window, so this is the wrong pot or the wrong "
+                    "probe, or the field capacity figure is stale."
+                ),
+            )
+            return outcome
+
+        state.save_soil(
+            key,
+            {
+                "wilting_point_raw": int(outcome["value"]),
+                "wilting_point_samples": outcome.get("samples"),
+                "wilting_point_measured_at": datetime.now().isoformat(timespec="seconds"),
+                "wilting_point_address": plant.sensor_address,
+            },
+            self._state_path,
+        )
+        logger.info(
+            "Wilting point for %r is %s, measured on %s", key, outcome["value"], plant.name
+        )
+        return outcome
+
     def calibrate_plant_field_capacity(
         self, plant_id: str, seconds: int = 20
     ) -> dict[str, object]:
@@ -2285,6 +2348,20 @@ class GreenThumbAutomation:
         for name, values in soils.items():
             entry = {"name": name, **values}
             entry["wilting_fraction"] = state.available_water_fraction(values)
+            # Where the percentages say wilting should read, in raw counts, so
+            # it can be shown beside the measured one. Same mapping as
+            # SoilSensorHub's percent: dry at 0, field capacity at 100. Dry is
+            # the dry point of the probe that took the measurement, since the
+            # figure is denominated in that probe's counts.
+            top = values.get("field_capacity_raw")
+            if entry["wilting_fraction"] is not None and isinstance(top, (int, float)):
+                address = values.get("wilting_point_address")
+                if address is None:
+                    address = values.get("field_capacity_address")
+                dry = self.sensor_hub.dry_for(address)
+                entry["predicted_wilting_raw"] = round(
+                    dry + entry["wilting_fraction"] * (top - dry)
+                )
             capacity = values.get("field_capacity_vwc")
             wilting = values.get("wilting_point_vwc")
             if isinstance(capacity, (int, float)) and isinstance(wilting, (int, float)):

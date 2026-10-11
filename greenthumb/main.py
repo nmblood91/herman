@@ -525,6 +525,30 @@ def calibrate_soil_field_capacity(
     return result
 
 
+@app.post(f"{settings.api_prefix}/soils/{{name}}/wilting-point")
+def calibrate_soil_wilting_point(
+    name: str, payload: dict[str, object] = Body(default_factory=dict)
+) -> dict[str, object]:
+    """Measure a mix's wilting point as a sensor reading using one pot's probe.
+
+    Expects {"plant_id": "plant_2", "seconds": 20}. plant_id names only which
+    probe to read; the figure lands on the mix and is not copied to any pot.
+    """
+    result = automation.calibrate_soil_wilting_point(
+        name,
+        str(payload.get("plant_id", "")),
+        int(payload.get("seconds", 20) or 20),
+    )
+    if result.get("written"):
+        log_event(
+            f"Wilting point for {result['soil']} is {result['value']}, measured "
+            f"on {result['measured_with']}"
+        )
+    else:
+        log_event(f"Wilting point for {name} not stored: {result.get('reason')}")
+    return result
+
+
 @app.delete(f"{settings.api_prefix}/soils/{{name}}")
 def delete_soil(name: str) -> dict[str, object]:
     result = automation.delete_soil(name)
