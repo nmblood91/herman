@@ -9,11 +9,10 @@ max_accel: 4000
 max_z_velocity: 15
 max_z_accel: 100
 
-# X coordinates, measured on this machine rather than estimated. Homing was run,
-# then the carriage jogged left until it reached the end of the rail 900 mm from
-# the trip point. position_endstop is set 10 mm short of that, so X0 sits clear
-# of the hard stop: the crash point is not known precisely, and any error here
-# propagates into every plant position.
+# X coordinates for this machine: 900 mm of usable travel, after a printed part
+# was reworked to free up room at the ends (it was 890). X0 must sit clear of
+# the hard stop at the far end: the crash point is not known precisely, and any
+# error here propagates into every plant position.
 #
 # Measure these against your own switch mounting -- see deploy/README.md.
 #
@@ -39,8 +38,8 @@ rotation_distance: 40
 # it would give up the fail-safe described in deploy/README.md.
 endstop_pin: ^PC0
 position_min: 0
-position_max: 890
-position_endstop: 890
+position_max: 900
+position_endstop: 900
 # Stated rather than inferred: Klipper would work this out from position_endstop
 # sitting at the top of the range, but then a later edit to position_max could
 # silently reverse the homing direction.
@@ -70,7 +69,7 @@ stealthchop_threshold: 999999
 # Parking here does mean a leftward jog is refused while sitting at X0, the
 # same way a rightward one would be refused at position_max. That is the better
 # end to have it on: "cannot go further left, you are at the left end" explains
-# itself, whereas the same error at 890 does not.
+# itself, whereas the same error at 900 does not.
 [homing_override]
 axes: x
 gcode:

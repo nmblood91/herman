@@ -68,10 +68,13 @@ export function PumpPanel() {
         // Re-read once it has stopped, so the measured run length appears
         // without anyone having to reload. The extra second is for the
         // auto-stop to land and be recorded.
-        window.setTimeout(() => {
-          setRunEndsAt(null)
-          readPump()
-        }, seconds * 1000 + 1200)
+        window.setTimeout(
+          () => {
+            setRunEndsAt(null)
+            readPump()
+          },
+          seconds * 1000 + 1200,
+        )
       } else {
         setRunEndsAt(null)
         setPumpStatus('Pump stopped.')
@@ -114,8 +117,7 @@ export function PumpPanel() {
   // No saving mid-run: the figure being divided by is the *previous* run, so
   // typing a volume while another is in progress would calibrate against the
   // wrong one.
-  const canSaveFlow =
-    !!runLongEnough && measuredMl !== '' && Number(measuredMl) > 0 && !runEndsAt
+  const canSaveFlow = !!runLongEnough && measuredMl !== '' && Number(measuredMl) > 0 && !runEndsAt
 
   return (
     <section className="panel-section">
@@ -130,15 +132,15 @@ export function PumpPanel() {
               : '—'}
           </p>
           {pump?.measured_at && (
-            <p className="field-hint">
-              Measured {new Date(pump.measured_at).toLocaleString()}. Worth
-              redoing once a season — peristaltic tubing takes a set as it ages,
-              and the rate drifts with it.
-            </p>
+            <p className="field-hint">Measured {new Date(pump.measured_at).toLocaleString()}.</p>
           )}
         </div>
 
         <div className="field-row">
+          <p className="field-hint">
+            Run pump for 60 seconds to measure the flow rate. Run once as a prime, and then run
+            again to measure. I recommend using a kitchen scale to weigh the water. 1g = 1 mL.
+          </p>
           {/* One control, which becomes its own abort while the run is going.
               There is deliberately no idle Stop button: nothing in the app
               runs the pump by hand any more, so a Stop with nothing running
@@ -154,23 +156,15 @@ export function PumpPanel() {
               Run calibration ({pump?.max_run_seconds ?? 60}s)
             </button>
           )}
-          <p className="field-hint">
-            Runs the pump where it stands, without moving the gantry, and stops
-            on its own at the end even if you close this page. This is the only
-            thing in the app that runs the pump directly — a dose you ask for on
-            a plant is a measured volume, which is why that one lives under
-            Controls.
-          </p>
           {pumpStatus && <p className="field-hint warning">{pumpStatus}</p>}
         </div>
 
         <div className="field-row">
           <label>
-            How much came out? (mL)
+            How much came out? (mL or g)
             <input
               type="number"
               min="0"
-              step="1"
               value={measuredMl}
               onChange={(event) => setMeasuredMl(event.target.value)}
             />
@@ -183,26 +177,19 @@ export function PumpPanel() {
           >
             Save flow rate
           </button>
-          {lastRun ? (
-            <p className={`field-hint${runLongEnough ? '' : ' warning'}`}>
-              {runLongEnough
-                ? `Divided by the last run, which was ${lastRun.seconds}s.`
-                : `The last run was only ${lastRun.seconds}s — too short to ` +
-                  `weigh accurately. Run the full ${pump?.max_run_seconds ?? 60}s.`}
-            </p>
-          ) : (
+          {/* Nothing to say once the last run is long enough to divide by. */}
+          {!lastRun && (
             <p className="field-hint warning">
-              Run the pump first. A flow rate is a volume divided by the time it
-              took to deliver it.
+              Run the pump to calibrate flow rate. A flow rate is the volume of water divided by the
+              time it took to deliver it.
             </p>
           )}
-          <p className="field-hint">
-            Weigh it rather than reading a jug — 1 g of water is 1 mL, and a
-            kitchen scale beats graduations. Run it once and throw that result
-            away: the first run fills the tube, and that volume is not flow.
-            Three runs that agree within a few percent is a number you can
-            trust.
-          </p>
+          {lastRun && !runLongEnough && (
+            <p className="field-hint warning">
+              The last run was only {lastRun.seconds}s — too short to weigh accurately. Run the full{' '}
+              {pump?.max_run_seconds ?? 60}s.
+            </p>
+          )}
         </div>
       </div>
     </section>

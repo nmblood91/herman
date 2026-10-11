@@ -41,7 +41,7 @@ needs a printed mount that does not exist yet, so budget that separately.
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | IKEA VITTSJÖ frame | 1 | $80.00 | $80.00 | as-is; includes both shelves |
-| 2020 aluminium extrusion rail, 1000 mm | 1 | $50.00 | $50.00 | VBX.com; comes with the gantry plate. 890 mm usable travel |
+| 2020 aluminium extrusion rail, 1000 mm | 1 | $50.00 | $50.00 | VBX.com; comes with the gantry plate. 900 mm usable travel |
 | T nuts | 4 | $0.50 | $2.00 | to secure rail |
 | GT2 belt | 1 | $4.00 | $4.00 | roughly twice the rail plus pulley wrap, so about 2.1 m |
 | GT2 drive pulley | 1 | $2.00 | $2.00 | motor end |

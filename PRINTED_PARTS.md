@@ -144,7 +144,7 @@ Only the parts with a constraint worth recording.
 
 - **The two gantry holders are not mirror images, and the right side carries
   everything.** `printer.cfg` homes in the positive direction onto
-  `position_endstop: 890`, and the comment there notes homing happens at the
+  `position_endstop: 900`, and the comment there notes homing happens at the
   motor end. X0 is the left end of the rail, so the motor and the limit switch
   both live in the right-hand holder — and so does the pump. The left holder
   carries two idler pulleys on shoulder bolts and nothing else.

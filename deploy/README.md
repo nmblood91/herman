@@ -472,13 +472,12 @@ shorter, they need scaling again. The app asks Klipper for the real limit
 rather than keeping its own copy, so it follows `position_max` automatically
 once Klipper is restarted.
 
-**Calibrating `position_endstop`.** X960 is the last usable position and the
-switch sits past it, so homing can retract clear of the switch instead of resting
-on the upper limit. `position_endstop` is the coordinate at which the switch
-trips — at `980`, it sits 20 mm beyond usable travel. Measure it against your own
-mounting, then set `position_max` to the same value and park 20 mm short of it in
-`homing_override`. X0 stays the left end of usable travel, so plant positions are
-unaffected by which end the switch lives at.
+**Calibrating `position_endstop`.** `position_endstop` is the coordinate at
+which the switch trips, and `position_max` is set to the same value, so the trip
+point is the right end of usable travel. This build uses `900`. Measure it
+against your own mounting, change both together, and keep X0 clear of the hard
+stop at the far end. X0 stays the left end of usable travel, so plant positions
+are unaffected by which end the switch lives at.
 
 **Homing parks the carriage at X0**, the far end from the switch, rather than
 leaving it where it tripped. That is a choice about who reads the screen: the
