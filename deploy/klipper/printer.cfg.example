@@ -38,8 +38,8 @@ rotation_distance: 40
 # it would give up the fail-safe described in deploy/README.md.
 endstop_pin: ^PC0
 position_min: 0
-position_max: 900
-position_endstop: 900
+position_max: 890
+position_endstop: 890
 # Stated rather than inferred: Klipper would work this out from position_endstop
 # sitting at the top of the range, but then a later edit to position_max could
 # silently reverse the homing direction.
