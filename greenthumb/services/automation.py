@@ -495,6 +495,16 @@ class GreenThumbAutomation:
         if self.plants:
             self.plants[-1].led_end_index = total_leds - 1
 
+    def gantry_position(self) -> dict[str, object]:
+        """The carriage's live position, for the Controls tab to poll.
+
+        Deliberately outside the hardware lock: it is a read Klipper answers
+        immediately, and the readout is most useful exactly while something
+        else -- a watering cycle, idle motion -- holds the lock and is moving
+        the carriage.
+        """
+        return self.klipper.live_position()
+
     def usable_travel_mm(self) -> float:
         """Reachable X range, where 0 is the first position the carriage can occupy.
 

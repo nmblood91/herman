@@ -6,9 +6,32 @@ from pathlib import Path
 LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
 LOG_FILE = LOG_DIR / "greenthumb.log"
 
+# Requests polled on a timer, kept out of uvicorn's access log. The Controls tab
+# reads the carriage position every second it is open, which buried every other
+# request in the journal under a line per second.
+QUIET_PATHS = ("/gantry/position",)
+
+
+class _QuietPollFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        # uvicorn's access record carries (client, method, path, http version,
+        # status) as its args; the path keeps any query string, hence endswith
+        # on the part before it.
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3:
+            path = str(args[2]).split("?", 1)[0]
+            return not path.endswith(QUIET_PATHS)
+        return True
+
 
 def setup_logging() -> logging.Logger:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Added on every call, but only once: uvicorn configures this logger before
+    # it imports the app, so a filter attached here survives.
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, _QuietPollFilter) for f in access.filters):
+        access.addFilter(_QuietPollFilter())
 
     logger = logging.getLogger("greenthumb")
     logger.setLevel(logging.INFO)

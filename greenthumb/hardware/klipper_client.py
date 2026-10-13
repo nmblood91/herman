@@ -96,6 +96,43 @@ class KlipperClient:
             "max_accel": _positive(toolhead.get("max_accel")),
         }
 
+    def live_position(self) -> dict[str, Any]:
+        """Where the carriage is right now, for a readout that can be polled.
+
+        toolhead.position is the *commanded* position -- the end of whatever
+        moves are queued -- so mid-move it already reads the destination.
+        motion_report.live_position is the carriage's actual place along that
+        move. Both come back so a caller can tell "moving" from "still".
+
+        Cheap and lock-free: objects/query answers straight away, even while a
+        move is running, so polling this never waits on or blocks a dose.
+        """
+        response = self._send_command(
+            "objects/query",
+            {
+                "objects": {
+                    "motion_report": ["live_position"],
+                    "toolhead": ["position", "homed_axes"],
+                }
+            },
+        )
+        if not response.get("ok"):
+            return {"ok": False, "error": response.get("error"), "homed": False}
+
+        status = response.get("result", {}).get("status", {})
+        toolhead = status.get("toolhead", {})
+        target = (toolhead.get("position") or [0.0])[0]
+        # motion_report is loaded by default, but fall back to the commanded
+        # position rather than report nothing if a build lacks it.
+        live = (status.get("motion_report", {}).get("live_position") or [target])[0]
+        return {
+            "ok": True,
+            "position": round(float(live), 1),
+            "target": round(float(target), 1),
+            "moving": abs(float(live) - float(target)) > 0.5,
+            "homed": "x" in (toolhead.get("homed_axes") or ""),
+        }
+
     def water_supply_present(self) -> bool | None:
         """True if the outlet tube reads wet, None if the sensor cannot be read.
 

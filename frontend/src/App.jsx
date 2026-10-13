@@ -32,6 +32,9 @@ const fetchJson = async (path, options = {}) => {
   return data
 }
 
+// How often the Controls tab re-reads the carriage position. Fast enough to
+// watch a move, and only while that tab is open.
+const GANTRY_POLL_MS = 1000
 
 function App() {
   const [activeTab, setActiveTab] = useState('plants')
@@ -62,8 +65,7 @@ function App() {
 
   // Motion endpoints answer 200 with {ok: false, error} when Klipper refuses
   // the move, so a successful request is not a successful move.
-  const describeResult = (result) =>
-    result?.ok === false ? `failed - ${result.error}` : 'ok'
+  const describeResult = (result) => (result?.ok === false ? `failed - ${result.error}` : 'ok')
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -111,14 +113,49 @@ function App() {
     message: 'Waking Herman up...',
   }
 
+  // The carriage's live position, polled only while the Controls tab is open.
+  // The dashboard is fetched on load and after each button press, so on its
+  // own it misses every move the planter makes by itself -- automatic
+  // watering, idle motion, the startup home -- and anything done from another
+  // browser. This is a cheap read that Klipper answers even mid-move, so it
+  // does not wait on, or hold up, a watering cycle.
+  const [livePosition, setLivePosition] = useState(null)
+
+  useEffect(() => {
+    if (activeTab !== 'controls') return undefined
+    let cancelled = false
+    async function poll() {
+      try {
+        const data = await fetchJson('/gantry/position')
+        if (!cancelled) setLivePosition(data)
+      } catch {
+        // A missed poll keeps the last reading; the next one replaces it.
+      }
+    }
+    poll()
+    const id = setInterval(poll, GANTRY_POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      // Dropped on leaving the tab, so coming back shows the dashboard's
+      // reading until the first poll lands rather than one from minutes ago.
+      setLivePosition(null)
+    }
+  }, [activeTab])
+
   const gantryPosition = useMemo(() => {
-    const movement = overview?.movement ?? {}
+    const movement = livePosition ?? overview?.movement ?? {}
     if (movement.ok === false) return 'unavailable'
     if (!movement.homed) return 'not homed'
 
-    const numericValue = Number(movement.position)
-    return Number.isFinite(numericValue) ? `${numericValue} mm` : 'unknown'
-  }, [overview])
+    // Whole millimetres: Klipper reports tenths, and the decimal flickers on a
+    // readout polled every second without telling anyone anything.
+    const numericValue = Math.round(Number(movement.position))
+    if (!Number.isFinite(numericValue)) return 'unknown'
+    return movement.moving
+      ? `${numericValue} mm → ${Math.round(movement.target)} mm`
+      : `${numericValue} mm`
+  }, [livePosition, overview])
 
   const delivery = overview?.delivery
   const deliveryPlant =
@@ -236,7 +273,7 @@ function App() {
       setStatus(
         result.written
           ? `Field capacity for this pot is ${result.value}. It now overrides ` +
-            'the figure from its mix.'
+              'the figure from its mix.'
           : `Not stored — ${result.reason}`,
       )
       await loadDashboard()
@@ -252,9 +289,9 @@ function App() {
       })
       setStatus(
         result.field_capacity_source === 'soil'
-          ? 'Dropped this pot\'s own figure. It is back to using its mix\'s.'
-          : 'Dropped this pot\'s own figure. Its mix has none, so the pot now ' +
-            'reads nothing until one is measured.',
+          ? "Dropped this pot's own figure. It is back to using its mix's."
+          : "Dropped this pot's own figure. Its mix has none, so the pot now " +
+              'reads nothing until one is measured.',
       )
       await loadDashboard()
     } catch (error) {
@@ -307,7 +344,6 @@ function App() {
     }
   }
 
-
   return (
     <div className="app-shell">
       <TopBar />
@@ -348,11 +384,7 @@ function App() {
           {/* Below the cards, because both are libraries the cards pick from:
               a plant and a mix are chosen from dropdowns up there, so editing
               them belongs on the same tab rather than one away. */}
-          <PlantEditorPanel
-            profiles={profiles}
-            bands={bands}
-            onRefresh={loadDashboard}
-          />
+          <PlantEditorPanel profiles={profiles} bands={bands} onRefresh={loadDashboard} />
           <SoilPanel soils={soils} plants={plants} onRefresh={loadDashboard} />
         </>
       )}
@@ -398,7 +430,6 @@ function App() {
       {activeTab === 'history' && <HistoryPanel />}
     </div>
   )
-
 }
 
 export default App

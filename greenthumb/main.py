@@ -712,6 +712,12 @@ def move_to_plant(plant_id: str) -> dict[str, object]:
     return log_motion(automation.move_to_plant(plant_id), f"Move gantry to plant {plant_id}")
 
 
+@app.get(f"{settings.api_prefix}/gantry/position")
+def gantry_position() -> dict[str, object]:
+    """Live carriage position. Polled by the Controls tab, so not logged."""
+    return automation.gantry_position()
+
+
 @app.post(f"{settings.api_prefix}/gantry/home")
 def home_gantry() -> dict[str, object]:
     return log_motion(automation.home_gantry(), "Home gantry")
