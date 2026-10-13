@@ -41,8 +41,13 @@ class Settings(BaseSettings):
     led_color_order: str = "GRB"
     led_spi_bus: int = 0
     led_spi_device: int = 0
-    gantry_rail_length_mm: float = 1000.0
-    gantry_position_margin_mm: float = 20.0
+    # Usable X travel, not the length of the rail. The extrusion is 1000 mm, but
+    # the carriage and the end holders take up the rest, leaving 890 mm it can
+    # actually move through. Klipper's position_max is the real limit and is
+    # asked first; this is only the answer when Klipper is not responding, so a
+    # plant position saved with the board unplugged still fits the rail. Keep
+    # it equal to position_max in printer.cfg.
+    gantry_travel_mm: float = 890.0
     debug: bool = False
 
     # Camera, an optional add-on. Nothing here assumes one is plugged in: with

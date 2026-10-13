@@ -437,9 +437,9 @@ install.
 ### Do not jog to X0 until the rail is measured
 
 After homing, Klipper believes the carriage is at `position_endstop` and that
-there is that much travel below it. While that value is still the shipped
-placeholder, `G1 X0` is an instruction to drive the carriage somewhere that
-may be past the end of the rail.
+there is that much travel below it. The shipped `890` was measured on one
+build; until it has been checked against yours, `G1 X0` is an instruction to
+drive the carriage somewhere that may be past the end of the rail.
 
 Work leftward in steps instead, watching:
 
@@ -470,7 +470,8 @@ the move is refused and that plant is never watered. The defaults in
 `greenthumb/plants.py` are scaled to the travel measured here; if yours is
 shorter, they need scaling again. The app asks Klipper for the real limit
 rather than keeping its own copy, so it follows `position_max` automatically
-once Klipper is restarted.
+once Klipper is restarted. The one copy it does keep is `GANTRY_TRAVEL_MM` in
+`.env`, used only while Klipper is not answering, so change it to match.
 
 **Calibrating `position_endstop`.** `position_endstop` is the coordinate at
 which the switch trips, and `position_max` is set to the same value, so the trip
@@ -482,7 +483,7 @@ are unaffected by which end the switch lives at.
 **Homing parks the carriage at X0**, the far end from the switch, rather than
 leaving it where it tripped. That is a choice about who reads the screen: the
 app shows the carriage position, and `0 mm` means something to the person who
-owns one of these, while `870 mm` is a number they cannot interpret. It costs a
+owns one of these, while `890 mm` is a number they cannot interpret. It costs a
 full traverse of the rail after every home, so raise the feedrate in
 `homing_override` if the wait is irritating.
 

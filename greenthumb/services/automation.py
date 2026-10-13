@@ -504,15 +504,15 @@ class GreenThumbAutomation:
         margin meant the two disagreed the moment that happened -- which is how
         a plant ended up configured at a position the carriage could not reach.
 
-        Falls back to the configured estimate when Klipper is not answering, so
-        a plant position can still be saved with the board unplugged.
+        Falls back to the configured travel when Klipper is not answering, so a
+        plant position can still be saved with the board unplugged. That used to
+        be the rail length less a margin at each end -- 960 against a real 890,
+        so a position saved offline could be one the carriage never reaches.
         """
         reported = self.klipper.status().get("max_x")
         if reported:
             return max(float(reported), 1.0)
-        rail_length = max(float(settings.gantry_rail_length_mm), 1.0)
-        margin = max(float(settings.gantry_position_margin_mm), 0.0)
-        return max(rail_length - (margin * 2), 1.0)
+        return max(float(settings.gantry_travel_mm), 1.0)
 
     def set_plant_position(self, plant_id: str, position_mm: float) -> dict[str, object]:
         plant = next((item for item in self.plants if item.plant_id == plant_id), None)

@@ -160,8 +160,10 @@ carriage into the end of the rail at full homing speed.
 
 3. **Home.** Use the app's home control. The carriage parks at X0.
 
-4. **Rail length.** `position_endstop` ships as a placeholder. Measure your own
-   and set it, with `position_max` to match. Do not jog to X0 until you have.
+4. **Travel.** The rail is 1000 mm, but the carriage can move through 890 mm of
+   it, and `position_endstop` and `position_max` ship as 890 for this build. On
+   a different build, measure your own and set both to it, plus
+   `GANTRY_TRAVEL_MM` in `.env`. Do not jog to X0 until you have.
 
 ## 8. Calibrate the sensors
 

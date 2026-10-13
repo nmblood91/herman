@@ -59,7 +59,7 @@ stealthchop_threshold: 999999
 #
 # Chosen for the person who owns one of these rather than for the person who
 # built it: the app shows the carriage position, and "0 mm" means something to
-# someone who has never used a machine like this, while "870 mm" is a number
+# someone who has never used a machine like this, while "890 mm" is a number
 # they have no way to interpret.
 #
 # The cost is the traverse -- the whole rail after every home, which happens at

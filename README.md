@@ -40,7 +40,8 @@ This repository is intentionally structured as a product-ready foundation for a 
 
 The system is a modular smart planter based on a modified IKEA VITTSJÖ frame with:
 - black-brown melamine lower shelf and glass upper shelf
-- 1000 mm 2020 extrusion rail mounted to the rear uprights
+- 1000 mm 2020 extrusion rail mounted to the rear uprights, with 890 mm of
+  usable carriage travel
 - GT2 belt + pulley drive powered by a NEMA 17 stepper
 - homing against a mechanical endstop at the motor end of the rail
 - addressable LED strip for lighting effects and per-plant segments
