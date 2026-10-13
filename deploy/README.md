@@ -474,7 +474,7 @@ once Klipper is restarted.
 
 **Calibrating `position_endstop`.** `position_endstop` is the coordinate at
 which the switch trips, and `position_max` is set to the same value, so the trip
-point is the right end of usable travel. This build uses `900`. Measure it
+point is the right end of usable travel. This build uses `890`. Measure it
 against your own mounting, change both together, and keep X0 clear of the hard
 stop at the far end. X0 stays the left end of usable travel, so plant positions
 are unaffected by which end the switch lives at.
