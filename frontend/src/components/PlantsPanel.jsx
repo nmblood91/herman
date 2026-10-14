@@ -355,13 +355,24 @@ export function PlantsPanel({
                       It is edited in the plant editor below, which keeps one
                       place for a plant and one for a pot. */}
                   <h3 className="card-group-title">Plant Info</h3>
-                  <p className="field-hint">
-                    <strong>{plant.name}</strong> — waters{' '}
-                    {plant.watering_volume_ml} mL at {plant.moisture_target}{' '}
-                    moisture reading. Lights on{' '}
-                    {formatClock(plant.light_start_time)}–
-                    {formatClock(plant.light_stop_time)}
-                  </p>
+                  {/* Until a saved plant is loaded, the care settings are the
+                      code's placeholders. Showing them as a summary made them
+                      look chosen. */}
+                  {plant.profile ? (
+                    <p className="field-hint">
+                      <strong>{plant.name}</strong> — waters{' '}
+                      {plant.watering_volume_ml} mL at {plant.moisture_target}{' '}
+                      moisture reading. Lights on{' '}
+                      {formatClock(plant.light_start_time)}–
+                      {formatClock(plant.light_stop_time)}
+                    </p>
+                  ) : (
+                    <p className="field-hint warning">
+                      No plant profile loaded. Load one from the drop down or
+                      create a new plant in the Plant Editor below the plant
+                      cards.
+                    </p>
+                  )}
                   {plant.notes && <p className="field-hint">Notes: {plant.notes}</p>}
 
                   {/* Directly under Plant Info because that is the block it

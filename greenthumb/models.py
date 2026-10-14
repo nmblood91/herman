@@ -66,6 +66,11 @@ class PlantSpec:
     # settings. A property of the plant, not the pot: the reason you water
     # something at a given band travels with it.
     notes: str = ""
+    # Which saved plant this pot's care settings came from, or "" for none.
+    # Set by loading one onto the pot or saving the pot as one. Until then the
+    # care settings are the code's placeholders, and the card says so rather
+    # than presenting them as though somebody chose them.
+    profile: str = ""
     # Auto-managed LED segment for the global strip. This is calculated by the app,
     # not exposed to the user for manual editing.
     led_start_index: int = 0

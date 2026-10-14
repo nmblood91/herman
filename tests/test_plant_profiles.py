@@ -55,6 +55,11 @@ def ids(auto):
 auto = build()
 first, second = ids(auto)[0], ids(auto)[1]
 
+# A fresh pot has no saved plant behind it, and the card says so instead of
+# presenting the code's placeholder care settings as a choice.
+assert all(plant.profile == "" for plant in auto.plants)
+print("ok: a fresh pot has no plant profile loaded")
+
 auto.update_plant_name(first, "Basil - Wet")
 auto.update_moisture_target(first, "medium")
 auto.update_watering_volume(first, 150)
@@ -70,6 +75,19 @@ assert plant.name == "Basil - Wet", plant.name
 assert plant.moisture_target == "medium", plant.moisture_target
 assert plant.watering_volume_ml == 150, plant.watering_volume_ml
 print("ok: loading copies the name and the care settings onto another pot")
+
+assert plant.profile == "Basil - Wet", plant.profile
+assert auto.get_plant(first).profile == "Basil - Wet", "saving a pot as a plant did not mark it"
+print("ok: loading or saving a plant marks the pot as having that profile")
+
+shared = temp_state()
+marked = build(shared)
+marked.save_plant_profile(first)
+marked.apply_plant_profile(second, marked.get_plant(first).name)
+again = build(shared)
+assert again.get_plant(second).profile == marked.get_plant(first).name
+assert again.get_plant(ids(again)[2]).profile == ""
+print("ok: which pots have a profile survives a restart")
 
 
 # --- the rule that matters: placement never travels ---

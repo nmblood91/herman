@@ -461,6 +461,9 @@ async def list_plants() -> list[dict[str, object]]:
             "sweep_min_mm": plant.sweep_min_mm,
             "sweep_max_mm": plant.sweep_max_mm,
             "notes": plant.notes,
+            # Which saved plant the care settings came from; "" until one is
+            # loaded, which the card shows instead of the placeholders.
+            "profile": plant.profile,
             "field_capacity_raw": plant.field_capacity_raw,
             "field_capacity_source": plant.field_capacity_source,
             "field_capacity_soil": plant.field_capacity_soil,

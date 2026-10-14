@@ -70,7 +70,7 @@ def build(path, history=None):
 def placement(plant):
     """Everything on a pot that a restore puts back."""
     return (
-        plant.name, plant.position_mm, plant.watering_mode, plant.sweep_min_mm,
+        plant.name, plant.profile, plant.position_mm, plant.watering_mode, plant.sweep_min_mm,
         plant.sweep_max_mm, plant.soil, plant.field_capacity_raw,
         plant.field_capacity_source, plant.moisture_target, plant.watering_volume_ml,
     )

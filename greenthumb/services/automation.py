@@ -258,7 +258,7 @@ class GreenThumbAutomation:
                 # A plant id that no longer exists is skipped rather than
                 # treated as an error: the plant set is defined by the code.
                 continue
-            for text_field in ("name", "soil", "moisture_target"):
+            for text_field in ("name", "soil", "moisture_target", "profile"):
                 value = saved.get(text_field)
                 if isinstance(value, str) and value.strip():
                     setattr(plant, text_field, value.strip())
@@ -432,6 +432,7 @@ class GreenThumbAutomation:
                     "sweep_max_mm": plant.sweep_max_mm,
                     "soil": plant.soil,
                     "notes": plant.notes,
+                    "profile": plant.profile,
                     "field_capacity_raw": plant.field_capacity_raw,
                     "field_capacity_source": plant.field_capacity_source,
                     "field_capacity_soil": plant.field_capacity_soil,
@@ -2347,6 +2348,9 @@ class GreenThumbAutomation:
             },
             self._state_path,
         )
+        # The pot is now what that saved plant describes.
+        plant.profile = plant.name.strip()
+        self._persist()
         return {"status": "ok", "name": plant.name.strip(), "profile": entry}
 
     def write_plant_profile(
@@ -2438,6 +2442,7 @@ class GreenThumbAutomation:
 
         entry = profiles[key]
         plant.name = key
+        plant.profile = key
 
         volume = entry.get("watering_volume_ml")
         if not isinstance(volume, bool) and isinstance(volume, (int, float)):
@@ -2472,6 +2477,7 @@ class GreenThumbAutomation:
             "status": "ok",
             "plant_id": plant_id,
             "name": plant.name,
+            "profile": plant.profile,
             "notes": plant.notes,
             "moisture_target": plant.moisture_target,
             "watering_volume_ml": plant.watering_volume_ml,
