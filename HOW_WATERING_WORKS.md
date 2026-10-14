@@ -44,28 +44,35 @@ probe's **air reading** (Calibration → Moisture probes), which counts as 0%
 water, and the soil profile's **% VWC** figures. It sits the same fraction of
 the way from air to field capacity as the soil's wilting point % is of its
 field capacity %. Taking a real wilting point reading means drying a pot by
-weight, which is slow and fiddly, and the estimate is close enough for the
-bands below.
+weight, which is slow and fiddly, and the estimate is close enough to water by.
 
-The moisture shown on a card is then **plant-available water**:
-`(reading − wilting point) ÷ (field capacity − wilting point)`, as a
-percentage. 100% is just watered and drained; 0% is wilting point. So "40%"
-means 40% of the water the plant can use is still there, whatever the soil.
+A reading between those two ends becomes the soil's **water content**, % VWC:
+the share of the pot's volume that is water. Each soil profile knows its own
+figures for both ends, so the reading is placed between them. In Rich &
+Retentive Mix, for example, field capacity is 50% and wilting point 17.5%, so a
+pot halfway between its two readings is at about 34%.
 
-The moisture bands are fixed slices of that same scale:
+**Each plant has a target**: water once the soil dries to this % VWC. The plant
+profiles that ship with Herman give one per plant, with a water level naming it
+in words:
 
-| Band | Available water |
+| Water level | Water when soil drops to |
 | --- | --- |
-| very wet | 90–100% |
-| wet | 70–90% |
-| medium | 50–70% |
-| dry | 25–50% |
-| very dry | 0–25% |
+| Wet | 35–40% — keep constantly damp, never dry out |
+| Medium | 25–30% — top 1–2 inches dry |
+| Dry | 15–20% — soil mostly dry 2–3 inches down |
+| Very Dry | 6–10% — just above wilting point |
 
-A plant set to water at "dry" is watered once it goes past dry into very dry;
-set to "medium", once it goes past medium into dry. The dry boundary at half the
-available water used is the standard irrigation trigger, not a number picked
-here.
+Wet-Medium and Medium-Dry sit between those. The figures are for a rich mix;
+coarse mixes hold less water, so the same level sits lower in them. The card
+shows the pot's water content next to its target, along with a word for how
+wet it is (very wet, wet, medium, dry, very dry).
+
+**A target has to fit the soil.** If it is as wet as the soil can hold or
+wetter, the pot can never dry to it and would be watered every half hour, so
+watering is held and the card says why. If it is at or below the soil's wilting
+point, the pot is watered one point above wilting point instead, and the card
+says that too.
 
 **Without a field capacity reading a pot reads nothing at all** — the card
 shows "no reading" and says what is missing — and is never watered
@@ -77,7 +84,7 @@ could catch it.
 dry, and the probes do not respond in a perfectly straight line. Both put the
 real wilting point a little *above* the estimate. So a pot reads slightly
 wetter than it is, and is watered a little late rather than early. If a plant
-looks thirsty before it is watered, set its target one band wetter.
+looks thirsty before it is watered, raise its target a couple of points.
 
 **Measuring wilting point instead.** A soil profile with a **Wilting point
 (sensor reading)** uses that instead of the estimate. To take one without

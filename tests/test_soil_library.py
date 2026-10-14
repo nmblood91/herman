@@ -153,48 +153,78 @@ assert auto.get_plant(first).soil == ""
 print("ok: an empty name clears it, which is how you say the mix is unknown")
 
 
-# --- it belongs to the pot, not to the plant profile ---
+# --- a plant profile's preferred soil ---
 
-auto.update_plant_soil(first, "Fast-Draining Mix")
+auto.update_plant_soil(first, "Rich & Retentive Mix")
 auto.update_plant_soil(second, "Rich & Retentive Mix")
 auto.update_plant_name(first, "Fern")
+auto.get_plant(first).preferred_soil = "Fast-Draining Mix"
 auto.save_plant_profile(first)
+
+# Saving a pot keeps the preference it was loaded with. The soil it happens
+# to be growing in is not written over it: a plant potted in something else
+# for now still wants what it wants.
+saved = state.load_profiles(shared)["Fern"]
+assert saved["preferred_soil"] == "Fast-Draining Mix", saved
+assert "soil" not in saved, saved
+auto.get_plant(first).preferred_soil = ""
+auto.save_plant_profile(first)
+assert state.load_profiles(shared)["Fern"]["preferred_soil"] == "", (
+    "saving a pot with no preference recorded the soil it is in as one"
+)
+auto.write_plant_profile("Fern", {
+    "preferred_soil": "Fast-Draining Mix", "target_vwc": 20, "watering_volume_ml": 50,
+    "light_start_time": "07:00", "light_hours": 12, "light_brightness": 50,
+})
+print("ok: saving a pot keeps its preferred soil, never the soil it is in")
+
+# Loading it pots the plant in the mix it wants, and says so.
 result = auto.apply_plant_profile(second, "Fern")
+assert auto.get_plant(second).soil == "Fast-Draining Mix", auto.get_plant(second).soil
+assert auto.get_plant(second).preferred_soil == "Fast-Draining Mix"
+assert result["soil"] == "Fast-Draining Mix" and not result["soil_note"], result
+print("ok: loading a plant profile switches the pot to its preferred soil profile")
 
-# The mix is physically in the pot, and loading a plant profile repots nothing.
-# The two ways of being wrong here are not symmetrical: if the soil stays and
-# you did repot, you pick the mix again from a dropdown you are looking at. If
-# it travelled and you did not, the pot bands every reading against the wrong
-# wilting point and waters to it, and nothing looks broken.
-assert auto.get_plant(second).soil == "Rich & Retentive Mix", auto.get_plant(second).soil
-print("ok: loading a plant profile leaves the pot's soil alone")
+# A preference naming a soil profile that is not installed leaves the pot's
+# soil alone and says why, rather than clearing it.
+raw = state.load_state(shared)
+raw["plant_profiles"]["Exotic"] = {
+    "target_vwc": 20,
+    "watering_volume_ml": 50,
+    "preferred_soil": "Moon dust",
+}
+state.save_state(raw, shared)
+result = auto.apply_plant_profile(second, "Exotic")
+assert auto.get_plant(second).soil == "Fast-Draining Mix", auto.get_plant(second).soil
+assert "Moon dust" in result["soil_note"], result
+print("ok: a preferred soil that is not installed leaves the pot's soil, and says so")
 
-# Reported back, so the caller can say it was left rather than leave someone
-# wondering whether the profile changed the mix.
-assert result["soil"] == "Rich & Retentive Mix", result
-print("ok: and the load reports the soil it did not touch")
-
-# Not written into the entry at all, rather than written and then ignored.
-assert "soil" not in state.load_profiles(shared)["Fern"], state.load_profiles(shared)["Fern"]
-print("ok: soil is not saved into a plant in the first place")
-
-# An entry saved while soil still travelled still has the key in it. The
-# whitelist filters on read as well as write, so the old behaviour cannot come
-# back for profiles saved up to now.
+# An entry written by an older build carried "soil". The whitelist filters on
+# read, so it neither loads nor moves the pot.
 raw = state.load_state(shared)
 raw["plant_profiles"]["Legacy"] = {
-    "moisture_target": "dry",
     "watering_volume_ml": 50,
     "soil": "Ultra-Coarse Epiphytic Mix",
 }
 state.save_state(raw, shared)
 assert "soil" not in state.load_profiles(shared)["Legacy"]
-
-auto.update_plant_soil(second, "Fast-Draining Mix")
 auto.apply_plant_profile(second, "Legacy")
 assert auto.get_plant(second).soil == "Fast-Draining Mix", auto.get_plant(second).soil
-print("ok: a profile saved with a soil in it does not apply it")
+print("ok: a profile saved with an old soil key does not apply it")
 
+# A preferred soil written in the editor must name a soil profile.
+try:
+    auto.write_plant_profile("Typo", {
+        "target_vwc": 20, "watering_volume_ml": 50, "light_start_time": "07:00",
+        "light_hours": 12, "light_brightness": 50, "preferred_soil": "Rich and Retentive",
+    })
+except ValueError:
+    pass
+else:
+    raise AssertionError("stored a preferred soil that names no soil profile")
+print("ok: a preferred soil that names no soil profile is refused")
+
+auto.update_plant_soil(first, "Fast-Draining Mix")
 auto.update_plant_soil(second, "Rich & Retentive Mix")
 restored = build(shared)
 assert restored.get_plant(first).soil == "Fast-Draining Mix"

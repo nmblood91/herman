@@ -71,7 +71,9 @@ def placement(plant):
     """Everything on a pot that a restore puts back."""
     return (
         plant.name, plant.profile, plant.position_mm, plant.watering_mode, plant.sweep_min_mm,
-        plant.sweep_max_mm, plant.soil, plant.moisture_target, plant.watering_volume_ml,
+        plant.sweep_max_mm, plant.soil, plant.preferred_soil, plant.target_vwc,
+        plant.water_level, plant.watering_volume_ml, plant.light_start_time,
+        plant.light_hours, plant.light_brightness,
     )
 
 

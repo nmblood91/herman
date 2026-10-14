@@ -58,18 +58,20 @@ SOILS_KEY = "soil_profiles"
 # over a span of zero. That falls back to point watering, which means the pot
 # would read as configured for something it was never doing.
 #
-# soil is out for the plainest reason of all: it is in the pot. Loading a
-# profile does not repot anything, so a travelling soil would have a saved
-# plant assert a physical fact about a pot nobody touched. And the two ways of
-# being wrong are not symmetrical. If soil stays and you *did* repot, you pick
-# the mix again from a dropdown you are already looking at. If soil travelled
-# and you did not, the pot silently bands every reading against the wrong
-# wilting point and waters to it, and nothing looks broken.
+# The pot's soil is not stored here either: a profile says which soil profile
+# the plant wants (preferred_soil), not what a particular pot holds. Loading a
+# profile does switch the pot to its preferred soil -- you pot a plant in the
+# mix it wants -- and the card warns if the pot is later given another.
 PROFILE_FIELDS = (
-    "moisture_target",
+    # Grouping for the library, e.g. "Culinary Herbs & Leafy Greens".
+    "category",
+    "preferred_soil",
+    "target_vwc",
+    "water_level",
     "watering_volume_ml",
     "light_start_time",
-    "light_stop_time",
+    "light_hours",
+    "light_brightness",
     # Why this plant is set up the way it is. Free text, and the only field here
     # the planter never acts on -- which is the point: the numbers say what it
     # does, and this says why, for whoever reads it next.

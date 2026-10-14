@@ -3,22 +3,31 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, time
 
+from greenthumb import care
+
 
 @dataclass
 class PlantSpec:
     name: str
     plant_id: str
     sensor_address: int
-    # Required rather than defaulted: every plant sets these, and a default that
-    # no caller uses is a value nobody notices is wrong.
-    #
-    # The target is a band name from greenthumb.moisture, not a percentage.
-    # "water when this reaches dry" is a decision; "water at 42%" is a number
-    # against a scale whose meaning depends on the soil.
-    moisture_target: str
     watering_volume_ml: int
+    # Water once the soil dries to this, as a whole % volumetric water content.
+    # Turned into a point on the pot's own scale through its soil profile's
+    # field capacity and wilting point %; see greenthumb.care.
+    target_vwc: int = care.DEFAULT_TARGET_VWC
+    # The same target in words ("Medium", "Very Dry"), for showing. Never
+    # converted into a number: the percentage is what waters.
+    water_level: str = ""
+    # The soil profile this plant wants. Loading a plant profile switches the
+    # pot to it; the card warns if the pot is later given a different one.
+    preferred_soil: str = ""
+    # When the lights come on, for how many hours, and how bright this plant's
+    # stretch of strip is, in percent. The stop time is worked out from the
+    # first two (care.light_stop) rather than stored beside them.
     light_start_time: time = time(8, 0)
-    light_stop_time: time = time(20, 0)
+    light_hours: int = care.DEFAULT_LIGHT_HOURS
+    light_brightness: int = care.DEFAULT_LIGHT_BRIGHTNESS
     # Whole millimetres, like the sweep bounds below. The carriage cannot be
     # placed over a pot to a fraction of a millimetre by eye, so a decimal
     # here would only be noise on the card.
@@ -76,11 +85,17 @@ class SensorSample:
 class PlantStatus:
     plant_id: str
     moisture_percent: float
-    # The band the reading falls in, and the band it is aimed at. The raw
+    # The band the reading falls in, for describing it in words. The raw
     # percentage stays alongside: the history chart needs it, and the rate of
     # drying says more than the level.
     moisture_band: str
-    target_moisture: str
+    # What waters: the pot's soil moisture as % VWC, None when it cannot be
+    # worked out, against the plant's target.
+    moisture_vwc: float | None
+    target_vwc: int
+    thirsty: bool = False
+    # Why the target cannot be used as written for this pot's soil, or None.
+    target_problem: str | None = None
     pump_active: bool = False
     lighting_mode: str = "ambient"
     last_watered: str | None = None

@@ -17,7 +17,7 @@ import { LedStripPanel } from './components/LedStripPanel'
 import { LogsPanel } from './components/LogsPanel'
 import './App.css'
 import { API_BASE } from './api'
-import { formatClock } from './time'
+import { describeBrightness, describeLightWindow } from './time'
 
 const fetchJson = async (path, options = {}) => {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -45,9 +45,6 @@ function App() {
   // plant changes it, so it has to refresh on the same beat.
   const [profiles, setProfiles] = useState([])
   const [soils, setSoils] = useState([])
-  // The band scale, fetched once rather than hard-coded, so the UI cannot
-  // drift from greenthumb/moisture.py.
-  const [bands, setBands] = useState([])
   // Transient feedback from something the user just did. Clears itself so the
   // bar falls back to the planter's actual state rather than freezing on the
   // last thing that happened to be clicked.
@@ -70,19 +67,17 @@ function App() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [overviewData, plantsData, profileData, soilData, bandData] = await Promise.all([
+      const [overviewData, plantsData, profileData, soilData] = await Promise.all([
         fetchJson('/overview'),
         fetchJson('/plants'),
         fetchJson('/plant-profiles'),
         fetchJson('/soils'),
-        fetchJson('/moisture-bands'),
       ])
 
       setOverview(overviewData)
       setPlants(plantsData)
       setProfiles(profileData.profiles ?? [])
       setSoils(soilData.soils ?? [])
-      setBands(bandData.bands ?? [])
       // Deliberately does not touch `action`. This runs after every action, so
       // writing to the status bar here would wipe the feedback from whatever
       // the user just pressed. The bar falls back to the planter's computed
@@ -249,16 +244,16 @@ function App() {
         method: 'POST',
         body: JSON.stringify({ name }),
       })
-      // Says what was left alone as well as what changed, because that is
-      // the surprising half: a plant profile carries care settings, and
-      // everything describing the pot itself stays put.
+      // Says what the soil profile became, because loading a plant profile
+      // changes it, and what was left alone: the pot's location.
       setStatus(
-        `Loaded plant profile ${result.name}: waters at ${result.moisture_target}, ` +
-          `${result.watering_volume_ml} mL, lights ` +
-          `${formatClock(result.light_start_time)}–` +
-          `${formatClock(result.light_stop_time)}. The pot keeps its location ` +
-          `(${result.position_mm} mm) and its soil ` +
-          `(${result.soil || 'not set'}).`,
+        `Loaded plant profile ${result.name}: waters ${result.watering_volume_ml} mL ` +
+          `at ${result.target_vwc}% VWC, lights ` +
+          `${describeLightWindow(result.light_start_time, result.light_hours)} at ` +
+          `${describeBrightness(result.light_brightness)}. Soil profile: ` +
+          `${result.soil || 'not set'}. ` +
+          (result.soil_note ? `${result.soil_note} ` : '') +
+          `The pot keeps its location (${result.position_mm} mm).`,
       )
       await loadDashboard()
     } catch (error) {
@@ -364,7 +359,7 @@ function App() {
           {/* Below the cards, because both are libraries the cards pick from:
               a plant and a mix are chosen from dropdowns up there, so editing
               them belongs on the same tab rather than one away. */}
-          <PlantEditorPanel profiles={profiles} bands={bands} onRefresh={loadDashboard} />
+          <PlantEditorPanel profiles={profiles} soils={soils} onRefresh={loadDashboard} />
           <SoilPanel soils={soils} plants={plants} onRefresh={loadDashboard} />
         </>
       )}

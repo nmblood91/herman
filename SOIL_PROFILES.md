@@ -112,15 +112,20 @@ as possible, so thick, fleshy roots never sit in standing water or fine sludge.
 | **Drying cycle indoors** | 5–10 days | 3–5 days | 1–3 days |
 | **Root type** | fine, fibrous, water-hungry | succulent, water-storing tap roots | thick, fleshy aerial roots |
 
-### The starter plant profiles
+### Which plant profiles use which
 
-| Plant profile | Soil profile |
+Every one of the 70 plant profiles that ship names its preferred soil profile,
+and loading it onto a pot switches the pot to that soil profile:
+
+| Soil profile | Plant profiles |
 | --- | --- |
-| Lettuce | Rich & Retentive Mix |
-| Basil | Rich & Retentive Mix |
-| Peace Lily | Rich & Retentive Mix |
-| Snake Plant | Fast-Draining Mix |
-| Pothos | Ultra-Coarse Epiphytic Mix |
+| Rich & Retentive Mix | 45 — the vegetables, the leafy greens and soft herbs, and most foliage houseplants |
+| Fast-Draining Mix | 15 — rosemary, thyme, oregano, sage, snake and ZZ plants, and the desert succulents and cacti |
+| Ultra-Coarse Epiphytic Mix | 10 — Monstera adansonii, the orchids, anthuriums, hoyas, Christmas cactus and staghorn fern |
+
+Each plant also has a target soil moisture in % VWC. A few targets fall
+outside their soil's range; the plant card flags those (see README, *Watering
+targets*).
 
 ---
 

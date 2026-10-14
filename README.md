@@ -145,9 +145,21 @@ and Soil tab, or over the API:
 
 ```bash
 curl -X POST http://herman.local/api/v1/plant-profiles -H 'Content-Type: application/json' \
-  -d '{"name":"Basil","moisture_target":"dry","watering_volume_ml":120,"light_start_time":"07:30","light_stop_time":"21:00","notes":"South window, dries fast in summer."}'
+  -d '{"name":"Basil","category":"Culinary Herbs & Leafy Greens","preferred_soil":"Rich & Retentive Mix","target_vwc":28,"water_level":"Medium","watering_volume_ml":120,"light_start_time":"07:30","light_hours":13,"light_brightness":75,"notes":"South window, dries fast in summer."}'
 curl http://herman.local/api/v1/plant-profiles/Basil
 ```
+
+What a plant profile carries:
+
+| Field | Meaning |
+|---|---|
+| Category | Groups the profile in the dropdowns. Optional. |
+| Preferred soil | The soil profile the plant wants. Loading the profile switches the pot to it. |
+| Water at (% VWC) | The pot is watered once its soil dries to this. See *Watering targets* below. |
+| Water level | Wet, Wet-Medium, Medium, Medium-Dry, Dry or Very Dry: the target in words. A label only. |
+| Watering volume | Millilitres per dose. |
+| Lights on at, hours | When this plant's stretch of strip comes on, and for how long. The card and editor show when it goes off; nothing stores a stop time. |
+| Brightness | 0–100% for this plant's stretch of strip. Low 25%, Medium 50%, High 75%, Intense 100%. |
 
 That is a change in direction worth knowing about. Previously the only way to
 write a plant profile was `POST /plants/{id}/profile`, which snapshots a pot — so
@@ -171,26 +183,20 @@ say so on the card.
 
 Each plant profile and each soil also carries **notes**: free text, and the only
 field the planter never acts on. The numbers say what it does; the note says
-why, which is the part nobody remembers a season later. The starter libraries
-have always carried this text in `plant_library.py` and `soil_library.py` — it
-was discarded on install until now, so the reasoning stayed in the source and
-never reached anyone reading the library in the app.
+why, which is the part nobody remembers a season later. The soil library's
+recipes are carried this way.
 
-**Nothing describing the pot is part of a plant profile** -- not the watering
-location, not the watering mode or its sweep bounds, and not the soil. A saved
-plant is care settings, and loading one onto a pot must not assert physical
-facts about a pot nobody touched.
+**Nothing describing the pot's placement is part of a plant profile** -- not
+the watering location, the watering mode or its sweep bounds. If the location
+travelled, loading one plant onto a second pot would give both the same rail
+coordinate and watering one would dribble into the other.
 
-The watering location is the obvious case: if it travelled, loading one plant
-onto a second pot would give both the same rail coordinate and watering one
-would dribble into the other.
-
-The soil is the one that looks arguable, since you usually *do* repot when you
-set a pot up for a different plant. But the two ways of being wrong are not
-symmetrical. If the soil stays and you did repot, you pick the mix again from a
-dropdown you are already looking at. If the soil travelled and you did not, the
-pot silently bands every reading against the wrong wilting point and waters to
-it -- and nothing about that looks broken.
+The soil is different: a plant profile names the soil profile the plant
+*prefers*, and loading it **switches the pot to that soil profile**, since you
+pot a plant in the mix it wants. If the pot is later given a different soil
+profile, its card says the plant prefers another and offers to switch back.
+Clearing a plant profile leaves the pot's soil profile alone: the mix is still
+in the pot.
 
 Stored in `data/state.json` under `plant_profiles`, alongside the rest of the
 settings.
@@ -342,17 +348,50 @@ A soil profile takes a note too, for where its figures came from. Saving
 replaces any soil profile of that name; a % pair must be given whole or not at
 all, and wilting point must read below field capacity.
 
-## Moisture bands
+## Watering targets
 
-A pot's moisture is **plant-available water**: 100% at its soil profile's
-field capacity reading, 0% at its wilting point (estimated, or the soil
-profile's reading).
+A pot's reading is first turned into **plant-available water**: 100% at its
+soil profile's field capacity reading, 0% at its wilting point (estimated, or
+the soil profile's reading).
 
-`moisture % = (reading − wilting point) ÷ (field capacity − wilting point)`
+`available % = (reading − wilting point) ÷ (field capacity − wilting point)`
 
-A plant is watered when its pot reaches a **band**, not a percentage. The bands
-are fixed slices of that scale, the same for every soil — the soil is already
-in the two ends:
+That is then placed on the soil profile's **% VWC** scale, between its wilting
+point % and field capacity %:
+
+`VWC = wilting point % + available % × (field capacity % − wilting point %)`
+
+**A plant is watered once its pot's VWC drops to its target.** The card shows
+the pot's VWC beside the target. As a guide, in a rich mix:
+
+| Water level | Water when soil drops to |
+|---|---|
+| Wet | 35–40% VWC — keep constantly damp |
+| Medium | 25–30% — top 1–2 inches dry |
+| Dry | 15–20% — mostly dry 2–3 inches down |
+| Very Dry | 6–10% — just above wilting point |
+
+Wet-Medium and Medium-Dry sit between. The same water level sits lower in a
+coarser mix, which is why the percentage, not the label, does the watering.
+
+**A target has to fit the pot's soil profile.** Two cases are caught and shown
+on the card:
+
+- **At or above the soil's field capacity %** (e.g. 21% in Ultra-Coarse
+  Epiphytic Mix, which holds 15%): the pot can never dry to it, so it would be
+  watered on every cooldown. Watering is **held** and the status bar says so.
+- **At or below the soil's wilting point %** (e.g. 7% in Fast-Draining Mix,
+  whose wilting point is 8%): the pot would have to reach the point the plant
+  cannot drink at. It is watered **one point above wilting point** instead.
+
+In the shipped library this affects Christmas / Thanksgiving Cactus (held),
+and Peperomia Obtusifolia, Desert Cactus and Prickly Pear Cactus (watered just
+above wilting point).
+
+### Moisture bands
+
+The card also names the reading in words. The bands are fixed slices of the
+plant-available water scale, the same for every soil:
 
 | Band | Available water | Depletion |
 |---|---|---|
@@ -364,50 +403,43 @@ in the two ends:
 
 The percentage is still kept and still charted — the *rate* of drying says more
 than the level, because it follows light, temperature and growth stage on its
-own where a fixed threshold cannot. The band is what a target is expressed in.
+own where a fixed threshold cannot.
+
+Readings hold their band until one clears a boundary properly, so a value
+parked on a threshold does not relabel on every poll.
 
 **How far to trust the estimated wilting point.** Soil reads a little above
 air even bone dry, and capacitive probes are not perfectly linear. Both put
 real wilting point slightly above the estimate, so a pot reads a little wetter
 than it is and is watered a little late, never early. Measuring wilting point
-by weight removes that, but it is slow; for most plants, setting the target
-one band wetter does the same job.
+by weight removes that, but it is slow; for most plants, raising the target a
+couple of points does the same job.
 
-**Why bands rather than the number.** A few percent of probe error moves a
-reading without meaning anything. A band states the decision and hides a
-distinction the hardware cannot make.
+**A pot whose moisture cannot be worked out is never watered automatically**
+— no soil profile, no field capacity reading, a soil profile without its two %
+figures, or an unreadable probe. "Cannot say" must not collapse into "bone
+dry", or an unplugged probe would read as the thirstiest plant on the rail. The
+card and status bar say what is missing. Manual watering is unaffected.
 
-Readings hold their band until one clears a boundary properly, so a value
-parked on a threshold does not relabel on every poll.
+### The plant library
 
-**A pot without a scale is never watered automatically** — no soil profile,
-no field capacity reading, or nothing to place wilting point from. A reading cannot become a band at all, and
-"cannot say" must not collapse into "very dry", or an unplugged probe would
-read as the thirstiest plant on the rail. The card and status bar say which is
-missing. Manual watering is unaffected.
-
-### Starter profiles
-
-Five common plants ship as a starting library, ordered by when they want water:
-Lettuce (medium), Peace Lily and Basil (dry), Pothos and Snake Plant (very
-dry).
+70 plant profiles ship in four categories: indoor vegetables and fruiting
+crops, culinary herbs and leafy greens, common houseplants, and succulents,
+cacti and epiphytes. Each names its preferred soil profile, target % VWC, water
+level, hours of light and light intensity. The dropdowns group them by
+category.
 
 ```bash
-python -m greenthumb.plant_library              # read them and why
+python -m greenthumb.plant_library              # list them
 python -m greenthumb.plant_library --install    # add them to the library
 ```
 
 Installing keeps any entry you have already tuned; `--overwrite` replaces them.
 
-**The photoperiods are researched; the targets are bands for a reason.** No
-horticultural source publishes a sensor percentage, because the number depends
-on the probe and the mix. What the literature describes is behaviour — "let the
-top inch dry", "let it dry out completely" — and a band is the closest honest
-expression of that. Several plants sharing a band is honest too: the research
-does not separate basil from lettuce to within a few percent.
-
-Volumes assume a 15 cm (6 inch) pot and frequent small doses rather than a
-weekly soak. Scale with the pot.
+Two things the source table does not give are filled in the same for every
+plant: a **100 mL** dose (it depends on the pot more than the plant) and lights
+on at **07:00** (the longest photoperiod, 15 h, then ends at 22:00). Change
+either per plant in the Plant Profile Editor.
 
 ## Hardware assumptions
 
@@ -449,7 +481,7 @@ This repository is set up to become a real product in stages:
 ## How watering decisions are made
 
 A background loop polls every sensor once a minute, averages the last ten
-readings per plant, and waters a plant once its band is drier than its target.
+readings per plant, and waters a plant once its soil dries to its target % VWC.
 [HOW_WATERING_WORKS.md](HOW_WATERING_WORKS.md) explains the rules and the
 reasoning in plain language, for people who won't be reading the code.
 

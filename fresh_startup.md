@@ -201,9 +201,12 @@ before its pots are watered.
 
 In **Plants and Soil**:
 
-1. **Soil.** Choose the soil profile each pot is filled with on its card (see SOIL_PROFILES.md).
-2. **Plant.** Load a plant profile into each pot, or write your own in the Plant Profile
-   Editor.
+1. **Plant.** Load a plant profile onto each pot from its card, or write your
+   own in the Plant Profile Editor. Loading one also sets the pot's soil profile
+   to the one the plant prefers, so pot each plant in that mix (see
+   SOIL_PROFILES.md).
+2. **Soil.** If a pot is filled with something else, choose that soil profile
+   on its card instead. The card will note that the plant prefers another.
 3. **Position.** Jog the carriage until the nozzle is over the pot, then press
    **Use current position** on that card. It fills the field without saving, so
    you can check the number first. It refuses an unhomed gantry.

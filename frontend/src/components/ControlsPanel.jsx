@@ -331,7 +331,15 @@ export function ControlsPanel({
             </label>
           </div>
 
-          {ledMode !== 'off' && (
+          {/* In Schedule each plant's stretch of strip runs at that plant's
+              own brightness, set in its plant profile, so one slider for the
+              whole strip would do nothing there. */}
+          {ledMode === 'schedule' && (
+            <p className="field-hint">
+              Each plant&apos;s lights use the brightness in its plant profile.
+            </p>
+          )}
+          {ledMode !== 'off' && ledMode !== 'schedule' && (
             <div className="field-row">
               <label>
                 Brightness

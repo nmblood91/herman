@@ -33,7 +33,7 @@ from greenthumb.hardware.soil_sensors import (
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
 from greenthumb.plants import default_plants, label_for, zone_for
-from greenthumb import dances, moisture, state
+from greenthumb import care, dances, moisture, state
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,28 @@ UNCHANGED = object()
 
 class HardwareBusyError(RuntimeError):
     """Raised when the gantry, pump, or I2C bus is already in use."""
+
+
+def care_fields(plant: PlantSpec) -> dict[str, object]:
+    """A pot's care settings as stored and reported: what a plant profile sets.
+
+    One place for the list, so the state file, the API and a saved plant
+    profile cannot drift apart. The stop time is derived, reported for the UI
+    and never read back.
+    """
+    return {
+        "preferred_soil": plant.preferred_soil,
+        "target_vwc": plant.target_vwc,
+        "water_level": plant.water_level,
+        "watering_volume_ml": plant.watering_volume_ml,
+        "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
+        "light_hours": plant.light_hours,
+        "light_brightness": plant.light_brightness,
+        "light_stop_time": care.light_stop(
+            plant.light_start_time, plant.light_hours
+        ).isoformat(timespec="minutes"),
+        "notes": plant.notes,
+    }
 
 
 def within_window(now: time, start: time, stop: time) -> bool:
@@ -253,6 +275,10 @@ class GreenThumbAutomation:
         """
         if not plant.soil:
             return "No soil profile set."
+        # Needed whatever the readings: they turn the reading into the % VWC
+        # a plant's target is written in.
+        if self._soil_vwc(plant) is None:
+            return "Its soil profile needs its field capacity and wilting point % VWC."
         address = plant.sensor_address
         capacity = self.sensor_hub.field_capacity.get(address)
         wilting = self.sensor_hub.wilting_point.get(address)
@@ -320,10 +346,25 @@ class GreenThumbAutomation:
                 # A plant id that no longer exists is skipped rather than
                 # treated as an error: the plant set is defined by the code.
                 continue
-            for text_field in ("name", "soil", "moisture_target", "profile"):
+            for text_field in ("name", "soil", "preferred_soil", "profile"):
                 value = saved.get(text_field)
                 if isinstance(value, str) and value.strip():
                     setattr(plant, text_field, value.strip())
+            # The care settings, each checked the way the editor checks it. A
+            # bad value keeps the default rather than failing the restore.
+            for field_name, check in (
+                ("target_vwc", care.check_target_vwc),
+                ("water_level", care.check_water_level),
+                ("light_hours", care.check_light_hours),
+                ("light_brightness", care.check_light_brightness),
+                ("light_start_time", care.check_start_time),
+            ):
+                if field_name not in saved:
+                    continue
+                try:
+                    setattr(plant, field_name, check(saved[field_name]))
+                except ValueError:
+                    logger.warning("Ignoring bad %s %r", field_name, saved[field_name])
             # Separately from the loop above, which skips blanks so that a
             # cleared name cannot wipe the default. An empty note is a real
             # value, so it is tested for being a string rather than for being
@@ -357,14 +398,6 @@ class GreenThumbAutomation:
                 # position stored with a decimal before positions became whole
                 # millimetres comes back at the nearest one, not the one below.
                 setattr(plant, field_name, round(value))
-            for field_name in ("light_start_time", "light_stop_time"):
-                text = saved.get(field_name)
-                if not isinstance(text, str):
-                    continue
-                try:
-                    setattr(plant, field_name, time.fromisoformat(text))
-                except ValueError:
-                    logger.warning("Ignoring bad %s %r", field_name, text)
 
         patrol = stored.get("auto_patrol")
         if isinstance(patrol, dict) and isinstance(patrol.get("enabled"), bool):
@@ -467,17 +500,13 @@ class GreenThumbAutomation:
                 {
                     "plant_id": plant.plant_id,
                     "name": plant.name,
-                    "moisture_target": plant.moisture_target,
-                    "watering_volume_ml": plant.watering_volume_ml,
                     "position_mm": plant.position_mm,
                     "watering_mode": plant.watering_mode,
                     "sweep_min_mm": plant.sweep_min_mm,
                     "sweep_max_mm": plant.sweep_max_mm,
                     "soil": plant.soil,
-                    "notes": plant.notes,
                     "profile": plant.profile,
-                    "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
-                    "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
+                    **care_fields(plant),
                 }
                 for plant in self.plants
             ],
@@ -929,7 +958,8 @@ class GreenThumbAutomation:
                 (
                     plant.led_start_index,
                     plant.led_end_index,
-                    within_window(now, plant.light_start_time, plant.light_stop_time),
+                    care.light_on(now, plant.light_start_time, plant.light_hours),
+                    plant.light_brightness,
                 )
                 for plant in self.plants
             ]
@@ -971,16 +1001,82 @@ class GreenThumbAutomation:
         self._bands[plant.plant_id] = band
         return band
 
-    def thirsty(self, plant: PlantSpec) -> bool:
-        """True when this pot is drier than its target band.
+    def _soil_vwc(self, plant: PlantSpec) -> tuple[float, float] | None:
+        """(wilting point %, field capacity %) of the pot's soil, or None."""
+        soil = self._soil_entry(plant)
+        if state.available_water_fraction(soil) is None:
+            return None
+        return float(soil["wilting_point_vwc"]), float(soil["field_capacity_vwc"])
 
-        An unknown band is never thirsty. That is the whole protection against
-        watering on a reading we do not have -- a probe that fell out, or a pot
-        whose soil was never recorded.
+    def vwc_for_plant(self, plant: PlantSpec) -> float | None:
+        """The pot's soil moisture as % VWC, or None when it cannot be said.
+
+        Plant-available water placed between the soil profile's wilting point
+        and field capacity %. The same straight line the wilting point estimate
+        assumes, so the two never disagree about where a reading sits.
         """
-        return not moisture.is_wetter_or_equal(
-            self.band_for_plant(plant), plant.moisture_target
-        )
+        percent = self.percent_for_plant(plant)
+        bounds = self._soil_vwc(plant)
+        if percent < 0 or bounds is None:
+            return None
+        wilting, capacity = bounds
+        return round(wilting + percent / 100 * (capacity - wilting), 1)
+
+    def effective_target(self, plant: PlantSpec) -> float | None:
+        """The VWC this pot is actually watered at, or None to never water.
+
+        The plant's target, unless it does not fit the pot's soil:
+
+        * At or above the soil's field capacity, the pot can never dry to it,
+          so it would be watered on every cooldown. None -- held, and said.
+        * At or below the soil's wilting point, the reading would have to
+          reach the point the plant cannot drink at. Watered one point above
+          wilting point instead -- "just above wilting point", the driest any
+          plant here is meant to go.
+        """
+        bounds = self._soil_vwc(plant)
+        if bounds is None:
+            return None
+        wilting, capacity = bounds
+        if plant.target_vwc >= capacity:
+            return None
+        if plant.target_vwc <= wilting:
+            return wilting + 1
+        return float(plant.target_vwc)
+
+    def target_problem(self, plant: PlantSpec) -> str | None:
+        """Why the plant's target does not fit its pot's soil, or None."""
+        bounds = self._soil_vwc(plant)
+        if bounds is None:
+            return None
+        wilting, capacity = bounds
+        if plant.target_vwc >= capacity:
+            return (
+                f"Its target of {plant.target_vwc}% VWC is at or above what "
+                f"{plant.soil} holds ({capacity:g}%), so it would be watered "
+                "constantly. Watering is held; choose a wetter soil profile or a "
+                "lower target."
+            )
+        if plant.target_vwc <= wilting:
+            return (
+                f"Its target of {plant.target_vwc}% VWC is at or below "
+                f"{plant.soil}'s wilting point ({wilting:g}%), so it is watered "
+                f"at {wilting + 1:g}% instead."
+            )
+        return None
+
+    def thirsty(self, plant: PlantSpec) -> bool:
+        """True when this pot has dried to its target moisture.
+
+        A pot whose moisture cannot be said is never thirsty. That is the whole
+        protection against watering on a reading we do not have -- a probe
+        that fell out, or a pot whose soil was never recorded.
+        """
+        vwc = self.vwc_for_plant(plant)
+        target = self.effective_target(plant)
+        if vwc is None or target is None:
+            return False
+        return vwc <= target
 
     def _smoothed_raw(self, address: int) -> float | None:
         """Mean raw count over the window, or None while it is empty."""
@@ -1127,9 +1223,23 @@ class GreenThumbAutomation:
             profiles = sorted({plant.soil for plant in unmeasured})
             return state(
                 "attention",
-                f"Watering is held on {', '.join(p.name for p in unmeasured)}: "
-                f"{', '.join(profiles)} needs a field capacity reading. Set it "
-                f"in the Soil Profile Editor.",
+                f"Watering is held on {', '.join(p.name for p in unmeasured)} "
+                f"({', '.join(profiles)}): {self.scale_problem(unmeasured[0])} "
+                "Set it up in the Soil Profile Editor.",
+            )
+
+        # A target wetter than the soil can hold is held rather than watered
+        # on every cooldown, and that has to be said: it looks like a plant
+        # that simply is not thirsty.
+        unreachable = [
+            plant.name for plant in self.plants
+            if self._soil_vwc(plant) is not None and self.effective_target(plant) is None
+        ]
+        if unreachable and self.auto_watering_enabled:
+            return state(
+                "attention",
+                f"Watering is held on {', '.join(unreachable)}: its target is "
+                "wetter than its soil profile holds. See the plant card.",
             )
 
         thirsty = [plant.name for plant in self.plants if self.thirsty(plant)]
@@ -1409,11 +1519,10 @@ class GreenThumbAutomation:
                 continue
 
             logger.info(
-                "Plant %s is %s against a target of %s, watering (%.1f%%)",
+                "Plant %s is at %s%% VWC against a target of %s%%, watering",
                 plant.plant_id,
-                self.band_for_plant(plant),
-                plant.moisture_target,
-                self.percent_for_plant(plant),
+                self.vwc_for_plant(plant),
+                self.effective_target(plant),
             )
             self._move_and_water(plant)
 
@@ -1616,7 +1725,10 @@ class GreenThumbAutomation:
                 plant_id=spec.plant_id,
                 moisture_percent=self.percent_for_plant(spec),
                 moisture_band=self.band_for_plant(spec),
-                target_moisture=spec.moisture_target,
+                moisture_vwc=self.vwc_for_plant(spec),
+                target_vwc=spec.target_vwc,
+                thirsty=self.thirsty(spec),
+                target_problem=self.target_problem(spec),
                 pump_active=self.pump.is_running,
                 lighting_mode=self.leds.mode,
                 last_watered=self._last_watered_iso(spec.plant_id),
@@ -1664,7 +1776,7 @@ class GreenThumbAutomation:
                     "plant_id": plant.plant_id,
                     "name": plant.name,
                     "sensor_address": plant.sensor_address,
-                    "moisture_target": plant.moisture_target,
+                    "target_vwc": plant.target_vwc,
                     **series[plant.sensor_address],
                 }
                 for plant in self.plants
@@ -2277,17 +2389,17 @@ class GreenThumbAutomation:
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        entry = state.save_profile(
-            plant.name,
-            {
-                "moisture_target": plant.moisture_target,
-                "watering_volume_ml": plant.watering_volume_ml,
-                "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
-                "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
-                "notes": plant.notes,
-            },
-            self._state_path,
-        )
+        fields = care_fields(plant)
+        fields.pop("light_stop_time")
+        # preferred_soil is the preference the pot was loaded with, not the
+        # soil it happens to be in: a pot potted in something else for now
+        # must not rewrite what the plant asks for.
+        # A pot has no category; keep the one the profile already has, so
+        # saving a pot back over a library plant does not ungroup it.
+        existing = state.load_profiles(self._state_path)
+        same = next((v for k, v in existing.items() if k.casefold() == plant.name.strip().casefold()), {})
+        fields["category"] = same["category"] if isinstance(same.get("category"), str) else ""
+        entry = state.save_profile(plant.name, fields, self._state_path)
         # The pot is now what that plant profile describes.
         plant.profile = plant.name.strip()
         self._persist()
@@ -2305,19 +2417,30 @@ class GreenThumbAutomation:
 
         Validated the same way apply_plant_profile validates on the way in,
         because a profile is only worth having if loading it does something
-        sensible. An unrecognised band is the one that matters: it makes a
-        plant permanently not-thirsty, which reads as a working planter that
-        has quietly stopped watering.
+        sensible.
         """
         clean = str(name).strip()
         entry: dict[str, object] = {}
 
-        target = settings.get("moisture_target")
-        if not isinstance(target, str) or target.strip().casefold() not in moisture.BY_NAME:
-            raise ValueError(
-                "Water when it reaches must be one of: " + ", ".join(moisture.ORDER)
-            )
-        entry["moisture_target"] = target.strip().casefold()
+        category = settings.get("category", "")
+        if category is not None and not isinstance(category, str):
+            raise ValueError("Category must be text")
+        entry["category"] = (category or "").strip()
+
+        # Refused rather than stored when it names no soil profile: loading
+        # the profile could not switch the pot to it, and a typo would
+        # otherwise sit there looking like a preference.
+        preferred = str(settings.get("preferred_soil") or "").strip()
+        if preferred:
+            soils = state.load_soils(self._state_path)
+            key = next((k for k in soils if k.casefold() == preferred.casefold()), None)
+            if key is None:
+                raise ValueError(f"No soil profile called {preferred!r}")
+            preferred = key
+        entry["preferred_soil"] = preferred
+
+        entry["target_vwc"] = care.check_target_vwc(settings.get("target_vwc"))
+        entry["water_level"] = care.check_water_level(settings.get("water_level"))
 
         volume = settings.get("watering_volume_ml")
         if isinstance(volume, bool) or not isinstance(volume, (int, float)):
@@ -2327,18 +2450,11 @@ class GreenThumbAutomation:
         # the editor refusing a dose the plant card accepts.
         entry["watering_volume_ml"] = max(0, int(volume))
 
-        for field_name, label in (
-            ("light_start_time", "Light start"),
-            ("light_stop_time", "Light stop"),
-        ):
-            text = settings.get(field_name)
-            if not isinstance(text, str):
-                raise ValueError(f"{label} must be a time like 08:00")
-            try:
-                parsed = time.fromisoformat(text)
-            except ValueError:
-                raise ValueError(f"{label} must be a time like 08:00, not {text!r}") from None
-            entry[field_name] = parsed.isoformat(timespec="minutes")
+        entry["light_start_time"] = care.check_start_time(
+            settings.get("light_start_time")
+        ).isoformat(timespec="minutes")
+        entry["light_hours"] = care.check_light_hours(settings.get("light_hours"))
+        entry["light_brightness"] = care.check_light_brightness(settings.get("light_brightness"))
 
         notes = settings.get("notes", "")
         if notes is not None and not isinstance(notes, str):
@@ -2366,9 +2482,10 @@ class GreenThumbAutomation:
         one plant's settings onto a second pot is the whole point. Nothing is
         suffixed to make the names unique.
 
-        position_mm, the watering mode, the sweep bounds and the soil are all
-        untouched -- see state.PROFILE_FIELDS for why. They describe the pot,
-        not the plant.
+        The pot is switched to the profile's preferred soil profile, when it
+        has one that exists. position_mm, the watering mode and the sweep
+        bounds are untouched -- see state.PROFILE_FIELDS for why. They describe
+        the pot, not the plant.
         """
         plant = self.get_plant(plant_id)
         if plant is None:
@@ -2388,45 +2505,61 @@ class GreenThumbAutomation:
         if not isinstance(volume, bool) and isinstance(volume, (int, float)):
             plant.watering_volume_ml = max(0, int(volume))
 
-        # The target is a band name, so it needs validating rather than
-        # coercing. An unrecognised one is dropped rather than stored: a target
-        # that does not resolve makes the plant permanently not-thirsty, which
-        # reads as a working planter that has quietly stopped watering.
-        target = entry.get("moisture_target")
-        if isinstance(target, str) and target.strip().casefold() in moisture.BY_NAME:
-            plant.moisture_target = target.strip().casefold()
-        elif target is not None:
-            logger.warning(
-                "Ignoring unusable moisture target %r in profile %r", target, key
-            )
-
-        for field_name in ("light_start_time", "light_stop_time"):
-            text = entry.get(field_name)
-            if not isinstance(text, str):
-                continue
+        # Each checked rather than taken as written, and a bad one is dropped
+        # with a warning: a profile written by hand, or by an older build,
+        # should load what it can rather than nothing.
+        fresh = next(p for p in default_plants() if p.plant_id == plant_id)
+        for field_name, check in (
+            ("target_vwc", care.check_target_vwc),
+            ("water_level", care.check_water_level),
+            ("light_start_time", care.check_start_time),
+            ("light_hours", care.check_light_hours),
+            ("light_brightness", care.check_light_brightness),
+        ):
             try:
-                setattr(plant, field_name, time.fromisoformat(text))
+                value = check(entry[field_name]) if field_name in entry else getattr(fresh, field_name)
             except ValueError:
-                logger.warning("Ignoring bad %s %r in profile %r", field_name, text, key)
+                logger.warning(
+                    "Ignoring unusable %s %r in profile %r", field_name, entry[field_name], key
+                )
+                value = getattr(fresh, field_name)
+            setattr(plant, field_name, value)
 
+        # Tested for being a string, not for being truthy: an emptied note is a
+        # real value and must overwrite the old one. A profile with no notes key
+        # at all leaves the pot's note alone.
         if isinstance(entry.get("notes"), str):
             plant.notes = entry["notes"].strip()
 
+        # Pot the plant in the mix it wants. One that is not installed is
+        # reported and the pot keeps the soil profile it has.
+        preferred = entry.get("preferred_soil") if isinstance(entry.get("preferred_soil"), str) else ""
+        plant.preferred_soil = preferred.strip()
+        soil_note = ""
+        if plant.preferred_soil:
+            soils = state.load_soils(self._state_path)
+            soil_key = next((k for k in soils if k.casefold() == plant.preferred_soil.casefold()), None)
+            if soil_key is None:
+                soil_note = (
+                    f"{key} prefers {plant.preferred_soil}, which is not in the soil "
+                    "profiles, so the pot's soil profile was left as it was."
+                )
+            else:
+                plant.preferred_soil = soil_key
+                plant.soil = soil_key
+
         self._persist()
+        self._sync_scales()
         return {
             "status": "ok",
             "plant_id": plant_id,
             "name": plant.name,
             "profile": plant.profile,
-            "notes": plant.notes,
-            "moisture_target": plant.moisture_target,
-            "watering_volume_ml": plant.watering_volume_ml,
-            "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
-            "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
-            # Echoed so the caller can see these were left alone rather than
-            # wonder whether the profile moved the pot or changed its mix.
-            "position_mm": plant.position_mm,
+            **care_fields(plant),
             "soil": plant.soil,
+            "soil_note": soil_note,
+            # Echoed so the caller can see it was left alone.
+            "position_mm": plant.position_mm,
         }
 
     def clear_plant_profile(self, plant_id: str) -> dict[str, object]:
@@ -2434,9 +2567,8 @@ class GreenThumbAutomation:
 
         Everything a profile brings -- the name and the care settings -- goes
         back to the pot's default, so the pot does not go on watering to a
-        plant it no longer claims to be. Everything a profile leaves alone
-        stays: placement, watering mode and soil profile describe the pot, not
-        the plant.
+        plant it no longer claims to be. Placement, watering mode and the soil
+        profile stay: the mix is still physically in the pot.
         """
         plant = self.get_plant(plant_id)
         if plant is None:
@@ -2445,11 +2577,17 @@ class GreenThumbAutomation:
         fresh = next(p for p in default_plants() if p.plant_id == plant_id)
         plant.name = fresh.name
         plant.profile = ""
-        plant.moisture_target = fresh.moisture_target
-        plant.watering_volume_ml = fresh.watering_volume_ml
-        plant.light_start_time = fresh.light_start_time
-        plant.light_stop_time = fresh.light_stop_time
-        plant.notes = fresh.notes
+        for field_name in (
+            "target_vwc",
+            "water_level",
+            "preferred_soil",
+            "watering_volume_ml",
+            "light_start_time",
+            "light_hours",
+            "light_brightness",
+            "notes",
+        ):
+            setattr(plant, field_name, getattr(fresh, field_name))
         self._persist()
         return {"status": "ok", "plant_id": plant_id, "name": plant.name}
 
@@ -2471,23 +2609,28 @@ class GreenThumbAutomation:
         self._persist()
         return {"status": "ok", "plant_id": plant_id, "name": plant.name}
 
-    def update_light_schedule(self, plant_id: str, start_time: time, stop_time: time) -> dict[str, object]:
+    def update_light_schedule(
+        self, plant_id: str, start_time: object, hours: object, brightness: object
+    ) -> dict[str, object]:
+        """When this pot's lights come on, for how long, and how bright."""
         plant = self.get_plant(plant_id)
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        if not isinstance(start_time, time) or not isinstance(stop_time, time):
-            raise ValueError("Light times must be valid Python time objects")
-
-        plant.light_start_time = start_time
-        plant.light_stop_time = stop_time
+        # All three checked before any is applied, so a bad one changes nothing.
+        start = care.check_start_time(start_time)
+        checked_hours = care.check_light_hours(hours)
+        checked_brightness = care.check_light_brightness(brightness)
+        plant.light_start_time = start
+        plant.light_hours = checked_hours
+        plant.light_brightness = checked_brightness
         self._persist()
 
+        fields = care_fields(plant)
         return {
             "status": "ok",
             "plant_id": plant_id,
-            "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
-            "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
+            **{k: fields[k] for k in ("light_start_time", "light_hours", "light_brightness", "light_stop_time")},
         }
 
     def update_plant_soil(self, plant_id: str, soil: str) -> dict[str, object]:
@@ -2717,30 +2860,29 @@ class GreenThumbAutomation:
             "watering_volume_ml": plant.watering_volume_ml,
         }
 
-    def update_moisture_target(self, plant_id: str, moisture_target: str) -> dict[str, object]:
-        """Set the band at which this plant should be watered.
+    def update_target_vwc(
+        self, plant_id: str, target_vwc: object, water_level: object = UNCHANGED
+    ) -> dict[str, object]:
+        """Set the soil moisture, as % VWC, at which this plant is watered.
 
-        Refused rather than coerced if it is not a band: a target that does not
-        resolve makes the plant permanently not-thirsty, which looks like a
-        working planter that has quietly stopped watering.
+        Refused rather than coerced if it is not a whole percentage: a target
+        that does not resolve would leave the plant never thirsty, which looks
+        like a working planter that has quietly stopped watering.
         """
         plant = self.get_plant(plant_id)
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        wanted = str(moisture_target).strip().casefold()
-        if wanted not in moisture.BY_NAME:
-            raise ValueError(
-                f"Unknown moisture target {moisture_target!r}. "
-                f"Use one of: {', '.join(moisture.ORDER)}"
-            )
-
-        plant.moisture_target = wanted
+        target = care.check_target_vwc(target_vwc)
+        level = plant.water_level if water_level is UNCHANGED else care.check_water_level(water_level)
+        plant.target_vwc = target
+        plant.water_level = level
         self._persist()
 
         return {
             "status": "ok",
             "plant_id": plant_id,
-            "moisture_target": plant.moisture_target,
-            "description": moisture.describe(wanted),
+            "target_vwc": plant.target_vwc,
+            "water_level": plant.water_level,
+            "target_problem": self.target_problem(plant),
         }

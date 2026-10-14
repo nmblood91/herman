@@ -393,15 +393,20 @@ state.save_soil("Fast-Draining Mix", {"field_capacity_raw": 915}, shared)
 first, second = auto.plants[0], auto.plants[1]
 auto.update_plant_soil(first.plant_id, "Fast-Draining Mix")
 auto.update_plant_name(first.plant_id, "Fern")
+first.preferred_soil = "Fast-Draining Mix"
 auto.save_plant_profile(first.plant_id)
 
 saved = state.load_profiles(shared)["Fern"]
 assert not any(k.startswith("field_capacity") for k in saved), saved
+# Loading it switches the pot to the plant's preferred soil profile, and the
+# scale then comes from that soil profile -- not from the profile itself.
 auto.apply_plant_profile(second.plant_id, "Fern")
-assert capacity_of(auto, second) is None, (
-    "loading a plant profile gave a pot a scale from another pot's soil"
-)
-print("ok: a plant profile carries no field capacity, and loading one applies none")
+assert second.soil == "Fast-Draining Mix", second.soil
+assert capacity_of(auto, second) == 915, capacity_of(auto, second)
+state.save_soil("Fast-Draining Mix", {"field_capacity_raw": 870}, shared)
+auto._sync_scales()
+assert capacity_of(auto, second) == 870, "the scale travelled with the plant profile"
+print("ok: a plant profile carries no field capacity; the pot reads its soil profile's")
 
 
 # --- 10. the chart does not draw "cannot say" as bone dry ---

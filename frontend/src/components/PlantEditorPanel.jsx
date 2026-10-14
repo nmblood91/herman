@@ -2,15 +2,38 @@ import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
 import { HoldRing } from './HoldRing'
+import { describeBrightness, formatClock, lightStop } from '../time'
+import { groupByCategory } from '../profileGroups'
 
 const BLANK = {
   name: '',
-  light_start_time: '08:00',
-  light_stop_time: '20:00',
-  moisture_target: 'dry',
+  category: '',
+  preferred_soil: '',
+  target_vwc: 25,
+  water_level: '',
   watering_volume_ml: 100,
+  light_start_time: '07:00',
+  light_hours: 12,
+  light_brightness: 75,
   notes: '',
 }
+
+// Mirrors greenthumb.care.WATER_LEVELS: a label for the target, never used to
+// set it.
+const WATER_LEVELS = ['Wet', 'Wet-Medium', 'Medium', 'Medium-Dry', 'Dry', 'Very Dry']
+
+const formFrom = (entry) => ({
+  name: entry.name,
+  category: entry.category ?? '',
+  preferred_soil: entry.preferred_soil ?? '',
+  target_vwc: entry.target_vwc ?? BLANK.target_vwc,
+  water_level: entry.water_level ?? '',
+  watering_volume_ml: entry.watering_volume_ml ?? BLANK.watering_volume_ml,
+  light_start_time: entry.light_start_time ?? BLANK.light_start_time,
+  light_hours: entry.light_hours ?? BLANK.light_hours,
+  light_brightness: entry.light_brightness ?? BLANK.light_brightness,
+  notes: entry.notes ?? '',
+})
 
 // How long Delete has to be held. Long enough that it cannot fire by brushing
 // the button, short enough that meaning it does not feel like a chore.
@@ -22,7 +45,7 @@ const DELETE_HOLD_MS = 5000
 // Nothing here touches a pot. A plant becomes real on a pot when you load it
 // from that pot's card, which is the same direction the whole pot/plant split
 // runs in: this names what a plant wants, the card says where it lives.
-export function PlantEditorPanel({ profiles, bands, onRefresh }) {
+export function PlantEditorPanel({ profiles, soils, onRefresh }) {
   // 'new' types a free name below; 'existing' turns that field into a picker
   // over the list. Picked is only ever non-empty in 'existing' mode -- every
   // path back to 'new' clears it, so the two stay in lockstep.
@@ -32,9 +55,8 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
   const [message, setMessage] = useState('')
 
   const list = profiles ?? []
-  // Very wet is deliberately not offered: a pot is only that just after
-  // watering, so targeting it waters on a loop.
-  const bandList = (bands ?? []).filter((band) => band.name !== 'very wet')
+  const soilList = soils ?? []
+  const categories = [...new Set(list.map((profile) => profile.category).filter(Boolean))]
 
   // The list already carries every field, so the form fills from the prop
   // rather than fetching the entry again. Synced during render, not in an
@@ -43,19 +65,10 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
   if (picked !== syncedPick) {
     setSyncedPick(picked)
     const entry = list.find((profile) => profile.name === picked)
-    setForm(
-      entry
-        ? {
-            name: entry.name,
-            light_start_time: entry.light_start_time ?? BLANK.light_start_time,
-            light_stop_time: entry.light_stop_time ?? BLANK.light_stop_time,
-            moisture_target: entry.moisture_target ?? BLANK.moisture_target,
-            watering_volume_ml: entry.watering_volume_ml ?? BLANK.watering_volume_ml,
-            notes: entry.notes ?? '',
-          }
-        : BLANK,
-    )
+    setForm(entry ? formFrom(entry) : BLANK)
   }
+
+  const stopsAt = lightStop(form.light_start_time, form.light_hours)
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
 
@@ -89,7 +102,10 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          target_vwc: Number(form.target_vwc),
           watering_volume_ml: Number(form.watering_volume_ml),
+          light_hours: Number(form.light_hours),
+          light_brightness: Number(form.light_brightness),
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -189,10 +205,14 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
                 onChange={(event) => setPicked(event.target.value)}
               >
                 <option value="">Choose a plant profile…</option>
-                {list.map((profile) => (
-                  <option key={profile.name} value={profile.name}>
-                    {profile.name}
-                  </option>
+                {groupByCategory(list).map(([category, members]) => (
+                  <optgroup key={category} label={category}>
+                    {members.map((profile) => (
+                      <option key={profile.name} value={profile.name}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </label>
@@ -208,7 +228,85 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
           )}
           <div className="field-pair">
             <label>
-              Light start
+              Category
+              <input
+                list="plant-categories"
+                value={form.category}
+                placeholder="Optional"
+                onChange={(event) => update('category', event.target.value)}
+              />
+              <datalist id="plant-categories">
+                {categories.map((category) => (
+                  <option key={category} value={category} />
+                ))}
+              </datalist>
+            </label>
+            <label>
+              Preferred soil
+              <select
+                value={form.preferred_soil}
+                onChange={(event) => update('preferred_soil', event.target.value)}
+              >
+                <option value="">None</option>
+                {soilList.map((soil) => (
+                  <option key={soil.name} value={soil.name}>
+                    {soil.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="field-hint">
+            Loading this plant profile onto a pot switches the pot to its
+            preferred soil profile.
+          </p>
+
+          <div className="field-pair">
+            <label>
+              Water at (% VWC)
+              <input
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                value={form.target_vwc}
+                onChange={(event) => update('target_vwc', event.target.value)}
+              />
+            </label>
+            <label>
+              Water level
+              <select
+                value={form.water_level}
+                onChange={(event) => update('water_level', event.target.value)}
+              >
+                <option value="">None</option>
+                {WATER_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="field-hint">
+            The pot is watered once its soil dries to this moisture. Roughly:
+            Wet 35–40%, Medium 25–30%, Dry 15–20%, Very Dry 6–10% in a rich mix,
+            lower in coarser ones. The water level is only a label.
+          </p>
+          <label>
+            Watering Volume (mL)
+            <input
+              type="number"
+              min="0"
+              step="10"
+              value={form.watering_volume_ml}
+              onChange={(event) => update('watering_volume_ml', event.target.value)}
+            />
+          </label>
+
+          <div className="field-pair">
+            <label>
+              Lights on at
               <input
                 type="time"
                 value={form.light_start_time}
@@ -216,39 +314,37 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
               />
             </label>
             <label>
-              Light stop
-              <input
-                type="time"
-                value={form.light_stop_time}
-                onChange={(event) => update('light_stop_time', event.target.value)}
-              />
-            </label>
-          </div>
-          <div className="field-pair">
-            <label>
-              Water when soil is
-              <select
-                value={form.moisture_target}
-                onChange={(event) => update('moisture_target', event.target.value)}
-              >
-                {bandList.map((band) => (
-                  <option key={band.name} value={band.name}>
-                    {band.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Watering Volume (mL)
+              Hours of light
               <input
                 type="number"
                 min="0"
-                step="10"
-                value={form.watering_volume_ml}
-                onChange={(event) => update('watering_volume_ml', event.target.value)}
+                max="24"
+                step="1"
+                value={form.light_hours}
+                onChange={(event) => update('light_hours', event.target.value)}
               />
             </label>
           </div>
+          <p className="field-hint">
+            {Number(form.light_hours) >= 24
+              ? 'Lights stay on all day.'
+              : Number(form.light_hours) <= 0
+                ? 'Lights stay off.'
+                : stopsAt
+                  ? `Lights off at ${formatClock(stopsAt)}.`
+                  : 'Set a start time and a whole number of hours.'}
+          </p>
+          <label>
+            Brightness: {describeBrightness(form.light_brightness)}
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={form.light_brightness}
+              onChange={(event) => update('light_brightness', event.target.value)}
+            />
+          </label>
         </div>
 
         <div className="field-row">

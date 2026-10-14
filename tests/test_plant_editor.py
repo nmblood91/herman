@@ -18,7 +18,7 @@ sys.modules["spidev"] = types.ModuleType("spidev")
 
 from datetime import time as clock
 
-from greenthumb import moisture, plant_library, soil_library, state
+from greenthumb import care, plant_library, soil_library, state
 from greenthumb.config import settings
 from greenthumb.hardware.soil_sensors import unavailable_sample
 from greenthumb.services.automation import GreenThumbAutomation
@@ -52,10 +52,14 @@ def build(path=None):
 
 
 BODY = {
-    "moisture_target": "dry",
+    "category": "",
+    "preferred_soil": "",
+    "target_vwc": 21,
+    "water_level": "Medium-Dry",
     "watering_volume_ml": 120,
     "light_start_time": "07:30",
-    "light_stop_time": "21:00",
+    "light_hours": 13,
+    "light_brightness": 75,
     "notes": "South window, dries fast in summer.",
 }
 
@@ -69,10 +73,12 @@ BODY = {
 auto = build()
 pot = auto.plants[0]
 pot.name = "From a pot"
-pot.moisture_target = "dry"
+pot.target_vwc = 21
+pot.water_level = "Medium-Dry"
 pot.watering_volume_ml = 120
 pot.light_start_time = clock(7, 30)
-pot.light_stop_time = clock(21, 0)
+pot.light_hours = 13
+pot.light_brightness = 75
 pot.notes = "South window, dries fast in summer."
 auto.save_plant_profile(pot.plant_id)
 auto.write_plant_profile("From a body", BODY)
@@ -92,28 +98,41 @@ print(f"ok: and it carries exactly {', '.join(sorted(state.PROFILE_FIELDS))}")
 
 auto = build()
 
-# The band is the one that matters. An unrecognised target is dropped on load
-# rather than applied, which leaves a plant permanently not-thirsty -- a
-# planter that looks like it works and has quietly stopped watering.
-for target, why in (
-    ("damp", "a band that does not exist"),
-    ("", "an empty band"),
-    (None, "no band at all"),
-    (3, "a number where a band name goes"),
-    ("very  wet", "a band with the wrong spacing inside it"),
+# The target is the one that matters. One that cannot be used leaves a plant
+# never thirsty -- a planter that looks like it works and has stopped watering.
+for value, why in (
+    ("damp", "a word"),
+    (None, "no target at all"),
+    (0, "zero, which nothing dries to"),
+    (61, "wetter than any mix here holds"),
+    (12.5, "a fraction"),
+    (True, "a boolean"),
 ):
     try:
-        auto.write_plant_profile("Rejected", {**BODY, "moisture_target": target})
+        auto.write_plant_profile("Rejected", {**BODY, "target_vwc": value})
     except ValueError:
         continue
-    raise AssertionError(f"accepted {why}: {target!r}")
-print("ok: an unrecognised band is refused")
+    raise AssertionError(f"accepted {why}: {value!r}")
+print("ok: an unusable target is refused")
 
-# Surrounding whitespace and capitalisation are folded rather than refused,
-# matching how apply_plant_profile reads a stored target.
-auto.write_plant_profile("Folded", {**BODY, "moisture_target": "  VERY WET "})
-assert state.load_profiles(auto._state_path)["Folded"]["moisture_target"] == "very wet"
-print("ok: but a stray space or capital is folded away, not rejected")
+for field_name, bad_values in (
+    ("water_level", ("Soggy", 3)),
+    ("light_hours", (-1, 25, 1.5, None, "twelve")),
+    ("light_brightness", (-1, 101, "bright", None)),
+    ("light_start_time", ("25:00", "half seven", "", None, 730)),
+):
+    for bad in bad_values:
+        try:
+            auto.write_plant_profile("Rejected", {**BODY, field_name: bad})
+        except ValueError:
+            continue
+        raise AssertionError(f"accepted {field_name}={bad!r}")
+print("ok: a bad water level, light length, brightness or start time is refused")
+
+# Capitalisation and stray spaces in the water level are folded, not refused.
+auto.write_plant_profile("Folded", {**BODY, "water_level": "  medium-DRY "})
+assert state.load_profiles(auto._state_path)["Folded"]["water_level"] == "Medium-Dry"
+print("ok: but a stray space or capital in the water level is folded away")
 
 for volume, why in (
     ("lots", "a non-numeric dose"),
@@ -138,24 +157,11 @@ print("ok: a negative dose clamps to zero, as it does on the plant card")
 # have to agree byte for byte -- the snapshot path writes
 # isoformat(timespec="minutes") -- or the equivalence above holds only for
 # input that happened to be formatted the same way already.
-auto.write_plant_profile(
-    "Odd times",
-    {**BODY, "light_start_time": "07:30:45", "light_stop_time": "21:00:00"},
-)
+auto.write_plant_profile("Odd times", {**BODY, "light_start_time": "07:30:45"})
 odd = state.load_profiles(auto._state_path)["Odd times"]
 assert odd["light_start_time"] == "07:30", odd
-assert odd["light_stop_time"] == "21:00", odd
-print("ok: a loosely typed light time is normalised, not stored as written")
-
-for field_name in ("light_start_time", "light_stop_time"):
-    for bad in ("25:00", "half seven", "", None, 730):
-        try:
-            auto.write_plant_profile("Bad time", {**BODY, field_name: bad})
-        except ValueError:
-            pass
-        else:
-            raise AssertionError(f"accepted {field_name}={bad!r}")
-print("ok: a light time that is not a time is refused")
+assert "light_stop_time" not in odd, "a stop time was stored beside the hours"
+print("ok: a loosely typed start time is normalised, and no stop time is stored")
 
 try:
     auto.write_plant_profile("Bad notes", {**BODY, "notes": 42})
@@ -252,9 +258,14 @@ raw["plant_profiles"]["Legacy"] = {
 state.save_state(raw, shared)
 again.get_plant(second).notes = "left alone"
 again.apply_plant_profile(second, "Legacy")
-assert again.get_plant(second).moisture_target == "wet"
-assert again.get_plant(second).notes == "left alone", again.get_plant(second).notes
-print("ok: a profile saved before notes existed loads, and leaves the pot's note alone")
+legacy = again.get_plant(second)
+assert legacy.watering_volume_ml == 80 and legacy.light_start_time == clock(9, 0)
+# Fields it does not have take the pot's defaults rather than whatever the
+# previous plant left behind.
+assert legacy.target_vwc == care.DEFAULT_TARGET_VWC, legacy.target_vwc
+assert legacy.light_hours == care.DEFAULT_LIGHT_HOURS, legacy.light_hours
+assert legacy.notes == "left alone", legacy.notes
+print("ok: a profile from an older build loads what it can, and leaves the pot's note alone")
 
 
 # --- the libraries stop throwing their own prose away ---
@@ -264,9 +275,9 @@ assert set(plant_library.install(path=fresh).values()) == {"written"}
 profiles = state.load_profiles(fresh)
 for entry in plant_library.LIBRARY:
     saved = profiles[entry.name]
-    assert saved["notes"] == entry.note, entry.name
-    assert saved["notes"].strip(), f"{entry.name} installed with an empty note"
-print(f"ok: all {len(plant_library.LIBRARY)} library plants install with their notes")
+    assert saved["category"] == entry.category, entry.name
+    assert saved["notes"] == "", entry.name
+print(f"ok: all {len(plant_library.LIBRARY)} library plants install with their category")
 
 assert set(soil_library.install(path=fresh).values()) == {"written"}
 soils = state.load_soils(fresh)
@@ -298,9 +309,9 @@ else:
     raise AssertionError("accepted a number as a soil note")
 print("ok: a soil note has to be text too")
 
-# Every band still has to be offerable by the editor's picker.
-assert all(name in moisture.BY_NAME for name in moisture.ORDER)
-print("ok: every band name the editor can offer resolves")
+# Every water level the editor offers has to be accepted.
+assert all(care.check_water_level(level) == level for level in care.WATER_LEVELS)
+print("ok: every water level the editor can offer is accepted")
 
 
 print("\nall plant editor checks passed")

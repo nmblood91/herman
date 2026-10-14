@@ -129,6 +129,27 @@ assert frame[10:15] == [(0, 255, 0)] * 5
 assert frame[15:20] == [(0, 0, 0)] * 5
 print("ok: schedule lights only the plants inside their window")
 
+# Each plant's stretch runs at that plant's own brightness, and the strip-wide
+# brightness does not scale it on top.
+led.set_brightness(10)
+led.set_plant_segments([(0, 4, True, 100), (5, 9, True, 50), (10, 14, False, 100), (15, 19, True, 0)])
+led._render()
+frame = strip.frames[-1]
+assert frame[0:5] == [(0, 255, 0)] * 5, frame[0:5]
+assert frame[5:10] == [(0, 127, 0)] * 5, frame[5:10]
+assert frame[10:15] == [(0, 0, 0)] * 5, "an unlit plant was drawn"
+assert frame[15:20] == [(0, 0, 0)] * 5, "a plant at 0% was drawn"
+print("ok: in schedule mode each plant is lit at its own brightness")
+
+# Outside schedule mode the strip-wide brightness still applies.
+led.set_static_color((0, 200, 0))
+led.set_brightness(50)
+led._render()
+assert strip.frames[-1][0] == (0, 100, 0), strip.frames[-1][0]
+led.set_mode("schedule")
+led.set_brightness(100)
+print("ok: and the strip-wide brightness still sets manual mode")
+
 # segments beyond the strip must not blow up or wrap
 led.set_plant_segments([(18, 99, True)])
 led._render()

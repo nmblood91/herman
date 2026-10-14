@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatClock } from '../time'
+import { describeBrightness, describeLightWindow } from '../time'
 import { cardTitle } from '../potLabel'
+import { groupByCategory } from '../profileGroups'
 
 // Pot fields only. A card no longer edits what a plant wants -- that is the
 // Plant Profile Editor's job, and a pot takes those settings by loading a
@@ -146,23 +147,20 @@ const describeMoisture = (status) => {
       hint: `gathering history, ${status.sample_count}/${status.window_size}`,
     }
   }
-  // The band leads and the percentage follows as detail: a few percent of
-  // probe error moves the number without meaning anything.
-  const band = status.moisture_band
-  const target = status.target_moisture
-
-  if (band && target) {
-    // Drier than the target means due a drink. Band order is wettest first,
-    // so a higher index is drier.
-    const order = ['very wet', 'wet', 'medium', 'dry', 'very dry']
-    const thirsty = order.indexOf(band) > order.indexOf(target)
-    return {
-      text: band,
-      hint: thirsty ? `${text}, past its ${target} target` : `${text}, waters at ${target}`,
-      dry: thirsty,
-    }
+  // Soil moisture as % VWC leads, because the target is written in it; the
+  // band follows in words.
+  if (status.moisture_vwc == null) return { text, hint: status.moisture_band ?? '' }
+  const vwc = `${Math.round(status.moisture_vwc)}% VWC`
+  if (status.target_problem) {
+    return { text: vwc, hint: status.target_problem, warn: true }
   }
-  return { text, hint: '' }
+  return {
+    text: vwc,
+    hint: status.thirsty
+      ? `${status.moisture_band}, due a drink (waters at ${status.target_vwc}%)`
+      : `${status.moisture_band}, waters at ${status.target_vwc}%`,
+    dry: status.thirsty,
+  }
 }
 
 // How close two plants have to be before capturing one looks like a mix-up.
@@ -338,7 +336,7 @@ export function PlantsPanel({
     )
   }
 
-  const profileNames = (profiles ?? []).map((profile) => profile.name)
+  const profileGroups = groupByCategory(profiles)
   const soilList = soils ?? []
 
   const togglePlantExpanded = (plantId) => {
@@ -399,10 +397,11 @@ export function PlantsPanel({
                   {plant.profile ? (
                     <p className="field-hint">
                       <strong>{plant.name}</strong> — waters{' '}
-                      {plant.watering_volume_ml} mL at {plant.moisture_target}{' '}
-                      moisture reading. Lights on{' '}
-                      {formatClock(plant.light_start_time)}–
-                      {formatClock(plant.light_stop_time)}
+                      {plant.watering_volume_ml} mL at {plant.target_vwc}% VWC
+                      {plant.water_level ? ` (${plant.water_level})` : ''}. Lights{' '}
+                      {describeLightWindow(plant.light_start_time, plant.light_hours)}{' '}
+                      at {describeBrightness(plant.light_brightness)}.
+                      {plant.preferred_soil ? ` Prefers ${plant.preferred_soil}.` : ''}
                     </p>
                   ) : (
                     <p className="field-hint warning">
@@ -442,12 +441,16 @@ export function PlantsPanel({
                           }
                         >
                           <option value="">
-                            {profileNames.length ? 'Load a plant profile…' : 'No plant profiles yet'}
+                            {profileGroups.length ? 'Load a plant profile…' : 'No plant profiles yet'}
                           </option>
-                          {profileNames.map((name) => (
-                            <option key={name} value={name}>
-                              {name}
-                            </option>
+                          {profileGroups.map(([category, members]) => (
+                            <optgroup key={category} label={category}>
+                              {members.map((profile) => (
+                                <option key={profile.name} value={profile.name}>
+                                  {profile.name}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                         <button
@@ -605,7 +608,23 @@ export function PlantsPanel({
                         <p className="field-hint">
                           {describeSoil(soilList.find((soil) => soil.name === draft.soil), draft.soil)}
                         </p>
+                        {/* The plant asked for a different mix: say so, with
+                            a way to switch rather than only a complaint. */}
+                        {plant.preferred_soil && plant.preferred_soil !== draft.soil && (
+                          <p className="field-hint warning">
+                            {plant.name} prefers {plant.preferred_soil}.
+                          </p>
+                        )}
                         <div className="plant-actions-row">
+                          {plant.preferred_soil && plant.preferred_soil !== draft.soil &&
+                            soilList.some((soil) => soil.name === plant.preferred_soil) && (
+                              <button
+                                type="button"
+                                onClick={() => updateDraft(plant, 'soil', plant.preferred_soil)}
+                              >
+                                Use preferred soil
+                              </button>
+                            )}
                           <button
                             type="button"
                             onClick={() => updateDraft(plant, 'soil', '')}

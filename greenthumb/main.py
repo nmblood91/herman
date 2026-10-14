@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from contextlib import asynccontextmanager
-from datetime import datetime, time
+from datetime import datetime
 from typing import AsyncIterator
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -17,7 +17,12 @@ from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_s
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
 from greenthumb import system_clock, version
 from greenthumb.plants import zone_for
-from greenthumb.services.automation import UNCHANGED, GreenThumbAutomation, HardwareBusyError
+from greenthumb.services.automation import (
+    UNCHANGED,
+    GreenThumbAutomation,
+    HardwareBusyError,
+    care_fields,
+)
 
 setup_logging()
 
@@ -460,14 +465,10 @@ async def list_plants() -> list[dict[str, object]]:
             "watering_mode": plant.watering_mode,
             "sweep_min_mm": plant.sweep_min_mm,
             "sweep_max_mm": plant.sweep_max_mm,
-            "notes": plant.notes,
             # Which plant profile the care settings came from; "" until one is
             # loaded, which the card shows instead of the placeholders.
             "profile": plant.profile,
-            "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
-            "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
-            "moisture_target": plant.moisture_target,
-            "watering_volume_ml": plant.watering_volume_ml,
+            **care_fields(plant),
             "soil": plant.soil,
             "led_start_index": plant.led_start_index,
             "led_end_index": plant.led_end_index,
@@ -604,9 +605,10 @@ def list_plant_profiles() -> dict[str, object]:
 def write_plant_profile(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """Create or replace a plant profile directly, with no pot involved.
 
-    Expects {"name", "moisture_target", "watering_volume_ml",
-    "light_start_time", "light_stop_time", "notes"}. Name is the key, so
-    saving replaces -- the same rule as the soil library.
+    Expects {"name", "category", "preferred_soil", "target_vwc", "water_level",
+    "watering_volume_ml", "light_start_time", "light_hours",
+    "light_brightness", "notes"}. Name is the key, so saving replaces -- the
+    same rule as the soil library.
     """
     result = automation.write_plant_profile(
         str(payload.get("name", "")), payload
@@ -666,21 +668,29 @@ async def update_plant_name(plant_id: str, payload: dict[str, str] = Body(defaul
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/lighting")
-async def update_light_schedule(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
-    start_time = time.fromisoformat(str(payload.get("start_time", "08:00")))
-    stop_time = time.fromisoformat(str(payload.get("stop_time", "20:00")))
-    result = automation.update_light_schedule(plant_id, start_time, stop_time)
-    log_event(f"Plant {plant_id} light schedule set to {result['light_start_time']} - {result['light_stop_time']}")
+async def update_light_schedule(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """{"light_start_time": "07:00", "light_hours": 13, "light_brightness": 75}."""
+    plant = automation.get_plant(plant_id)
+    result = automation.update_light_schedule(
+        plant_id,
+        payload.get("light_start_time", plant.light_start_time if plant else None),
+        payload.get("light_hours", plant.light_hours if plant else None),
+        payload.get("light_brightness", plant.light_brightness if plant else None),
+    )
+    log_event(
+        f"Plant {plant_id} lights {result['light_start_time']} for {result['light_hours']} h "
+        f"(off at {result['light_stop_time']}) at {result['light_brightness']}%"
+    )
     return result
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/moisture")
-async def update_moisture_target(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
-    """Set the band at which this plant is watered, e.g. {"moisture_target": "dry"}."""
-    result = automation.update_moisture_target(
-        plant_id, str(payload.get("moisture_target", "dry"))
+async def update_target_vwc(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Set the soil moisture this plant is watered at, e.g. {"target_vwc": 28}."""
+    result = automation.update_target_vwc(
+        plant_id, payload.get("target_vwc"), payload.get("water_level", UNCHANGED)
     )
-    log_event(f"Plant {plant_id} moisture target set to {result['moisture_target']}")
+    log_event(f"Plant {plant_id} watering target set to {result['target_vwc']}% VWC")
     return result
 
 
