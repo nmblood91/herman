@@ -1,23 +1,22 @@
 import { useState } from 'react'
 import { API_BASE } from '../api'
 
-// Puts every setting that has a .env default back to it. The planter's own
-// setup -- plants, positions, soils, saved plants, field capacity, history --
-// has no default to go back to and is left alone, and the list below says so,
-// because "defaults" on its own reads like a factory reset.
+// Puts the planter back as it was freshly installed. The saved-plant and soil
+// libraries are kept, and so is the history -- the list below says so, because
+// "defaults" on its own reads as though those would go too.
 export function SystemValuesPanel() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
   const restore = async () => {
-    // Behind a confirm: this throws away a measured flow rate and the probes'
-    // dry points, and neither comes back without redoing the measurement.
+    // Behind a confirm: none of this comes back without setting it up again,
+    // and the flow rate and dry points without measuring them again.
     const ok = window.confirm(
-      'Restore system values to their defaults?\n\n' +
-        'This resets auto-water, the pump flow rate, hourly auto-patrol, home ' +
-        'after startup, quiet hours and any snooze, the LED strip settings, and ' +
-        "the probes' dry calibration.\n\n" +
-        'Plants, positions, soils, saved plants and field capacity are kept.',
+      'Restore the planter to its defaults, as if freshly installed?\n\n' +
+        'Every pot goes back to its default: name, watering location, sweep, ' +
+        'soil and field capacity. Every setting goes back too, including the ' +
+        "pump flow rate and the probes' dry calibration.\n\n" +
+        'Kept: the saved plants and soils libraries, and the history.',
     )
     if (!ok) return
 
@@ -27,11 +26,13 @@ export function SystemValuesPanel() {
       const response = await fetch(`${API_BASE}/system/restore-defaults`, { method: 'POST' })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
+        // 409 while a watering cycle holds the hardware: it swaps out the
+        // plant list that cycle is working through.
         setMessage(data.error || `Restore failed (HTTP ${response.status})`)
         return
       }
-      // Reloaded rather than refreshed: most panels on this tab fetch their own
-      // data, so there is no single refresh that reaches all of them.
+      // Reloaded rather than refreshed: most panels fetch their own data, so
+      // there is no single refresh that reaches all of them.
       window.location.reload()
     } catch (error) {
       setMessage(`Restore failed: ${error.message}`)
@@ -55,14 +56,13 @@ export function SystemValuesPanel() {
             Restore to Defaults
           </button>
           <p className="field-hint">
-            Puts these back to the values in the planter&apos;s .env file:
-            auto-water, the pump flow rate, hourly auto-patrol, home after
-            startup, quiet hours (and any snooze), the LED strip settings, and
-            the probes&apos; dry calibration.
+            Puts the planter back as it was freshly installed. Every pot returns
+            to its default name, watering location, sweep, soil and field
+            capacity, and every setting returns to the planter&apos;s .env file —
+            including the pump flow rate and the probes&apos; dry calibration.
           </p>
           <p className="field-hint">
-            Kept: plants and their positions, soils, saved plants, field
-            capacity, and history.
+            Kept: the saved plants and soils libraries, and the history.
           </p>
           {message && <p className="field-hint warning">{message}</p>}
         </div>

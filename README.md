@@ -86,7 +86,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
 | `/lights/...` | mode, brightness, colour, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
-| `/system/restore-defaults` | put every setting with a `.env` default back to it; plants are kept |
+| `/system/restore-defaults` | back to a fresh install; the saved-plant and soil libraries and the history are kept |
 | `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame. No UI — reach these directly |
 | `/diagnostics/endstop` | reads the home switch and interprets it |
 | `/system/time`, `/system/timezone` | the planter's clock |

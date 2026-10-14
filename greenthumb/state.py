@@ -320,13 +320,12 @@ def clear_calibration(path: str | Path | None = None) -> None:
         save_state(data, path)
 
 
-def clear_keys(keys: tuple[str, ...], path: str | Path | None = None) -> None:
-    """Drop top-level keys, so the code and .env defaults apply again."""
+def keep_only(keys: tuple[str, ...], path: str | Path | None = None) -> None:
+    """Drop every top-level key except these, so the code and .env defaults
+    apply again to everything else -- including keys an older version wrote
+    that nothing reads any more."""
     data = load_state(path)
-    if any(key in data for key in keys):
-        for key in keys:
-            data.pop(key, None)
-        save_state(data, path)
+    save_state({key: data[key] for key in keys if key in data}, path)
 
 
 # --- saved plants ---------------------------------------------------------

@@ -1,10 +1,11 @@
-"""Restore to Defaults: every setting with a .env default goes back to it.
+"""Restore to Defaults: the planter as it was freshly installed.
 
-Two things matter. It has to take effect now, not after a restart -- a button
-that changes nothing until the service is bounced reads as broken. And it must
-not touch the planter's own setup: plants, positions, soils and field capacity
-have no default to go back to, and losing them would be a factory reset
-nobody asked for.
+Three things matter. It has to take effect now, not after a restart -- a
+button that changes nothing until the service is bounced reads as broken. It
+has to reach every pot, since a saved position quietly outliving a change of
+defaults is what prompted it. And it must not touch the saved-plant and soil
+libraries or the history, which are built up over time and are not this
+planter's configuration.
 """
 
 import sys
@@ -14,7 +15,7 @@ from datetime import datetime, time, timedelta
 sys.modules["smbus2"] = types.ModuleType("smbus2")
 sys.modules["spidev"] = types.ModuleType("spidev")
 
-from greenthumb import state
+from greenthumb import soil_library, state
 from greenthumb.config import settings
 from greenthumb.hardware.lighting import (
     DEFAULT_BRIGHTNESS,
@@ -23,7 +24,9 @@ from greenthumb.hardware.lighting import (
     LedController,
 )
 from greenthumb.hardware.soil_sensors import unavailable_sample
-from greenthumb.services.automation import GreenThumbAutomation
+from greenthumb.models import SensorSample
+from greenthumb.plants import default_plants
+from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
 from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 settings.auto_watering_enabled = False
@@ -47,6 +50,7 @@ class Hub(CalibrationSurface):
 
     def __init__(self):
         self.calibration = {}
+        self.field_capacity = {}
 
     def read_one(self, a):
         return unavailable_sample(a)
@@ -56,17 +60,34 @@ class Pump:
     flow_ml_per_second = settings.pump_flow_ml_per_second
 
 
-def build(path):
+def build(path, history=None):
     return GreenThumbAutomation(
         Hub(), Klip(), Pump(), LedController(led_count=10),
-        history=temp_store(), state_path=path,
+        history=history or temp_store(), state_path=path,
     )
 
 
-path = temp_state()
-auto = build(path)
+def placement(plant):
+    """Everything on a pot that a restore puts back."""
+    return (
+        plant.name, plant.position_mm, plant.watering_mode, plant.sweep_min_mm,
+        plant.sweep_max_mm, plant.soil, plant.field_capacity_raw,
+        plant.field_capacity_source, plant.moisture_target, plant.watering_volume_ml,
+    )
 
-# Change everything Restore to Defaults owns...
+
+FRESH = [placement(plant) for plant in default_plants()]
+
+path = temp_state()
+history = temp_store()
+auto = build(path, history)
+
+# The libraries, which have to survive.
+soil_library.install(path=path)
+soils_before = state.load_soils(path)
+assert soils_before, "the soil library did not install"
+
+# Every system value...
 auto.set_auto_watering(True)
 auto.pump.flow_ml_per_second = 2.5
 auto._flow_measured_at = "2026-10-01T12:00:00"
@@ -80,12 +101,39 @@ auto.set_light_color((255, 0, 0))
 auto.sensor_hub.calibration = {0x36: {"dry": 410}}
 state.save_calibration_point(0x36, "dry", 410, path=path)
 
-# ...and the planter's own setup, which it must leave alone.
-auto.update_plant_name("plant_1", "Basil")
+# ...and every pot.
+soil = next(iter(soils_before))
+for plant in auto.plants:
+    auto.update_plant_name(plant.plant_id, f"Renamed {plant.plant_id}")
+    auto.update_plant_soil(plant.plant_id, soil)
+    plant.field_capacity_raw = 777
+    plant.field_capacity_source = "pot"
 auto.set_plant_position("plant_2", 300)
+auto.set_plant_sweep("plant_3", 450, 680)
+auto.set_watering_mode("plant_3", "sweep")
 auto._persist()
+auto._sync_field_capacity()
+auto.save_plant_profile("plant_1")
+profiles_before = state.load_profiles(path)
+assert profiles_before, "the saved plant did not save"
+
+history.record_readings([SensorSample(0x36, 50.0, 500, 21.0)])
+history.record_watering("plant_1", 100, "manual", True)
+readings_before = history.series([0x36], 1)
+waterings_before = history.waterings(1)
+assert waterings_before, "the watering did not record"
 
 auto.restore_system_defaults()
+
+# --- every pot is as freshly installed ---
+
+assert [placement(plant) for plant in auto.plants] == FRESH, [
+    placement(plant) for plant in auto.plants
+]
+assert auto.sensor_hub.field_capacity == {}, "a wiped pot's field capacity is still in use"
+print("ok: every pot is back to its default name, spot, sweep, soil and field capacity")
+
+# --- and every setting ---
 
 assert auto.auto_watering_enabled is settings.auto_watering_enabled
 assert auto.pump.flow_ml_per_second == settings.pump_flow_ml_per_second
@@ -102,23 +150,42 @@ assert auto.leds.brightness == DEFAULT_BRIGHTNESS
 assert auto.leds.color == DEFAULT_COLOR
 assert auto.leds.mode == DEFAULT_MODE
 assert auto.sensor_hub.calibration == {}
-print("ok: every system value is back on its default, without a restart")
+print("ok: every setting is back on its default, without a restart")
 
-assert auto.get_plant("plant_1").name == "Basil"
-assert auto.get_plant("plant_2").position_mm == 300
-print("ok: plant names and positions are kept")
+# --- the libraries and the history are kept ---
 
-# On disk too: the system keys are gone, so .env applies on the next start,
-# and the plants are still there.
+assert state.load_soils(path) == soils_before, "the soil library changed"
+assert state.load_profiles(path) == profiles_before, "the saved plants changed"
+assert history.series([0x36], 1) == readings_before, "readings were lost"
+assert history.waterings(1) == waterings_before, "waterings were lost"
+print("ok: the saved plants, the soils and the history are untouched")
+
+# --- and it holds across a restart ---
+
 stored = state.load_state(path)
-for key in GreenThumbAutomation.SYSTEM_STATE_KEYS:
-    assert key not in stored, f"{key} is still in the state file"
-assert state.load_calibration(path) == {}
+leftover = set(stored) - {*GreenThumbAutomation.KEPT_STATE_KEYS, "schema_version"}
+assert not leftover, f"still in the state file: {sorted(leftover)}"
 restarted = build(path)
-assert restarted.get_plant("plant_1").name == "Basil"
-assert restarted.get_plant("plant_2").position_mm == 300
-assert restarted.leds.brightness == DEFAULT_BRIGHTNESS
+assert [placement(plant) for plant in restarted.plants] == FRESH
 assert restarted.pump.flow_ml_per_second == settings.pump_flow_ml_per_second
-print("ok: the state file drops the system values and keeps the plants across a restart")
+assert restarted.leds.brightness == DEFAULT_BRIGHTNESS
+assert state.load_calibration(path) == {}
+print("ok: the state file holds only the libraries, so a restart comes back fresh too")
+
+# --- not in the middle of a watering ---
+
+auto = build(temp_state())
+auto.update_plant_name("plant_1", "Mid-dose")
+auto._hardware_lock.acquire()
+try:
+    auto.restore_system_defaults()
+except HardwareBusyError:
+    pass
+else:
+    raise AssertionError("restored while the hardware was busy")
+finally:
+    auto._hardware_lock.release()
+assert auto.get_plant("plant_1").name == "Mid-dose", "partly restored before refusing"
+print("ok: refused while a watering holds the hardware, and nothing is half-done")
 
 print("\nall restore-to-defaults checks passed")

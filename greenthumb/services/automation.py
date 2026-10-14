@@ -1991,26 +1991,38 @@ class GreenThumbAutomation:
         self.sensor_hub.calibration = {}
         return {"status": "ok", "message": "Calibration cleared, using .env defaults"}
 
-    # The state keys Restore to Defaults drops, so .env applies again. The rest
-    # of the file is the planter's own setup -- plants, positions, soils, saved
-    # plants -- and none of it has a .env default to go back to.
-    SYSTEM_STATE_KEYS = (
-        "watering",
-        "auto_patrol",
-        "startup_home",
-        "quiet",
-        "leds",
-        state.CALIBRATION_KEY,
-    )
+    # What Restore to Defaults keeps from the state file: the two libraries,
+    # which are reference data built up over time rather than this planter's
+    # configuration. Everything else in the file goes, as on a fresh install.
+    # History lives in its own database and is not touched either.
+    KEPT_STATE_KEYS = (state.PROFILES_KEY, state.SOILS_KEY)
 
     def restore_system_defaults(self) -> dict[str, object]:
-        """Put every setting that has a .env default back to it, live.
+        """Put the planter back as it was freshly installed, live.
 
-        Applied in memory as well as dropped from the state file, so the
-        planter runs on the defaults now rather than after a restart. Plants,
-        their positions and soils, saved plants, field capacity and history are
-        left alone: they are this planter's setup, not system values.
+        Every setting returns to .env or the code default, and every pot to its
+        default plant: name, watering spot, sweep span and mode, soil, its own
+        field capacity, care settings. The saved-plant and soil libraries and
+        the history database are kept.
+
+        Applied in memory as well as on disk, so the planter runs on the
+        defaults now rather than after a restart. Under the hardware lock,
+        because it replaces the plant list a watering cycle would be iterating.
         """
+        with self._exclusive("Restore to defaults"):
+            self._restore_defaults_locked()
+        logger.info("Restored the planter to its defaults, libraries kept")
+        return {"status": "ok"}
+
+    def _restore_defaults_locked(self) -> None:
+        self.plants = default_plants()
+        self.apply_default_led_ranges()
+        self._sync_field_capacity()
+        # Band hysteresis is per plant and remembers the old one's soil.
+        # Last-watered times are kept: they are about the water already in the
+        # pots, and dropping them would let the cooldown be skipped.
+        self._bands = {}
+
         self.auto_watering_enabled = settings.auto_watering_enabled
         self.pump.flow_ml_per_second = float(settings.pump_flow_ml_per_second)
         self._flow_measured_at = None
@@ -2034,9 +2046,7 @@ class GreenThumbAutomation:
 
         self.sensor_hub.calibration = {}
 
-        state.clear_keys(self.SYSTEM_STATE_KEYS, self._state_path)
-        logger.info("Restored system values to the .env defaults")
-        return {"status": "ok"}
+        state.keep_only(self.KEPT_STATE_KEYS, self._state_path)
 
     def set_light_mode(self, mode: str) -> dict[str, object]:
         result = self.leds.set_mode(mode)

@@ -296,9 +296,10 @@ def reset_moisture_calibration() -> dict[str, object]:
 
 @app.post(f"{settings.api_prefix}/system/restore-defaults")
 def restore_system_defaults() -> dict[str, object]:
-    """Every setting with a .env default goes back to it. Plants are kept."""
+    """Back to a fresh install, keeping the saved-plant and soil libraries
+    and the history."""
     result = automation.restore_system_defaults()
-    log_event("System values restored to defaults")
+    log_event("Planter restored to defaults (plant and soil libraries kept)")
     return result
 
 
