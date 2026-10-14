@@ -464,6 +464,74 @@ export function PlantsPanel({
                     )}
                   </div>
 
+                  <h3 className="card-group-title">Soil Profile</h3>
+                  <div className="field-grid">
+                    {/* The same shape as Plant Profile: the picker only while
+                        the pot has no soil profile, and a summary with a way
+                        to take it off once it has one. Driven by the draft, so
+                        it switches the moment a choice is made; the save
+                        follows a moment later like every other pot field. */}
+                    {draft.soil ? (
+                      <>
+                        <p className="field-hint">
+                          {describeSoil(soilList.find((soil) => soil.name === draft.soil), draft.soil)}
+                        </p>
+                        {/* The plant asked for a different mix: say so, with
+                            a way to switch rather than only a complaint. */}
+                        {plant.preferred_soil && plant.preferred_soil !== draft.soil && (
+                          <p className="field-hint warning">
+                            {plant.name} prefers {plant.preferred_soil}.
+                          </p>
+                        )}
+                        <div className="plant-actions-row">
+                          {plant.preferred_soil && plant.preferred_soil !== draft.soil &&
+                            soilList.some((soil) => soil.name === plant.preferred_soil) && (
+                              <button
+                                type="button"
+                                onClick={() => updateDraft(plant, 'soil', plant.preferred_soil)}
+                              >
+                                Use preferred soil
+                              </button>
+                            )}
+                          <button
+                            type="button"
+                            onClick={() => updateDraft(plant, 'soil', '')}
+                          >
+                            Clear soil profile
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="field-hint warning">
+                          No soil profile set. Choose one from the drop down or
+                          create a new one in the Soil Profile Editor below the
+                          plant cards.
+                        </p>
+                        <div className="plant-actions-row">
+                          <div className="load-profile-row">
+                            <select
+                              aria-label={`Soil profile for ${plant.name}`}
+                              value=""
+                              onChange={(event) =>
+                                updateDraft(plant, 'soil', event.target.value)
+                              }
+                            >
+                              <option value="">
+                                {soilList.length ? 'Choose a soil profile…' : 'No soil profiles yet'}
+                              </option>
+                              {soilList.map((soil) => (
+                                <option key={soil.name} value={soil.name}>
+                                  {soil.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                   <h3 className="card-group-title">Watering</h3>
                   <div className="field-grid">
                     <label>
@@ -593,74 +661,6 @@ export function PlantsPanel({
                     )}
                     {holdNote[plant.plant_id] && (
                       <p className="field-hint warning">{holdNote[plant.plant_id]}</p>
-                    )}
-                  </div>
-
-                  <h3 className="card-group-title">Soil Profile</h3>
-                  <div className="field-grid">
-                    {/* The same shape as Plant Profile: the picker only while
-                        the pot has no soil profile, and a summary with a way
-                        to take it off once it has one. Driven by the draft, so
-                        it switches the moment a choice is made; the save
-                        follows a moment later like every other pot field. */}
-                    {draft.soil ? (
-                      <>
-                        <p className="field-hint">
-                          {describeSoil(soilList.find((soil) => soil.name === draft.soil), draft.soil)}
-                        </p>
-                        {/* The plant asked for a different mix: say so, with
-                            a way to switch rather than only a complaint. */}
-                        {plant.preferred_soil && plant.preferred_soil !== draft.soil && (
-                          <p className="field-hint warning">
-                            {plant.name} prefers {plant.preferred_soil}.
-                          </p>
-                        )}
-                        <div className="plant-actions-row">
-                          {plant.preferred_soil && plant.preferred_soil !== draft.soil &&
-                            soilList.some((soil) => soil.name === plant.preferred_soil) && (
-                              <button
-                                type="button"
-                                onClick={() => updateDraft(plant, 'soil', plant.preferred_soil)}
-                              >
-                                Use preferred soil
-                              </button>
-                            )}
-                          <button
-                            type="button"
-                            onClick={() => updateDraft(plant, 'soil', '')}
-                          >
-                            Clear soil profile
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <p className="field-hint warning">
-                          No soil profile set. Choose one from the drop down or
-                          create a new one in the Soil Profile Editor below the
-                          plant cards.
-                        </p>
-                        <div className="plant-actions-row">
-                          <div className="load-profile-row">
-                            <select
-                              aria-label={`Soil profile for ${plant.name}`}
-                              value=""
-                              onChange={(event) =>
-                                updateDraft(plant, 'soil', event.target.value)
-                              }
-                            >
-                              <option value="">
-                                {soilList.length ? 'Choose a soil profile…' : 'No soil profiles yet'}
-                              </option>
-                              {soilList.map((soil) => (
-                                <option key={soil.name} value={soil.name}>
-                                  {soil.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </>
                     )}
                   </div>
 
