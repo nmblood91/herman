@@ -1,15 +1,15 @@
-"""Idle motion — the planter moving for its own sake.
+"""Routines — the planter moving for its own sake.
 
 A gantry that only moves when it waters spends almost all its time perfectly
 still, which reads as broken rather than idle. These routines exist so it
-visibly does something between waterings, and so the periodic re-home that
-goes with them has a reason to be interesting rather than just a noise at the
-top of the hour.
+visibly does something between waterings. All of them can be run by hand from
+Controls; Patrol is also what the hourly auto-patrol runs after its re-home.
 
 The re-home is the part that earns its keep. Steppers are open-loop: nothing
 tells Klipper the carriage is where it thinks it is, so a belt that slips or a
 carriage nudged by hand leaves every plant position quietly wrong until the
-next home. Doing it hourly keeps that window to an hour.
+next home. Doing it hourly keeps that window to an hour, and patrolling after
+it shows where the planter now thinks each plant is.
 
 Positions are fractions of usable travel rather than millimetres, so a dance
 scales to whatever the rail measures and cannot be sent somewhere the carriage
@@ -150,6 +150,9 @@ def gcode_for(steps: list[tuple[float, int, int]]) -> str:
         lines.append(f"G1 X{position} F{feedrate}")
         if dwell_ms:
             lines.append(f"G4 P{dwell_ms}")
+    # Without it the reply comes back while the routine is still running, and
+    # the hardware lock is released mid-dance. See klipper_client.WAIT_FOR_MOVES.
+    lines.append("M400")
     return "\n".join(lines)
 
 

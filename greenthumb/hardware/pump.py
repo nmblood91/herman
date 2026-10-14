@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from greenthumb.hardware.klipper_client import KlipperClient
+from greenthumb.hardware.klipper_client import WAIT_FOR_MOVES, KlipperClient
 
 logger = logging.getLogger(__name__)
 
-# Klipper does not reply until the dwell finishes, so the wait has to outlast the
-# dose itself with room for the board to answer.
+# The dose script ends with M400, so Klipper does not reply until the dwell or
+# the sweep has finished and the pump is off. The wait has to outlast the dose
+# itself with room for the board to answer.
 RESPONSE_MARGIN_SECONDS = 30.0
 
 
@@ -66,6 +67,10 @@ class PumpController:
             [f"SET_PIN PIN={self.pin_name} VALUE=1"]
             + filler
             + [f"SET_PIN PIN={self.pin_name} VALUE=0"]
+            # The dwell and the moves only queue, so without this the script
+            # replies while the pump is still running, and the dose -- and the
+            # hardware lock around it -- reports finished early.
+            + [WAIT_FOR_MOVES]
         )
 
         self.is_running = True

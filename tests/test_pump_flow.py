@@ -32,7 +32,7 @@ from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state,
 
 settings.auto_watering_enabled = False
 settings.water_sensor_enabled = False
-settings.idle_motion_enabled = False
+settings.auto_patrol_enabled = False
 
 
 class Klip:

@@ -1,6 +1,39 @@
 import { useState } from 'react'
 import { API_BASE } from '../api'
 
+// "2026-10-14T14:00" -> "14:00". The planter only ever reports today-ish
+// times here, and the date would just be noise.
+const clock = (iso) => (iso ? iso.slice(11, 16) : '')
+
+// What the startup home is doing right now, or null when there is nothing
+// worth saying.
+function startupLine(status) {
+  switch (status?.phase) {
+    case 'waiting':
+      return status.held ? `Waiting to home: ${status.held}.` : 'Homing shortly.'
+    case 'retrying':
+      return (
+        `Has not homed yet (${status.error}). Tried ${status.attempts} ` +
+        `time${status.attempts === 1 ? '' : 's'}, trying again every minute.` +
+        (status.held ? ` Paused for now: ${status.held}.` : '')
+      )
+    case 'done':
+      return 'Homed since the planter started.'
+    case 'next_start':
+      return 'Takes effect the next time the planter starts.'
+    default:
+      return null
+  }
+}
+
+function patrolLine(status) {
+  const last = status?.last
+  if (!status?.enabled || !last) return null
+  return last.ok
+    ? `Last patrol at ${clock(last.at)}.`
+    : `The ${clock(last.at)} patrol did not run: ${last.error}.`
+}
+
 // Everything the planter does on its own, and the windows in which it is
 // allowed to. Three groups in that order: what it does unattended, how it keeps
 // itself accurate, and when it has to stay quiet.
@@ -14,11 +47,15 @@ export function AutomationPanel({ overview, onRefresh }) {
   const [autoMsg, setAutoMsg] = useState('')
   const [savingAuto, setSavingAuto] = useState(false)
 
-  const idle = overview?.idle_motion
-  const [idleOn, setIdleOn] = useState(true)
-  const [idleMinutes, setIdleMinutes] = useState(60)
-  const [homeOnStartup, setHomeOnStartup] = useState(true)
-  const [idleMsg, setIdleMsg] = useState('')
+  const startupHome = overview?.startup_home
+  const [homeOnStartup, setHomeOnStartup] = useState(false)
+  const [startupMsg, setStartupMsg] = useState('')
+  const [savingStartup, setSavingStartup] = useState(false)
+
+  const patrol = overview?.auto_patrol
+  const [patrolOn, setPatrolOn] = useState(false)
+  const [patrolMsg, setPatrolMsg] = useState('')
+  const [savingPatrol, setSavingPatrol] = useState(false)
 
   const quiet = overview?.quiet
   const [quietOn, setQuietOn] = useState(false)
@@ -32,70 +69,74 @@ export function AutomationPanel({ overview, onRefresh }) {
   if (overview !== syncedOverview) {
     setSyncedOverview(overview)
     setAutoOn(watering?.auto_watering_enabled ?? autoOn)
-    setIdleOn(idle?.enabled ?? idleOn)
-    setIdleMinutes(idle?.minutes ?? idleMinutes)
-    setHomeOnStartup(idle?.home_on_startup ?? homeOnStartup)
+    setHomeOnStartup(startupHome?.enabled ?? homeOnStartup)
+    setPatrolOn(patrol?.enabled ?? patrolOn)
     setQuietOn(quiet?.quiet_hours_enabled ?? quietOn)
     setQuietStart(quiet?.quiet_hours_start ?? quietStart)
     setQuietStop(quiet?.quiet_hours_stop ?? quietStop)
   }
 
-  // Saves on toggle rather than behind a Save button: it is one boolean with
-  // nothing to coordinate, and the status bar answers immediately once the
-  // dashboard reloads. Optimistic, so the box follows the finger, and it goes
-  // back if the planter refuses.
-  const saveAutoWatering = async (enabled) => {
-    const previous = autoOn
-    setAutoOn(enabled)
-    setAutoMsg('')
-    setSavingAuto(true)
+  // The switches save on toggle rather than behind a Save button: each is one
+  // boolean with nothing to coordinate. Optimistic, so the box follows the
+  // finger, and it goes back if the planter refuses.
+  const saveToggle = async ({ path, enabled, previous, setOn, setMsg, setSaving, readBack }) => {
+    setOn(enabled)
+    setMsg('')
+    setSaving(true)
     try {
-      const response = await fetch(`${API_BASE}/watering/auto`, {
+      const response = await fetch(`${API_BASE}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setAutoOn(previous)
-        setAutoMsg(data.error || `Could not save (HTTP ${response.status})`)
+        setOn(previous)
+        setMsg(data.error || `Could not save (HTTP ${response.status})`)
         return
       }
-      setAutoOn(data.auto_watering_enabled)
+      setOn(readBack(data))
       onRefresh?.()
     } catch (error) {
-      setAutoOn(previous)
-      setAutoMsg(`Could not save: ${error.message}`)
+      setOn(previous)
+      setMsg(`Could not save: ${error.message}`)
     } finally {
-      setSavingAuto(false)
+      setSaving(false)
     }
   }
 
-  // Behind a button rather than saving on each keystroke, like quiet hours:
-  // the interval is a typed number, and halfway through editing 90 it is 9.
-  const saveIdle = async () => {
-    setIdleMsg('')
-    try {
-      const response = await fetch(`${API_BASE}/dances/auto`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled: idleOn,
-          minutes: Number(idleMinutes),
-          home_on_startup: homeOnStartup,
-        }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        setIdleMsg(data.error || `Save failed (HTTP ${response.status})`)
-        return
-      }
-      setIdleMsg('Saved.')
-      onRefresh?.()
-    } catch (error) {
-      setIdleMsg(`Save failed: ${error.message}`)
-    }
-  }
+  const saveAutoWatering = (enabled) =>
+    saveToggle({
+      path: '/watering/auto',
+      enabled,
+      previous: autoOn,
+      setOn: setAutoOn,
+      setMsg: setAutoMsg,
+      setSaving: setSavingAuto,
+      readBack: (data) => data.auto_watering_enabled,
+    })
+
+  const saveHomeOnStartup = (enabled) =>
+    saveToggle({
+      path: '/gantry/home-on-startup',
+      enabled,
+      previous: homeOnStartup,
+      setOn: setHomeOnStartup,
+      setMsg: setStartupMsg,
+      setSaving: setSavingStartup,
+      readBack: (data) => data.enabled,
+    })
+
+  const saveAutoPatrol = (enabled) =>
+    saveToggle({
+      path: '/patrol/auto',
+      enabled,
+      previous: patrolOn,
+      setOn: setPatrolOn,
+      setMsg: setPatrolMsg,
+      setSaving: setSavingPatrol,
+      readBack: (data) => data.enabled,
+    })
 
   const saveQuiet = async () => {
     setQuietMsg('')
@@ -150,64 +191,62 @@ export function AutomationPanel({ overview, onRefresh }) {
           </div>
         </div>
 
-        {/* Named after the half that matters. This was "Move about now and
-            then", which described the visible effect and hid the point: the
-            routine is a side effect of the re-home, not the other way round. */}
+        {/* Both switches move the arm without anyone pressing a button, so
+            both start off: a planter being assembled should not set off
+            across the rail before someone has checked it is clear. */}
         <div className="settings-group">
-          <h3>Auto-home</h3>
+          <h3>Homing</h3>
 
           <div className="field-row">
             <label className="checkbox-row">
               <input
                 type="checkbox"
                 checked={homeOnStartup}
-                onChange={(event) => setHomeOnStartup(event.target.checked)}
+                disabled={savingStartup}
+                onChange={(event) => saveHomeOnStartup(event.target.checked)}
               />
-              Re-home on startup
+              Home after startup
             </label>
             <p className="field-hint">
-              Homes once, shortly after the planter comes up. Until it homes,
-              the board reports a position relative to wherever the arm happened
-              to be when the power went on — so every saved plant coordinate is
-              wrong by an unknown amount and watering is refused outright.
-              Deferred, not skipped, if the planter boots inside quiet hours.
+              Homes the arm shortly after the planter comes up, and keeps trying
+              once a minute until it succeeds. Until it homes, the board does not
+              know where the arm is, so watering is refused outright. Waits for
+              quiet hours or a snooze to end first.
             </p>
+            {startupLine(startupHome) && (
+              <p className={`field-hint${startupHome?.phase === 'retrying' ? ' warning' : ''}`}>
+                {startupLine(startupHome)}
+              </p>
+            )}
+            {startupMsg && <p className="field-hint warning">{startupMsg}</p>}
 
             <label className="checkbox-row">
               <input
                 type="checkbox"
-                checked={idleOn}
-                onChange={(event) => setIdleOn(event.target.checked)}
+                checked={patrolOn}
+                disabled={savingPatrol}
+                onChange={(event) => saveAutoPatrol(event.target.checked)}
               />
-              Re-home during operation
+              Hourly auto-patrol
             </label>
-            <div className="slider-row">
-              <label>
-                Every
-                <input
-                  type="number"
-                  min="5"
-                  max="1440"
-                  value={idleMinutes}
-                  onChange={(event) => setIdleMinutes(event.target.value)}
-                />
-              </label>
-              <span>minutes</span>
-              <button type="button" onClick={saveIdle}>Save</button>
-            </div>
             <p className="field-hint">
-              Re-homes the arm on this interval and runs a short routine while it
-              is up, cycling through them. The re-home is the useful half:
-              nothing tells the planter the arm has been nudged or that a belt
-              slipped, so every plant position stays slightly wrong until it
-              homes again.
+              Every hour, on the hour, the arm homes and then visits each plant
+              in turn. Homing is the point: nothing tells the planter the arm has
+              been nudged or a belt has slipped, so every plant position stays
+              slightly wrong until the next home. The patrol shows you where it
+              now thinks each plant is.
             </p>
             <p className="field-hint">
-              Held during quiet hours and a snooze, same as watering — the arm is
-              the other noisy part. Routines you start yourself always run.
-              {idle?.last_at ? ` Last moved ${idle.last_at}.` : ''}
+              Skipped during quiet hours and a snooze, since the arm is the other
+              noisy part. If a watering is running, it waits a few minutes for it
+              to finish.
             </p>
-            {idleMsg && <p className="field-hint warning">{idleMsg}</p>}
+            {patrolLine(patrol) && (
+              <p className={`field-hint${patrol?.last?.ok === false ? ' warning' : ''}`}>
+                {patrolLine(patrol)}
+              </p>
+            )}
+            {patrolMsg && <p className="field-hint warning">{patrolMsg}</p>}
           </div>
         </div>
 

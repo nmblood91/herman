@@ -31,7 +31,7 @@ from greenthumb.services.automation import GreenThumbAutomation
 from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state, temp_store
 
 settings.auto_watering_enabled = False
-settings.idle_motion_enabled = False
+settings.auto_patrol_enabled = False
 
 DRY = settings.moisture_raw_dry       # 320
 CAPACITY = 800

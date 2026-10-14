@@ -29,7 +29,7 @@ from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state,
 
 settings.auto_watering_enabled = True
 settings.water_sensor_enabled = False
-settings.idle_motion_enabled = False
+settings.auto_patrol_enabled = False
 
 ACCEL = 1000.0
 TOP_SPEED = 100.0
@@ -356,7 +356,8 @@ lines = script.splitlines()
 # a second call, a dropped connection mid-sweep would strand the pump on with
 # the carriage parked over one spot -- which is the flood this guards against.
 assert lines[0] == "SET_PIN PIN=pump VALUE=1", lines[0]
-assert lines[-1] == "SET_PIN PIN=pump VALUE=0", lines[-1]
+# Then M400, so the reply waits for the passes to finish.
+assert lines[-2:] == ["SET_PIN PIN=pump VALUE=0", "M400"], lines[-2:]
 assert sum(line.startswith("SET_PIN") for line in lines) == 2, lines
 
 passes = [line for line in lines if line.startswith("G1 ")]

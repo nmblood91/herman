@@ -116,7 +116,7 @@ function App() {
   // The carriage's live position, polled only while the Controls tab is open.
   // The dashboard is fetched on load and after each button press, so on its
   // own it misses every move the planter makes by itself -- automatic
-  // watering, idle motion, the startup home -- and anything done from another
+  // watering, the hourly patrol, the startup home -- and anything done from another
   // browser. This is a cheap read that Klipper answers even mid-move, so it
   // does not wait on, or hold up, a watering cycle.
   const [livePosition, setLivePosition] = useState(null)
@@ -146,6 +146,9 @@ function App() {
   const gantryPosition = useMemo(() => {
     const movement = livePosition ?? overview?.movement ?? {}
     if (movement.ok === false) return 'unavailable'
+    // Klipper invents a position for the homing move (negative, counting up),
+    // so there is no real number to show until the switch trips.
+    if (movement.homing) return 'homing…'
     if (!movement.homed) return 'not homed'
 
     // Whole millimetres: Klipper reports tenths, and the decimal flickers on a

@@ -1,4 +1,4 @@
-"""Idle motion: the periodic re-home and the routines that go with it.
+"""Routines, the hourly auto-patrol, and the startup home.
 
 Two things matter here and neither is the choreography. A routine must never
 hand Klipper a move outside the rail, and it must never be the reason
@@ -20,8 +20,8 @@ from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyErr
 from tests.helpers import temp_state, temp_store
 
 settings.auto_watering_enabled = False
-settings.idle_motion_enabled = True
-settings.idle_motion_minutes = 60
+settings.auto_patrol_enabled = False
+settings.home_on_startup = False
 
 TRAVEL = 890.0
 
@@ -136,202 +136,254 @@ finally:
     auto._hardware_lock.release()
 
 
-# --- the hourly cycle ---
+# --- the hourly auto-patrol ---
+#
+# auto_patrol is what the scheduler calls at minute 0. Called directly here
+# with a fixed time, so nothing below depends on what the clock says while
+# the test runs.
+
+AT_TWO = datetime(2026, 10, 14, 14, 0)
+
+
+def patrol_gcode(auto):
+    return dances.gcode_for(dances.steps_for(
+        "patrol", auto.usable_travel_mm(), [plant.position_mm for plant in auto.plants]
+    ))
+
+
+# Off by default, for the same reason as the startup home: nobody assembling
+# a planter should have the arm set off before they are ready for it.
+assert type(settings).model_fields["auto_patrol_enabled"].default is False
+auto, klip = build()
+auto.auto_patrol(now=AT_TWO)
+assert klip.gcode == [] and klip.homes == 0, (klip.gcode, klip.homes)
+print("ok: the hourly patrol is off by default, and off means off")
 
 auto, klip = build()
-# Off, so the home counted below is the routine's own. The startup home has
-# its own section at the end of this file.
-auto.home_on_startup = False
-auto.set_idle_motion(True, 60)
-auto.tick()
-assert klip.gcode == [], "danced on the first tick after startup"
-print("ok: a restart does not set it dancing immediately")
+auto.set_auto_patrol(True)
+for hour in range(3):
+    auto.auto_patrol(now=AT_TWO + timedelta(hours=hour))
+assert klip.homes == 3, f"homed {klip.homes} times for 3 patrols"
+assert klip.gcode == [patrol_gcode(auto)] * 3, klip.gcode
+assert auto.auto_patrol_status()["last"] == {"at": "2026-10-14T16:00", "ok": True, "error": None}
+print("ok: every run homes first and then patrols -- always the patrol, never a rotation")
 
-auto._last_idle_motion = datetime.now() - timedelta(minutes=61)
-auto.tick()
-assert klip.homes == 1 and len(klip.gcode) == 1, (klip.homes, klip.gcode)
-print("ok: once the interval is up it homes and runs one routine")
-
-before = len(klip.gcode)
-auto.tick()
-assert len(klip.gcode) == before, "ran again on the very next tick"
-print("ok: and then waits out the interval again")
-
-# Rotating matters: four routines that always open with the same one is one
-# routine as far as anybody watching is concerned. Fresh instance, so the
-# rotation starts where a new planter would.
+# The control loop no longer moves the arm on a timer: on the hour is the
+# scheduler's job, and a tick a minute apart could not land on it.
 auto, klip = build()
-auto.set_idle_motion(True, 60)
-auto._last_idle_motion = datetime.now()
-seen = []
-for _ in range(len(dances.DEFAULT_ORDER)):
-    seen.append(auto.idle_motion_status()["next_dance"])
-    auto._last_idle_motion = datetime.now() - timedelta(minutes=61)
+auto.set_auto_patrol(True)
+for _ in range(3):
     auto.tick()
-assert seen == list(dances.DEFAULT_ORDER), seen
-print(f"ok: it cycles through all of them -> {', '.join(seen)}")
+assert klip.gcode == [] and klip.homes == 0, (klip.gcode, klip.homes)
+print("ok: the control loop never patrols by itself")
+
+# A manual routine is never held, and has no bearing on the schedule.
+auto, klip = build()
+auto.set_auto_patrol(True)
+auto.run_dance("shuffle")
+auto.auto_patrol(now=AT_TWO)
+assert len(klip.gcode) == 2, "a manual routine suppressed the hourly patrol"
+print("ok: a manual routine does not push the hourly patrol back")
 
 
-# --- it yields to everything else ---
+# --- it yields to quiet hours and a snooze ---
 
 auto, klip = build()
-auto.set_idle_motion(True, 60)
-# Anchored to the clock rather than written as 00:00-23:59. within_window
-# treats a non-wrapping window as start <= now < stop, so that one leaves the
-# minute 23:59 outside itself -- and this test failed for that minute every
-# day. A window that wraps past midnight has no such gap: a start five minutes
-# ago and a stop an hour ahead contains now whatever the time is.
-_now = datetime.now()
-auto.set_quiet_hours(
-    True,
-    (_now - timedelta(minutes=5)).time().isoformat(timespec="minutes"),
-    (_now + timedelta(hours=1)).time().isoformat(timespec="minutes"),
-)
-auto._last_idle_motion = datetime.now() - timedelta(minutes=61)
-auto.tick()
-assert klip.gcode == [], "danced during quiet hours"
-print("ok: quiet hours holds it, the arm being the other noisy part")
-
-# Held, not skipped: the clock must not advance, or closing the window would
-# mean waiting another full interval before anything happens.
-auto.set_quiet_hours(False)
-auto.tick()
-assert len(klip.gcode) == 1, "did not run once quiet hours ended"
-print("ok: it runs as soon as the window closes rather than waiting again")
+auto.set_auto_patrol(True)
+auto.set_quiet_hours(True, "21:00", "08:00")
+auto.auto_patrol(now=datetime(2026, 10, 14, 23, 0))
+assert klip.gcode == [] and klip.homes == 0, "patrolled during quiet hours"
+assert auto.auto_patrol_status()["last"] is None, "a skipped hour was reported as a run"
+auto.auto_patrol(now=datetime(2026, 10, 15, 9, 0))
+assert len(klip.gcode) == 1, "did not patrol once quiet hours were over"
+print("ok: quiet hours skip the hour, and the next hour after the window runs")
 
 auto, klip = build()
-auto.set_idle_motion(True, 60)
+auto.set_auto_patrol(True)
 auto.snooze_watering(2)
-auto._last_idle_motion = datetime.now() - timedelta(minutes=61)
-auto.tick()
-assert klip.gcode == [], "danced while snoozed"
-print("ok: a snooze holds it too")
+auto.auto_patrol()
+assert klip.gcode == [], "patrolled while snoozed"
+print("ok: a snooze skips it too")
+
+
+# --- busy hardware is waited out, briefly ---
+
+import threading
+import greenthumb.services.automation as automation_module
+
+automation_module.PATROL_BUSY_POLL_SECONDS = 0.02
 
 auto, klip = build()
-auto.set_idle_motion(False)
-auto._last_idle_motion = datetime.now() - timedelta(days=1)
-auto.tick()
-assert klip.gcode == [], "danced while switched off"
-print("ok: switched off means switched off")
+auto.set_auto_patrol(True)
+auto._hardware_lock.acquire()
+try:
+    auto.auto_patrol(now=AT_TWO, busy_wait_seconds=0)
+finally:
+    auto._hardware_lock.release()
+assert klip.gcode == [], klip.gcode
+last = auto.auto_patrol_status()["last"]
+assert last["ok"] is False and last["error"] == "hardware was busy", last
+print("ok: hardware that stays busy past the wait gives up the hour and says so")
+
+auto, klip = build()
+auto.set_auto_patrol(True)
+auto._hardware_lock.acquire()
+threading.Timer(0.1, auto._hardware_lock.release).start()
+auto.auto_patrol(now=AT_TWO, busy_wait_seconds=5)
+assert len(klip.gcode) == 1, "gave up instead of waiting for a dose to finish"
+print("ok: hardware that frees up within the wait gets its patrol")
+
+
+class NoHome(Klip):
+    def home_gantry(self):
+        self.homes += 1
+        return {"ok": False, "error": "endstop not triggered"}
+
+
+auto, klip = build(klip=NoHome())
+auto.set_auto_patrol(True)
+auto.auto_patrol(now=AT_TWO)
+assert klip.gcode == [], "patrolled without a home"
+last = auto.auto_patrol_status()["last"]
+assert last["ok"] is False and "endstop not triggered" in last["error"], last
+print("ok: a failed home stops the patrol, and the reason reaches the UI")
 
 
 # --- settings survive a restart ---
 
 shared = temp_state()
 first, _ = build(shared)
-first.set_idle_motion(True, 180)
-first._last_idle_motion = datetime.now() - timedelta(minutes=181)
-first.tick()
+first.set_auto_patrol(True)
 restored, _ = build(shared)
-assert restored.idle_motion_enabled is True
-assert restored.idle_motion_minutes == 180, restored.idle_motion_minutes
-assert restored.idle_motion_status()["next_dance"] == dances.DEFAULT_ORDER[1], (
-    "the rotation restarted from the top after a restart"
-)
-print("ok: interval and position in the rotation both survive a restart")
-
-for bad in (0, 4, 1441, -10):
-    try:
-        build()[0].set_idle_motion(True, bad)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError(f"accepted a {bad} minute interval")
-print("ok: absurd intervals are refused")
-
-# A routine you asked for counts, so pressing the button is not followed by an
-# automatic one a minute later.
-auto, klip = build()
-auto.set_idle_motion(True, 60)
-auto._last_idle_motion = datetime.now() - timedelta(minutes=61)
-auto.run_dance("shuffle")
-auto.tick()
-assert len(klip.gcode) == 1, "an automatic routine followed a manual one"
-print("ok: a manual routine resets the interval")
+assert restored.auto_patrol_enabled is True
+print("ok: the patrol switch survives a restart")
 
 
 # --- the startup home ---
 #
 # Until the arm is homed Klipper reports a position relative to wherever the
 # carriage happened to power up, so every saved plant coordinate is wrong by an
-# unknown amount and watering is refused outright. Without this the first home
-# is up to a whole idle-motion interval away.
+# unknown amount and watering is refused outright.
+
+assert type(settings).model_fields["home_on_startup"].default is False
+print("ok: the startup home is off by default")
 
 auto, klip = build(klip=Klip(homed=False))
-auto.set_idle_motion(False)
+auto.set_home_on_startup(True)
 assert klip.homes == 0, "homed during construction, before anything held the lock"
 print("ok: nothing homes while the service is still starting up")
 
 auto.tick()
 assert klip.homes == 1, klip.homes
 assert klip.gcode == [], "ran a routine as well as homing"
-print("ok: the first tick homes, and only homes")
-
 for _ in range(5):
     auto.tick()
 assert klip.homes == 1, f"homed {klip.homes} times, so it is homing every tick"
-print("ok: and does not home again on every tick after that")
+assert auto.startup_home_status()["phase"] == "done", auto.startup_home_status()
+print("ok: the first tick homes, only homes, and only once")
 
-# Off means off.
+# Off at startup means off for this run. Switching it on afterwards must not
+# set the arm off out of nowhere -- that is the surprise the default prevents.
 auto, klip = build(klip=Klip(homed=False))
-auto.set_idle_motion(False, home_on_startup=False)
+for _ in range(3):
+    auto.tick()
+auto.set_home_on_startup(True)
 for _ in range(3):
     auto.tick()
 assert klip.homes == 0, klip.homes
-print("ok: switched off, it never homes by itself")
+assert auto.startup_home_status()["phase"] == "next_start", auto.startup_home_status()
+print("ok: switched on after startup, it waits for the next start rather than homing now")
 
-# Held during quiet hours like every other unattended movement -- the arm is
-# the noisy part whether or not it was asked nicely.
+# Deferred, not cancelled, by a snooze.
 auto, klip = build(klip=Klip(homed=False))
-auto.set_idle_motion(False)
+auto.set_home_on_startup(True)
 auto.snooze_watering(2)
 auto.tick()
 assert klip.homes == 0, "homed through a snooze"
-print("ok: a snooze defers the startup home")
-
-# And the deferral is not a cancellation: the flag is left clear so the next
-# tick after the window closes does it, rather than waiting for a restart.
+status = auto.startup_home_status()
+assert status["phase"] == "waiting" and status["held"].startswith("snoozed"), status
 auto.cancel_snooze()
 auto.tick()
 assert klip.homes == 1, klip.homes
-print("ok: once the snooze lifts it homes, rather than waiting for a restart")
+print("ok: a snooze defers the startup home, and it homes once the snooze lifts")
 
 
-# --- a board that cannot home ---
+# --- a home that fails is retried until it lands ---
 #
-# Retrying every second would fill the log and hold the lock against real work,
-# and a board that cannot home will not start being able to on the next tick.
+# The usual cause is this service starting before Klipper is ready, which
+# clears up on its own. Giving up would leave watering refused until a restart.
 
-class Broken(Klip):
+class Flaky(Klip):
+    def __init__(self, failures):
+        super().__init__(homed=False)
+        self.failures = list(failures)
+
     def home_gantry(self):
         self.homes += 1
-        raise RuntimeError("no endstop")
+        if self.failures:
+            failure = self.failures.pop(0)
+            if isinstance(failure, Exception):
+                raise failure
+            return {"ok": False, "error": failure}
+        self._homed = True
+        return {"ok": True}
 
 
-broken = Broken(homed=False)
-auto = GreenThumbAutomation(
-    Hub(), broken, Nul(), Nul(), history=temp_store(), state_path=temp_state()
-)
-auto.set_idle_motion(False)
-for _ in range(4):
+flaky = Flaky(["Klipper not ready", RuntimeError("socket refused")])
+auto, _ = build(klip=flaky)
+auto.set_home_on_startup(True)
+
+auto.tick()
+status = auto.startup_home_status()
+assert status["phase"] == "retrying" and status["error"] == "Klipper not ready", status
+auto.tick()
+status = auto.startup_home_status()
+assert status["phase"] == "retrying" and status["error"] == "socket refused", status
+assert status["attempts"] == 2, status
+print("ok: a refused or raising home is reported and retried, not given up on")
+
+auto.tick()
+assert flaky.homes == 3, flaky.homes
+status = auto.startup_home_status()
+assert status["phase"] == "done" and status["error"] is None, status
+for _ in range(3):
     auto.tick()
-assert broken.homes == 1, f"retried a failing home {broken.homes} times"
-print("ok: a home that raises is tried once, not every tick")
+assert flaky.homes == 3, f"kept homing after it succeeded ({flaky.homes})"
+print("ok: once it lands it stops")
+
+# Someone else holding the arm is a wait, not a failed attempt.
+auto, klip = build(klip=Klip(homed=False))
+auto.set_home_on_startup(True)
+auto._hardware_lock.acquire()
+try:
+    auto.tick()
+finally:
+    auto._hardware_lock.release()
+assert klip.homes == 0 and auto.startup_home_status()["attempts"] == 0, (
+    klip.homes, auto.startup_home_status()
+)
+print("ok: busy hardware does not count as a failed attempt")
+
+# Any home settles it, so pressing the button first is not followed by a
+# second home a minute later.
+auto, klip = build(klip=Klip(homed=False))
+auto.set_home_on_startup(True)
+auto.home_gantry()
+auto.tick()
+assert klip.homes == 1, klip.homes
+assert auto.startup_home_status()["phase"] == "done", auto.startup_home_status()
+print("ok: a manual home before the first tick settles the startup home")
 
 
 # --- the choice persists ---
 
 shared = temp_state()
-auto = GreenThumbAutomation(
-    Hub(), Klip(), Nul(), Nul(), history=temp_store(), state_path=shared
-)
-auto.set_idle_motion(True, 60, home_on_startup=False)
-again = GreenThumbAutomation(
-    Hub(), Klip(), Nul(), Nul(), history=temp_store(), state_path=shared
-)
-assert again.home_on_startup is False
-assert again.idle_motion_status()["home_on_startup"] is False
+first, _ = build(shared)
+first.set_home_on_startup(True)
+again, _ = build(shared)
+assert again.home_on_startup is True
+assert again.startup_home_status()["enabled"] is True
 print("ok: the startup-home choice survives a restart")
 
 
-print("\nall idle motion checks passed")
+print("\nall routine, patrol and startup-home checks passed")

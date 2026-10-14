@@ -25,7 +25,7 @@ from greenthumb.services.automation import GreenThumbAutomation
 from tests.helpers import temp_state, temp_store
 
 settings.auto_watering_enabled = False
-settings.idle_motion_enabled = False
+settings.auto_patrol_enabled = False
 
 
 class Klip:

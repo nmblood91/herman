@@ -9,7 +9,7 @@ from datetime import datetime, time, timedelta
 # Not datetime: the Pi has no battery-backed clock, so an NTP sync can
 # land mid-run and move the wall clock. A calibration divides by this
 # duration, so it has to come from a clock that only goes forwards.
-from time import monotonic
+from time import monotonic, sleep
 from pathlib import Path
 
 from greenthumb.config import settings
@@ -38,6 +38,10 @@ DELIVERY_JOIN_SECONDS = 5.0
 # homing_retract_dist so a carriage resting just off the switch after a failed
 # home is still read as being at it.
 NEAR_SWITCH_MM = 15.0
+# How long the hourly patrol waits out busy hardware before giving up on the
+# hour, and how often it looks. A dose finishes well inside this.
+PATROL_BUSY_WAIT_SECONDS = 300.0
+PATROL_BUSY_POLL_SECONDS = 5.0
 
 
 class HardwareBusyError(RuntimeError):
@@ -103,6 +107,8 @@ class GreenThumbAutomation:
         # a time, and a watering cycle holds them for minutes. A single lock for
         # all three is what keeps the control loop and manual commands apart.
         self._hardware_lock = threading.Lock()
+        # True for the length of a G28. See _home.
+        self._homing = False
         self._history: dict[int, deque[float]] = {
             address: deque(maxlen=settings.moisture_window_size)
             for address in self.sensor_hub.addresses
@@ -127,10 +133,15 @@ class GreenThumbAutomation:
         # tank. Seeded from history at startup so a reboot does not forget that
         # the reservoir is empty.
         self._delivery_failures = 0
-        # Cleared once the startup home has actually run, so it happens once
-        # per process rather than once per tick.
-        self._homed_at_startup = False
+        # The startup home is owed until any home succeeds -- its own, a
+        # patrol's, or the button -- or until the first tick finds it switched
+        # off. Switching it on later takes effect on the next start rather than
+        # setting the arm off unannounced. See _maybe_home_on_startup.
         self.home_on_startup = settings.home_on_startup
+        self._startup_home_pending = True
+        self._startup_homed = False
+        self._startup_home_attempts = 0
+        self._startup_home_error: str | None = None
         self._pump_timer: threading.Timer | None = None
         self._pump_lock_held = False
         # How long the last manual run actually lasted, which is the
@@ -150,14 +161,13 @@ class GreenThumbAutomation:
         # something the person who owns a planter should have to do.
         self.auto_watering_enabled = settings.auto_watering_enabled
 
-        # Idle motion: a periodic re-home plus a short routine. The re-home
-        # is the useful half -- steppers are open-loop, so a slipped belt or a
-        # nudged carriage leaves every plant position wrong until the next
-        # home, and doing it hourly caps how long that can go unnoticed.
-        self.idle_motion_enabled = settings.idle_motion_enabled
-        self.idle_motion_minutes = settings.idle_motion_minutes
-        self.idle_motion_next = 0
-        self._last_idle_motion: datetime | None = None
+        # Hourly auto-patrol: a re-home and a pass over every plant, on the
+        # hour. The re-home is the useful half -- steppers are open-loop, so a
+        # slipped belt or a nudged carriage leaves every plant position wrong
+        # until the next home, and doing it hourly caps how long that can go
+        # unnoticed. Run by its own scheduler job; see main.lifespan.
+        self.auto_patrol_enabled = settings.auto_patrol_enabled
+        self._last_patrol: dict[str, object] | None = None
 
         self.quiet_hours_enabled = settings.quiet_hours_enabled
         self.quiet_hours_start = time.fromisoformat(settings.quiet_hours_start)
@@ -302,20 +312,13 @@ class GreenThumbAutomation:
                 except ValueError:
                     logger.warning("Ignoring bad %s %r", field_name, text)
 
-        idle = stored.get("idle_motion")
-        if isinstance(idle, dict):
-            if isinstance(idle.get("enabled"), bool):
-                self.idle_motion_enabled = idle["enabled"]
-            minutes = idle.get("minutes")
-            if isinstance(minutes, int) and not isinstance(minutes, bool) and minutes > 0:
-                self.idle_motion_minutes = minutes
-            if isinstance(idle.get("home_on_startup"), bool):
-                self.home_on_startup = idle["home_on_startup"]
-            nxt = idle.get("next")
-            if isinstance(nxt, int) and not isinstance(nxt, bool):
-                # Keeps the rotation going across a restart instead of always
-                # opening with the same routine.
-                self.idle_motion_next = nxt % len(dances.DEFAULT_ORDER)
+        patrol = stored.get("auto_patrol")
+        if isinstance(patrol, dict) and isinstance(patrol.get("enabled"), bool):
+            self.auto_patrol_enabled = patrol["enabled"]
+
+        startup_home = stored.get("startup_home")
+        if isinstance(startup_home, dict) and isinstance(startup_home.get("enabled"), bool):
+            self.home_on_startup = startup_home["enabled"]
 
         watering = stored.get("watering")
         if isinstance(watering, dict):
@@ -440,12 +443,8 @@ class GreenThumbAutomation:
                 "flow_ml_per_second": self._pump_flow(),
                 "flow_measured_at": self._flow_measured_at,
             },
-            "idle_motion": {
-                "enabled": self.idle_motion_enabled,
-                "minutes": self.idle_motion_minutes,
-                "next": self.idle_motion_next,
-                "home_on_startup": self.home_on_startup,
-            },
+            "auto_patrol": {"enabled": self.auto_patrol_enabled},
+            "startup_home": {"enabled": self.home_on_startup},
             "quiet": {
                 "enabled": self.quiet_hours_enabled,
                 "start": self.quiet_hours_start.isoformat(timespec="minutes"),
@@ -500,10 +499,37 @@ class GreenThumbAutomation:
 
         Deliberately outside the hardware lock: it is a read Klipper answers
         immediately, and the readout is most useful exactly while something
-        else -- a watering cycle, idle motion -- holds the lock and is moving
+        else -- a watering cycle, the hourly patrol -- holds the lock and is moving
         the carriage.
+
+        While homing, the number is Klipper's invention rather than a place:
+        it starts the axis at a made-up position far enough from the switch to
+        cover the whole rail (about -445 here) and marks it homed for that
+        move. So it is flagged, and the readout says "homing" instead.
         """
-        return self.klipper.live_position()
+        reading = self.klipper.live_position()
+        if self._homing and reading.get("ok"):
+            reading["homing"] = True
+        return reading
+
+    def _home(self) -> dict[str, object]:
+        """Home X, flagged so the position readout knows the number is not real.
+
+        The caller holds the hardware lock. G28 blocks until the switch trips
+        and Klipper resets the coordinate, so clearing the flag when it returns
+        is exactly when the position starts meaning something again.
+        """
+        self._homing = True
+        try:
+            result = self.klipper.home_gantry()
+        finally:
+            self._homing = False
+        # Any home that lands settles the startup one: a patrol or the button
+        # getting there first should not be followed by a second home.
+        if result.get("ok") and self._startup_home_pending:
+            self._startup_home_pending = False
+            self._startup_homed = True
+        return result
 
     def usable_travel_mm(self) -> float:
         """Reachable X range, where 0 is the first position the carriage can occupy.
@@ -761,12 +787,11 @@ class GreenThumbAutomation:
             # silently end all polling.
             logger.exception("Control loop tick failed")
 
-        # Both outside the block above so they take the lock on their own
-        # terms: neither should ever be the reason a watering cycle was
-        # skipped. The startup home comes first -- until the arm is homed,
-        # watering is refused anyway, so it is the one that unblocks the rest.
+        # Outside the block above so it takes the lock on its own terms: it
+        # should never be the reason a watering cycle was skipped. The hourly
+        # patrol is not here -- it has its own job pinned to the top of the
+        # hour, which a tick a minute apart could not land on.
         self._maybe_home_on_startup()
-        self._maybe_idle_motion()
 
     def _apply_lighting(self) -> None:
         now = datetime.now().time()
@@ -1487,7 +1512,8 @@ class GreenThumbAutomation:
             # So the UI can say why nothing is watering rather than leaving it
             # looking broken.
             "watering": self.watering_status(),
-            "idle_motion": self.idle_motion_status(),
+            "auto_patrol": self.auto_patrol_status(),
+            "startup_home": self.startup_home_status(),
             "quiet": self.quiet_status(),
             # What the status bar shows. Computed rather than echoed from the
             # log, so it says what is true now instead of what was last written.
@@ -1895,10 +1921,10 @@ class GreenThumbAutomation:
             "brightness": result["brightness"],
         }
 
-    # --- idle motion ------------------------------------------------------
+    # --- routines ---------------------------------------------------------
 
     def run_dance(self, name: str, home_first: bool = False) -> dict[str, object]:
-        """Run one routine now. Not gated by quiet hours -- see _maybe_idle_motion."""
+        """Run one routine now. Not gated by quiet hours -- see auto_patrol."""
         steps = dances.steps_for(
             name, self.usable_travel_mm(), [plant.position_mm for plant in self.plants]
         )
@@ -1912,7 +1938,7 @@ class GreenThumbAutomation:
             # starting. Homing anyway is also the honest thing for a routine
             # whose job is partly to re-establish where the carriage is.
             if home_first or not status.get("homed"):
-                homed = self.klipper.home_gantry()
+                homed = self._home()
                 if not homed.get("ok"):
                     return {"ok": False, "error": f"Homing failed: {homed.get('error')}"}
 
@@ -1925,25 +1951,33 @@ class GreenThumbAutomation:
 
         if not result.get("ok"):
             return {"ok": False, "error": result.get("error")}
-
-        # A routine you asked for also resets the clock, so pressing the
-        # button does not get followed by an automatic one a minute later.
-        self._last_idle_motion = datetime.now()
         return {"ok": True, "dance": name}
 
+    # --- the startup home -------------------------------------------------
+
     def _maybe_home_on_startup(self) -> None:
-        """Home once, the first time the loop gets a chance.
+        """Home after startup, retrying every tick until it lands.
 
         Not in the lifespan hook, where it would hold the API down for the
         length of the travel before serving anything. Not in __init__ either,
         for the same reason and because nothing has the hardware lock yet.
 
-        Held during quiet hours like every other unattended movement -- the arm
-        is the noisy part whether or not it was asked nicely. The flag is not
-        set in that case, so it homes as soon as the window closes rather than
-        waiting for the next restart.
+        A failure is retried rather than given up on. The usual cause is the
+        Pi bringing this service up before Klipper is ready, which sorts itself
+        out within a minute or two -- and until the arm is homed, watering is
+        refused outright, so giving up would leave the planter dry until a
+        restart. One attempt a tick is slow enough not to crowd real work.
+
+        Held during quiet hours and a snooze like every other unattended
+        movement; still owed, so it homes as soon as the window closes.
         """
-        if self._homed_at_startup or not self.home_on_startup:
+        if not self._startup_home_pending:
+            return
+        if not self.home_on_startup:
+            # The startup moment has passed with it switched off. Turning it on
+            # afterwards waits for the next start rather than homing out of
+            # nowhere, which is the surprise the switch exists to prevent.
+            self._startup_home_pending = False
             return
 
         held = self.watering_suppressed()
@@ -1951,96 +1985,128 @@ class GreenThumbAutomation:
             logger.debug("Deferring the startup home, %s", held)
             return
 
+        self._startup_home_attempts += 1
         try:
             result = self.home_gantry()
         except HardwareBusyError:
+            # Someone else has the arm; that is not a failed attempt.
+            self._startup_home_attempts -= 1
             logger.debug("Deferring the startup home, hardware is busy")
             return
-        except Exception:
-            # Marked done regardless: a board that cannot home will not start
-            # being able to on the next tick, and retrying every second would
-            # fill the log and hold the lock against real work.
-            self._homed_at_startup = True
-            logger.exception("Startup home failed")
-            return
-
-        self._homed_at_startup = True
-        if result.get("ok"):
-            logger.info("Homed on startup")
-        else:
-            logger.warning("Startup home did not run: %s", result.get("error"))
-
-    def _maybe_idle_motion(self) -> None:
-        """Called every tick. Runs at most one routine per interval."""
-        if not self.idle_motion_enabled:
-            return
-
-        now = datetime.now()
-        if self._last_idle_motion is None:
-            # Start the clock rather than dancing the instant the service
-            # comes up, which would make every restart twitch.
-            self._last_idle_motion = now
-            return
-        if now < self._last_idle_motion + timedelta(minutes=self.idle_motion_minutes):
-            return
-
-        held = self.watering_suppressed(now)
-        if held:
-            # Deliberately does not reset the clock: once the window closes the
-            # next tick runs the routine rather than waiting another hour.
-            logger.debug("Skipping idle motion, %s", held)
-            return
-
-        name = dances.DEFAULT_ORDER[self.idle_motion_next % len(dances.DEFAULT_ORDER)]
-        self._last_idle_motion = now
-        try:
-            result = self.run_dance(name, home_first=True)
-        except HardwareBusyError:
-            logger.debug("Skipping idle motion, hardware is busy")
-            return
-        except Exception:
-            logger.exception("Idle motion failed")
-            return
+        except Exception as exc:
+            result = {"ok": False, "error": str(exc) or type(exc).__name__}
 
         if result.get("ok"):
-            self.idle_motion_next = (self.idle_motion_next + 1) % len(dances.DEFAULT_ORDER)
-            logger.info("Homed and ran the %s routine", name)
-        else:
-            logger.warning("Idle motion did not run: %s", result.get("error"))
+            # _home has already settled the pending flag.
+            self._startup_home_error = None
+            if self._startup_home_attempts > 1:
+                logger.info("Homed on startup, attempt %d", self._startup_home_attempts)
+            else:
+                logger.info("Homed on startup")
+            return
+
+        self._startup_home_error = str(result.get("error") or "unknown error")
+        # Warned once, then quiet: Klipper being down for an hour would
+        # otherwise write sixty identical lines.
+        log = logger.warning if self._startup_home_attempts == 1 else logger.debug
+        log(
+            "Startup home did not run (%s), retrying every tick",
+            self._startup_home_error,
+        )
+
+    def set_home_on_startup(self, enabled: bool) -> dict[str, object]:
+        self.home_on_startup = bool(enabled)
         self._persist()
+        return self.startup_home_status()
 
-    def set_idle_motion(
+    def startup_home_status(self) -> dict[str, object]:
+        """Where the startup home stands. Asks Klipper nothing."""
+        if not self.home_on_startup:
+            phase = "off"
+        elif self._startup_homed:
+            phase = "done"
+        elif not self._startup_home_pending:
+            # Switched on after this start had already gone by.
+            phase = "next_start"
+        elif self._startup_home_error:
+            phase = "retrying"
+        else:
+            phase = "waiting"
+        return {
+            "enabled": self.home_on_startup,
+            "phase": phase,
+            "attempts": self._startup_home_attempts,
+            "error": self._startup_home_error,
+            "held": self.watering_suppressed() if phase in ("waiting", "retrying") else None,
+        }
+
+    # --- hourly auto-patrol -----------------------------------------------
+
+    def auto_patrol(
         self,
-        enabled: bool,
-        minutes: int | None = None,
-        home_on_startup: bool | None = None,
-    ) -> dict[str, object]:
-        if minutes is not None:
-            if not 5 <= int(minutes) <= 1440:
-                raise ValueError("Interval must be between 5 minutes and 24 hours")
-            self.idle_motion_minutes = int(minutes)
-        if home_on_startup is not None:
-            self.home_on_startup = bool(home_on_startup)
-        self.idle_motion_enabled = bool(enabled)
-        self._persist()
-        return self.idle_motion_status()
+        now: datetime | None = None,
+        busy_wait_seconds: float = PATROL_BUSY_WAIT_SECONDS,
+    ) -> None:
+        """Home and patrol the plants. Called by the scheduler on the hour.
 
-    def idle_motion_status(self) -> dict[str, object]:
+        Its own job rather than part of tick: the loop runs a minute apart
+        from wherever the service happened to start, so it could only ever
+        land somewhere in the first minute of the hour.
+
+        Quiet hours or a snooze skip the hour rather than defer it, so the
+        patrol only ever happens on the hour. Busy hardware is waited out
+        for a few minutes instead -- that is nearly always a dose in
+        progress, and skipping a whole hour for one would be a waste.
+        """
+        if not self.auto_patrol_enabled:
+            return
+
+        moment = now or datetime.now()
+        held = self.watering_suppressed(moment)
+        if held:
+            logger.debug("Skipping the hourly patrol, %s", held)
+            return
+
+        deadline = monotonic() + busy_wait_seconds
+        while True:
+            try:
+                result = self.run_dance("patrol", home_first=True)
+                break
+            except HardwareBusyError:
+                if monotonic() >= deadline:
+                    logger.info("Skipping the hourly patrol, hardware stayed busy")
+                    self._last_patrol = {
+                        "at": moment.isoformat(timespec="minutes"),
+                        "ok": False,
+                        "error": "hardware was busy",
+                    }
+                    return
+                sleep(PATROL_BUSY_POLL_SECONDS)
+            except Exception as exc:
+                logger.exception("Hourly patrol failed")
+                result = {"ok": False, "error": str(exc) or type(exc).__name__}
+                break
+
+        self._last_patrol = {
+            "at": moment.isoformat(timespec="minutes"),
+            "ok": bool(result.get("ok")),
+            "error": None if result.get("ok") else result.get("error"),
+        }
+        if result.get("ok"):
+            logger.info("Homed and patrolled the plants")
+        else:
+            logger.warning("Hourly patrol did not run: %s", result.get("error"))
+
+    def set_auto_patrol(self, enabled: bool) -> dict[str, object]:
+        self.auto_patrol_enabled = bool(enabled)
+        self._persist()
+        return self.auto_patrol_status()
+
+    def auto_patrol_status(self) -> dict[str, object]:
         """Cheap enough for /overview -- asks Klipper nothing."""
         return {
-            "status": "ok",
-            "enabled": self.idle_motion_enabled,
-            "minutes": self.idle_motion_minutes,
-            "home_on_startup": self.home_on_startup,
-            "homed_at_startup": self._homed_at_startup,
-            "next_dance": dances.DEFAULT_ORDER[
-                self.idle_motion_next % len(dances.DEFAULT_ORDER)
-            ],
-            "last_at": (
-                self._last_idle_motion.isoformat(timespec="minutes")
-                if self._last_idle_motion
-                else None
-            ),
+            "enabled": self.auto_patrol_enabled,
+            "last": self._last_patrol,
         }
 
     def dance_catalogue(self) -> list[dict]:
@@ -2050,7 +2116,7 @@ class GreenThumbAutomation:
 
     def home_gantry(self) -> dict[str, object]:
         with self._exclusive("Homing gantry"):
-            return self.klipper.home_gantry()
+            return self._home()
 
     def move_gantry_relative(self, distance_mm: float) -> dict[str, object]:
         with self._exclusive("Gantry move"):

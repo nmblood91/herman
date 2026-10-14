@@ -217,6 +217,8 @@ assert dose.splitlines() == [
     "SET_PIN PIN=pump VALUE=1",
     "G4 P72000",
     "SET_PIN PIN=pump VALUE=0",
+    # Waits for the dwell to finish, so the reply means the dose is done.
+    "M400",
 ], dose
 print(f"ok: 180 mL at 2.5 mL/s -> 72s dwell")
 

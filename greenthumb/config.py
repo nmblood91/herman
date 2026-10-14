@@ -103,13 +103,13 @@ class Settings(BaseSettings):
     auto_watering_enabled: bool = False
     watering_cooldown_minutes: int = 30
 
-    # Idle motion: re-home and run a short routine on this interval. On by
-    # default -- the re-home is worth having whether or not anyone enjoys the
-    # dance, because an open-loop stepper has no other way to notice that the
-    # carriage is not where Klipper thinks it is. Starting values only; the
-    # Automation tab owns both and persists them.
-    idle_motion_enabled: bool = True
-    idle_motion_minutes: int = 60
+    # Hourly auto-patrol: on the hour, every hour, home and then visit each
+    # plant. The home is what earns it -- an open-loop stepper has no other way
+    # to notice the carriage is not where Klipper thinks it is. Off by default
+    # for the same reason as home_on_startup: nobody assembling a planter
+    # should have the arm set off across the rail before they are ready for it.
+    # Starting value only; the Automation tab owns it and persists it.
+    auto_patrol_enabled: bool = False
 
     # Quiet hours. The pump and the gantry are the only loud parts of this
     # machine, and it lives in a room people sit in. Suppresses *automatic*
@@ -119,11 +119,13 @@ class Settings(BaseSettings):
     # Home once when the service comes up. Until it homes, Klipper reports a
     # position relative to wherever the carriage happened to be powered on at,
     # so every saved plant coordinate is wrong by an unknown amount and
-    # watering is refused outright. Without this the first home is up to
-    # idle_motion_minutes away.
+    # watering is refused outright. Retried every tick until it lands, since
+    # the usual reason it fails is Klipper still coming up alongside us.
     #
+    # Off by default: a planter being put together for the first time should
+    # not move until someone has checked the endstop and the rail are clear.
     # Only the value a planter starts life with; the stored choice wins.
-    home_on_startup: bool = True
+    home_on_startup: bool = False
 
     quiet_hours_enabled: bool = False
     quiet_hours_start: str = "21:00"

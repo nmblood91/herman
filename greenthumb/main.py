@@ -46,6 +46,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_instances=1,
         coalesce=True,
     )
+    # On the hour, every hour. Scheduled whether or not the patrol is on, so
+    # switching it on needs no rescheduling -- auto_patrol checks the switch.
+    # The grace covers a thread pool that starts the job a little late; past
+    # it, the hour is skipped rather than run at some arbitrary minute.
+    scheduler.add_job(
+        automation.auto_patrol,
+        "cron",
+        minute=0,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=60,
+    )
     # Daily rather than per tick: pruning 90 day old rows is not urgent work.
     scheduler.add_job(
         lambda: automation.history.prune(settings.history_retention_days),
@@ -194,12 +206,9 @@ def set_auto_watering(payload: dict[str, object] = Body(default_factory=dict)) -
 
 @app.get(f"{settings.api_prefix}/dances")
 def list_dances() -> dict[str, object]:
-    return {**automation.idle_motion_status(), "dances": automation.dance_catalogue()}
+    return {"dances": automation.dance_catalogue()}
 
 
-# /dances/run/{name} rather than /dances/{name}: the latter would be matched
-# by a POST to /dances/auto as well, and which one wins would depend on the
-# order they happen to be registered in.
 @app.post(f"{settings.api_prefix}/dances/run/{{name}}")
 def run_dance(name: str) -> dict[str, object]:
     result = automation.run_dance(name)
@@ -210,26 +219,28 @@ def run_dance(name: str) -> dict[str, object]:
     return result
 
 
-@app.post(f"{settings.api_prefix}/dances/auto")
-def set_idle_motion(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-    """Turn the periodic re-home and routine on or off, and set its interval.
+def _require_enabled(payload: dict[str, object]) -> bool:
+    # A missing or non-boolean value is refused rather than read as False, so
+    # a malformed request cannot quietly switch something off.
+    enabled = payload.get("enabled")
+    if not isinstance(enabled, bool):
+        raise ValueError("enabled must be true or false")
+    return enabled
 
-    Also carries home_on_startup, which is the other half of automatic homing:
-    the interval covers belts slipping during operation, and that covers the
-    arm having been moved while the planter was off.
-    """
-    minutes = payload.get("minutes")
-    on_startup = payload.get("home_on_startup")
-    result = automation.set_idle_motion(
-        enabled=bool(payload.get("enabled", False)),
-        minutes=int(minutes) if minutes is not None else None,
-        home_on_startup=bool(on_startup) if on_startup is not None else None,
-    )
-    log_event(
-        f"Idle motion {'on' if result['enabled'] else 'off'}, every "
-        f"{result['minutes']} min, home on startup "
-        f"{'on' if result['home_on_startup'] else 'off'}"
-    )
+
+@app.post(f"{settings.api_prefix}/patrol/auto")
+def set_auto_patrol(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Switch the hourly auto-patrol: a re-home and a pass over every plant."""
+    result = automation.set_auto_patrol(_require_enabled(payload))
+    log_event(f"Hourly auto-patrol {'on' if result['enabled'] else 'off'}")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/gantry/home-on-startup")
+def set_home_on_startup(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Switch homing after startup. Takes effect on the next start."""
+    result = automation.set_home_on_startup(_require_enabled(payload))
+    log_event(f"Home on startup {'on' if result['enabled'] else 'off'}")
     return result
 
 

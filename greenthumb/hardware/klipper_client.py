@@ -8,8 +8,15 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 QUERY_TIMEOUT = 5.0
-# gcode/script does not reply until the move completes, so anything that
-# physically moves the gantry needs room for the full travel time.
+# gcode/script replies once a script's commands have been *queued*, not run: a
+# G1 or G4 goes into Klipper's motion queue and the reply comes back while the
+# carriage is still travelling. Measured on the planter -- "Home gantry: ok"
+# arrived before the return trip to X0 had finished -- which let the hardware
+# lock go while the carriage was still moving. So every script that moves, or
+# dwells, ends with M400 (wait for the queue to drain), and the reply then means
+# the carriage has stopped. That is also why anything that moves needs a timeout
+# with room for the full travel time.
+WAIT_FOR_MOVES = "M400"
 MOTION_TIMEOUT = 180.0
 
 
@@ -216,13 +223,19 @@ class KlipperClient:
         }
 
     def home_gantry(self) -> dict[str, Any]:
-        return self.send_gcode("G28 X", timeout=MOTION_TIMEOUT)
+        # G28 itself blocks until the switch trips, but homing_override follows
+        # it with a G1 back to X0, which only queues.
+        return self.send_gcode(f"G28 X\n{WAIT_FOR_MOVES}", timeout=MOTION_TIMEOUT)
 
     def move_gantry_relative(self, distance_mm: float) -> dict[str, Any]:
-        return self.send_gcode(f"G91\nG1 X{distance_mm} F6000\nG90", timeout=MOTION_TIMEOUT)
+        return self.send_gcode(
+            f"G91\nG1 X{distance_mm} F6000\nG90\n{WAIT_FOR_MOVES}", timeout=MOTION_TIMEOUT
+        )
 
     def move_gantry_absolute(self, position_mm: float) -> dict[str, Any]:
-        return self.send_gcode(f"G90\nG1 X{position_mm} F6000", timeout=MOTION_TIMEOUT)
+        return self.send_gcode(
+            f"G90\nG1 X{position_mm} F6000\n{WAIT_FOR_MOVES}", timeout=MOTION_TIMEOUT
+        )
 
     def send_gcode(self, gcode: str, timeout: float = QUERY_TIMEOUT) -> dict[str, Any]:
         logger.debug("Sending gcode: %r", gcode)

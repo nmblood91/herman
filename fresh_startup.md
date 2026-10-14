@@ -230,7 +230,10 @@ Optional extras, each covered in [deploy/README.md](deploy/README.md):
 - **LED strip:** pick the chip type in the app before the colour order.
 - **Camera:** the service account needs the `video` group:
   `sudo usermod -aG video pi`.
-- **Quiet hours:** hold automatic watering and idle motion overnight.
+- **Homing:** once the endstop is confirmed and the rail is clear, switch on
+  *Home after startup* and *Hourly auto-patrol* in the Automation tab. Both
+  start off so the arm never moves before you are ready for it.
+- **Quiet hours:** hold automatic watering and the hourly patrol overnight.
 
 ## Day-to-day
 

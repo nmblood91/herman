@@ -179,8 +179,7 @@ the warning.
 
 The pump and the carriage are the only loud parts of this machine, and it lives
 in a room people sit in. So anything the planter does on its own — watering,
-and the periodic re-home described under *Idle motion* — can be held back two
-ways:
+and the re-homes described under *Homing* — can be held back two ways:
 
 - **Quiet hours** — a nightly window, set in Settings. A window that ends before
   it starts runs through midnight, so 21:00 to 08:00 means overnight.
@@ -204,38 +203,37 @@ a restart with the right amount left — and one that expired while the planter
 was powered off is simply gone, rather than resuming for its remaining hours
 at some arbitrary later date.
 
-## Idle motion
+## Homing
 
-Every hour by default, the planter homes the arm and runs a short routine —
-*Stretch*, *Wave*, *Shuffle* or *Patrol*, cycling through them. Both halves of
-that are switchable in Settings.
+The motor is open-loop: nothing tells the planter where the carriage actually
+is, only where it has been told to go. A belt that slips a tooth, or a carriage
+nudged while you are watering a plant by hand, leaves every saved position
+quietly wrong until the next home. Two switches in the Automation tab handle
+that, and **both start off**, so a planter being put together never sets off
+across the rail before you are ready for it.
 
-**The re-home is the part that earns it.** The motor is open-loop: nothing
-tells the planter where the carriage actually is, only where it has been told
-to go. A belt that slips a tooth, or a carriage nudged while you are watering
-a plant by hand, leaves every saved position quietly wrong — and it stays
-wrong until the next home, which otherwise might be the next reboot. Hourly
-caps that at an hour.
+**Home after startup.** Homes shortly after the planter comes up. Until it
+does, the board does not know where the arm is and watering is refused
+outright. If the home fails, usually because Klipper is still starting up,
+it tries again every minute until it lands, and the Automation tab shows the
+reason. Switching it on takes effect the next time the planter starts, not
+right away.
 
-The routine on the end is there because a machine that only moves to water
-looks broken the rest of the time, and because it makes the re-home visible
-rather than something that happens behind you.
+**Hourly auto-patrol.** Every hour, on the hour, the arm homes and then visits
+each plant's saved position in turn, pausing at every pot. Homing is the point;
+the patrol shows you where the planter now thinks each plant is.
 
-Rules it follows:
+Rules both follow:
 
 - **Held during quiet hours and a snooze**, same as watering. The arm is the
-  other noisy part, and unlike watering, a routine has nowhere urgent to be.
-- **Never delays anything real.** It takes the hardware only if nothing else
-  wants it, and gives up rather than queueing if a watering cycle or a manual
-  pump run is in progress.
+  other noisy part. The startup home waits for the window to close; the patrol
+  skips that hour and runs at the next one.
+- **Never interrupts anything real.** If a watering is running at the top of
+  the hour, the patrol waits up to five minutes for it to finish, then gives
+  up the hour.
 - **Always parks at 0**, the same place homing leaves it.
-- **Routines you start yourself always run**, quiet hours or not, and reset
-  the clock so an automatic one does not follow a minute later.
-
-Patrol is the odd one out: instead of a fixed pattern it visits each plant's
-saved position in turn, pausing at every pot. It is worth watching after
-changing a position, since it shows you where the planter thinks each plant
-is.
+- **Routines you start yourself always run**, quiet hours or not. They have
+  no effect on the hourly schedule.
 
 ## The half-hour wait, and why it matters
 

@@ -81,7 +81,8 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
 | `/watering/auto` | the master switch for unattended watering |
-| `/dances`, `/dances/run/{name}`, `/dances/auto` | the routines, and the periodic re-home |
+| `/dances`, `/dances/run/{name}` | the routines, run by hand |
+| `/patrol/auto`, `/gantry/home-on-startup` | the hourly auto-patrol and the startup home, each on or off |
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
 | `/lights/...` | mode, brightness, colour, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
