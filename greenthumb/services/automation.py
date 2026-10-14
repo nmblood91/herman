@@ -50,6 +50,10 @@ PATROL_BUSY_WAIT_SECONDS = 300.0
 PATROL_BUSY_POLL_SECONDS = 5.0
 
 
+# "Not given" for optional fields where None means "clear it". See save_soil.
+UNCHANGED = object()
+
+
 class HardwareBusyError(RuntimeError):
     """Raised when the gantry, pump, or I2C bus is already in use."""
 
@@ -1824,27 +1828,45 @@ class GreenThumbAutomation:
             self._state_path,
         )
 
-        inherited = []
-        for pot in self.plants:
-            if pot.soil.casefold() != key.casefold():
-                continue
-            if pot.field_capacity_source == "pot":
-                continue
-            pot.field_capacity_raw = int(outcome["value"])
-            pot.field_capacity_source = "soil"
-            pot.field_capacity_soil = key
-            pot.field_capacity_measured_at = measured_at
-            pot.field_capacity_address = plant.sensor_address
-            inherited.append(pot.name)
-
+        inherited = self._backfill_soil_capacity(
+            key, int(outcome["value"]), measured_at, plant.sensor_address
+        )
         outcome["inherited_by"] = inherited
-        self._persist()
-        self._sync_field_capacity()
         logger.info(
             "Field capacity for %r is %s, measured on %s, applied to %d pot(s)",
             key, outcome["value"], plant.name, len(inherited),
         )
         return outcome
+
+    def _backfill_soil_capacity(
+        self,
+        soil: str,
+        value: int | None,
+        measured_at: str | None,
+        address: int | None,
+    ) -> list[str]:
+        """Copy a soil profile's new field capacity onto the pots filled with it.
+
+        Pots that measured their own are skipped: a per-pot figure is more
+        specific and must not be overwritten by a general one. A value of None
+        -- the figure was cleared -- clears what those pots inherited. Returns
+        the names of the pots changed, since it changes how they read.
+        """
+        changed = []
+        for pot in self.plants:
+            if pot.soil.casefold() != soil.casefold():
+                continue
+            if pot.field_capacity_source == "pot":
+                continue
+            pot.field_capacity_raw = value
+            pot.field_capacity_source = "soil" if value is not None else ""
+            pot.field_capacity_soil = soil if value is not None else ""
+            pot.field_capacity_measured_at = (measured_at or "") if value is not None else ""
+            pot.field_capacity_address = address if value is not None else None
+            changed.append(pot.name)
+        self._persist()
+        self._sync_field_capacity()
+        return changed
 
     def calibrate_soil_wilting_point(
         self, soil_name: str, plant_id: str, seconds: int = 20
@@ -2647,6 +2669,8 @@ class GreenThumbAutomation:
         field_capacity_vwc: float,
         wilting_point_vwc: float,
         notes: str = "",
+        field_capacity_raw: object = UNCHANGED,
+        wilting_point_raw: object = UNCHANGED,
     ) -> dict[str, object]:
         """Add or replace a soil, keyed on its name like the plant library.
 
@@ -2654,7 +2678,15 @@ class GreenThumbAutomation:
         ratio would store happily and then behave exactly like no soil at all,
         which is worse than refusing it: the pot would read as configured and
         never be watered.
+
+        The two sensor readings are optional and typed, the alternative to
+        measuring them. UNCHANGED leaves a stored reading alone, so saving the
+        percentages does not wipe a measurement; None clears it; a number
+        replaces it and drops the measured-on details, which no longer
+        describe it. A new field capacity reaches the pots filled with this
+        mix, the same as a measured one.
         """
+        raw_changes = self._soil_raw_changes(name, field_capacity_raw, wilting_point_raw)
         # The name is validated by state.save_soil, which owns the keying for
         # every named library. Checking it again here would be a branch that
         # can never behave differently from the one beneath it.
@@ -2690,14 +2722,76 @@ class GreenThumbAutomation:
             raise ValueError("Notes must be text")
         readings["notes"] = (notes or "").strip()
 
-        entry = state.save_soil(clean, readings, self._state_path)
+        entry = state.save_soil(clean, {**readings, **raw_changes}, self._state_path)
+
+        inherited: list[str] = []
+        if "field_capacity_raw" in raw_changes:
+            inherited = self._backfill_soil_capacity(
+                clean, raw_changes["field_capacity_raw"], None, None
+            )
         return {
             "status": "ok",
             "name": clean,
             "soil": entry,
             "wilting_fraction": state.available_water_fraction(readings),
             "available_points": round(capacity - wilting, 1),
+            "inherited_by": inherited,
         }
+
+    def _soil_raw_changes(
+        self, name: str, field_capacity_raw: object, wilting_point_raw: object
+    ) -> dict[str, object]:
+        """Validate typed sensor readings and turn them into state fields.
+
+        Checked against each other using the stored value for whichever one is
+        not being changed, so wilting point can never end up at or above field
+        capacity -- the dry end of the window above the wet end.
+        """
+        stored = next(
+            (
+                values
+                for key, values in state.load_soils(self._state_path).items()
+                if key.casefold() == str(name).strip().casefold()
+            ),
+            {},
+        )
+
+        def parse(value: object, label: str) -> int | None:
+            if value is None:
+                return None
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or value != int(value):
+                raise ValueError(f"{label} must be a whole sensor reading, not {value!r}")
+            if int(value) <= 0:
+                raise ValueError(f"{label} must be above 0, not {value!r}")
+            return int(value)
+
+        changes: dict[str, object] = {}
+        for value, prefix, label in (
+            (field_capacity_raw, "field_capacity", "Field capacity (sensor reading)"),
+            (wilting_point_raw, "wilting_point", "Wilting point (sensor reading)"),
+        ):
+            if value is UNCHANGED:
+                continue
+            changes[f"{prefix}_raw"] = parse(value, label)
+            # Typed, not measured: the old measurement's details would now
+            # describe a number that is not there.
+            changes[f"{prefix}_samples"] = None
+            changes[f"{prefix}_measured_at"] = None
+            changes[f"{prefix}_address"] = None
+
+        capacity = changes.get("field_capacity_raw", stored.get("field_capacity_raw"))
+        wilting = changes.get("wilting_point_raw", stored.get("wilting_point_raw"))
+        if (
+            changes
+            and isinstance(capacity, (int, float))
+            and isinstance(wilting, (int, float))
+            and wilting >= capacity
+        ):
+            raise ValueError(
+                f"Wilting point (sensor reading) must be below field capacity "
+                f"({int(capacity)}), not {int(wilting)}"
+            )
+        return changes
 
     def delete_soil(self, name: str) -> dict[str, object]:
         """Remove a soil. Plants still naming it keep the name, unresolved."""

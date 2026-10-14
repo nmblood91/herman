@@ -347,4 +347,80 @@ assert plant.field_capacity_soil == "Coco coir", plant.field_capacity_soil
 print("ok: a pot inherits a hand-entered figure like any other")
 
 
+# --- typed sensor readings on a soil profile ---
+#
+# The editor's two sensor-reading fields. Optional: left out keeps what is
+# stored, so saving the percentages never wipes a measurement; null clears; a
+# number replaces it and loses the measurement's details.
+
+from greenthumb.services.automation import UNCHANGED
+
+typed = build()
+typed.save_soil("Typed mix", 30, 14)
+first, second, third = (p.plant_id for p in typed.plants[:3])
+typed.update_plant_soil(first, "Typed mix")
+typed.update_plant_soil(second, "Typed mix")
+typed.update_plant_soil(third, "Typed mix")
+typed.get_plant(third).field_capacity_raw = 640
+typed.get_plant(third).field_capacity_source = "pot"
+
+result = typed.save_soil("Typed mix", 30, 14, field_capacity_raw=700, wilting_point_raw=450)
+stored = state.load_soils(typed._state_path)["Typed mix"]
+assert (stored["field_capacity_raw"], stored["wilting_point_raw"]) == (700, 450), stored
+assert stored["field_capacity_measured_at"] is None, "a typed figure claims to be measured"
+assert typed.get_plant(first).field_capacity_raw == 700
+assert typed.get_plant(first).field_capacity_source == "soil"
+assert typed.get_plant(third).field_capacity_raw == 640, "overwrote a pot's own measurement"
+assert sorted(result["inherited_by"]) == sorted(
+    [typed.get_plant(first).name, typed.get_plant(second).name]
+), result["inherited_by"]
+assert typed.sensor_hub.field_capacity[typed.get_plant(first).sensor_address] == 700
+print("ok: typed readings save, and field capacity reaches the pots like a measured one")
+
+# Saving the percentages alone leaves a measured reading and its date alone.
+state.save_soil(
+    "Typed mix",
+    {"field_capacity_raw": 710, "field_capacity_measured_at": "2026-10-01T12:00:00"},
+    typed._state_path,
+)
+typed.save_soil("Typed mix", 31, 14)
+stored = state.load_soils(typed._state_path)["Typed mix"]
+assert stored["field_capacity_raw"] == 710, stored
+assert stored["field_capacity_measured_at"] == "2026-10-01T12:00:00", stored
+assert stored["field_capacity_vwc"] == 31
+print("ok: saving without the readings keeps a measurement and when it was taken")
+
+# Cleared: the pots that inherited it lose it too, and read nothing again.
+typed.save_soil("Typed mix", 31, 14, field_capacity_raw=None)
+assert state.load_soils(typed._state_path)["Typed mix"]["field_capacity_raw"] is None
+assert typed.get_plant(first).field_capacity_raw is None
+assert typed.get_plant(third).field_capacity_raw == 640, "cleared a pot's own measurement"
+print("ok: clearing the reading clears what the pots inherited, not what they measured")
+
+for capacity, wilting, why in (
+    (500, 500, "wilting point equal to field capacity"),
+    (500, 600, "wilting point above field capacity"),
+    (0, UNCHANGED, "a field capacity of zero"),
+    (-5, UNCHANGED, "a negative reading"),
+    (512.5, UNCHANGED, "a fraction of a reading"),
+    (True, UNCHANGED, "a boolean"),
+    ("700", UNCHANGED, "text"),
+):
+    try:
+        typed.save_soil("Typed mix", 31, 14, field_capacity_raw=capacity, wilting_point_raw=wilting)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted {why}")
+# Checked against the stored figure for whichever one is not being changed.
+typed.save_soil("Typed mix", 31, 14, field_capacity_raw=700)
+try:
+    typed.save_soil("Typed mix", 31, 14, wilting_point_raw=800)
+except ValueError:
+    pass
+else:
+    raise AssertionError("accepted a wilting point above the stored field capacity")
+print("ok: unusable readings are refused, including a wilting point at or above capacity")
+
+
 print("\nall soil library checks passed")

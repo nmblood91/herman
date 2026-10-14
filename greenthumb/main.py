@@ -17,7 +17,7 @@ from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_s
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
 from greenthumb import system_clock, version
 from greenthumb.plants import zone_for
-from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
+from greenthumb.services.automation import UNCHANGED, GreenThumbAutomation, HardwareBusyError
 
 setup_logging()
 
@@ -512,13 +512,17 @@ def save_soil(payload: dict[str, object] = Body(default_factory=dict)) -> dict[s
     """Add or replace a soil. Keyed on name, so saving overwrites.
 
     Expects {"name": ..., "field_capacity_vwc": ..., "wilting_point_vwc": ...}
-    as volumetric water content percentages.
+    as volumetric water content percentages. Optionally field_capacity_raw and
+    wilting_point_raw, typed sensor readings: left out to keep what is stored,
+    null to clear it.
     """
     result = automation.save_soil(
         str(payload.get("name", "")),
         payload.get("field_capacity_vwc"),
         payload.get("wilting_point_vwc"),
         payload.get("notes", ""),
+        payload.get("field_capacity_raw", UNCHANGED),
+        payload.get("wilting_point_raw", UNCHANGED),
     )
     log_event(
         f"Saved soil {result['name']}: field capacity "

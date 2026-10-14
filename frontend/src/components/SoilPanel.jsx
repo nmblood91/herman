@@ -15,7 +15,17 @@ const SAMPLE_SECONDS = 20
 // How long Delete has to be held. Matches the plant profile editor's.
 const DELETE_HOLD_MS = 5000
 
-const BLANK = { name: '', capacity: '', wilting: '', notes: '' }
+const BLANK = {
+  name: '',
+  capacity: '',
+  wilting: '',
+  capacityRaw: '',
+  wiltingRaw: '',
+  notes: '',
+}
+
+// The sensor readings as the form shows them: blank for none.
+const rawText = (value) => (value == null ? '' : String(value))
 
 export function SoilPanel({ soils, plants, onRefresh }) {
   // 'new' types a free name below; 'existing' turns that field into a picker
@@ -48,18 +58,43 @@ export function SoilPanel({ soils, plants, onRefresh }) {
   // rather than fetching the entry again. Synced during render, not in an
   // effect, so the inputs never paint one frame of the previous mix.
   const [syncedPick, setSyncedPick] = useState('')
+  // The sensor readings the form was last filled with. A reading is sent on
+  // save only when its field differs from this -- not from what is stored,
+  // because a measurement taken after the form filled would then be
+  // overwritten by the stale number still sitting in the box.
+  const [rawBase, setRawBase] = useState({ capacityRaw: '', wiltingRaw: '' })
   if (picked !== syncedPick) {
     setSyncedPick(picked)
+    const base = {
+      capacityRaw: rawText(pickedSoil?.field_capacity_raw),
+      wiltingRaw: rawText(pickedSoil?.wilting_point_raw),
+    }
+    setRawBase(base)
     setForm(
       pickedSoil
         ? {
             name: pickedSoil.name,
             capacity: String(pickedSoil.field_capacity_vwc ?? ''),
             wilting: String(pickedSoil.wilting_point_vwc ?? ''),
+            ...base,
             notes: pickedSoil.notes ?? '',
           }
         : BLANK,
     )
+  } else if (pickedSoil) {
+    // A measurement landed while this mix was open. Show it in any reading
+    // field nobody has typed into, and make it the new baseline.
+    for (const [field, value] of [
+      ['capacityRaw', rawText(pickedSoil.field_capacity_raw)],
+      ['wiltingRaw', rawText(pickedSoil.wilting_point_raw)],
+    ]) {
+      if (value !== rawBase[field]) {
+        setRawBase((current) => ({ ...current, [field]: value }))
+        if (form[field] === rawBase[field]) {
+          setForm((current) => ({ ...current, [field]: value }))
+        }
+      }
+    }
   }
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
@@ -136,6 +171,27 @@ export function SoilPanel({ soils, plants, onRefresh }) {
 
   const save = async () => {
     setMessage('')
+    // Only the readings that were edited. Left out, the planter keeps what it
+    // has -- including a measurement and when it was taken. Blank clears.
+    const readings = {}
+    for (const [field, key, label] of [
+      ['capacityRaw', 'field_capacity_raw', 'Field capacity (sensor reading)'],
+      ['wiltingRaw', 'wilting_point_raw', 'Wilting point (sensor reading)'],
+    ]) {
+      const text = String(form[field]).trim()
+      if (text === rawBase[field]) continue
+      if (text === '') {
+        readings[key] = null
+        continue
+      }
+      const value = Number(text)
+      if (!Number.isInteger(value) || value <= 0) {
+        setMessage(`${label} has to be a whole number above 0.`)
+        return
+      }
+      readings[key] = value
+    }
+
     try {
       const response = await fetch(`${API_BASE}/soils`, {
         method: 'POST',
@@ -145,6 +201,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
           field_capacity_vwc: Number(form.capacity),
           wilting_point_vwc: Number(form.wilting),
           notes: form.notes,
+          ...readings,
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -152,10 +209,16 @@ export function SoilPanel({ soils, plants, onRefresh }) {
         setMessage(data.detail || data.error || `Save failed (HTTP ${response.status})`)
         return
       }
+      const applied = data.inherited_by ?? []
       setMessage(
         `Saved soil profile ${data.name}: ${data.available_points} points of usable water, ` +
-          `wilting at ${Math.round((data.wilting_fraction ?? 0) * 100)}% of field capacity.`,
+          `wilting at ${Math.round((data.wilting_fraction ?? 0) * 100)}% of field capacity.` +
+          (applied.length ? ` New field capacity applied to ${applied.join(', ')}.` : ''),
       )
+      setRawBase({
+        capacityRaw: String(form.capacityRaw).trim(),
+        wiltingRaw: String(form.wiltingRaw).trim(),
+      })
       setMode('existing')
       setPicked(data.name)
       setSyncedPick(data.name)
@@ -291,7 +354,38 @@ export function SoilPanel({ soils, plants, onRefresh }) {
                 onChange={(event) => update('wilting', event.target.value)}
               />
             </label>
+            {/* The same two ends as raw probe counts, typed rather than
+                measured with the buttons below. Optional: blank means not
+                known yet, and a pot of this mix reads nothing until field
+                capacity has a figure one way or the other. */}
+            <label>
+              Field capacity (sensor reading)
+              <input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Not set"
+                value={form.capacityRaw}
+                onChange={(event) => update('capacityRaw', event.target.value)}
+              />
+            </label>
+            <label>
+              Wilting point (sensor reading)
+              <input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Not set"
+                value={form.wiltingRaw}
+                onChange={(event) => update('wiltingRaw', event.target.value)}
+              />
+            </label>
           </div>
+          <p className="field-hint">
+            The sensor readings can be typed here or measured below. A field
+            capacity typed here is copied onto every pot using this soil
+            profile, except pots that measured their own.
+          </p>
         </div>
 
         {/* Measured, not typed -- so it lives beside the picker rather than
