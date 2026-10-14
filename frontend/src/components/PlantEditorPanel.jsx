@@ -10,7 +10,6 @@ const BLANK = {
   category: '',
   preferred_soil: '',
   target_vwc: 25,
-  water_level: '',
   watering_volume_ml: 100,
   light_start_time: '07:00',
   light_hours: 12,
@@ -18,16 +17,28 @@ const BLANK = {
   notes: '',
 }
 
-// Mirrors greenthumb.care.WATER_LEVELS: a label for the target, never used to
-// set it.
-const WATER_LEVELS = ['Wet', 'Wet-Medium', 'Medium', 'Medium-Dry', 'Dry', 'Very Dry']
+// The water level a target % VWC falls in. A label only, worked out from the
+// target and never stored: the percentage waters. Mirrors
+// greenthumb.care.WATER_LEVEL_FLOORS.
+const WATER_LEVEL_FLOORS = [
+  [46, 'Ultra Wet'],
+  [41, 'Very Wet'],
+  [35, 'Wet'],
+  [31, 'Wet-Medium'],
+  [25, 'Medium'],
+  [21, 'Medium-Dry'],
+  [16, 'Dry'],
+  [11, 'Very Dry'],
+  [0, 'Ultra Dry'],
+]
+const waterLevelFor = (vwc) =>
+  WATER_LEVEL_FLOORS.find(([floor]) => Number(vwc) >= floor)?.[1] ?? ''
 
 const formFrom = (entry) => ({
   name: entry.name,
   category: entry.category ?? '',
   preferred_soil: entry.preferred_soil ?? '',
   target_vwc: entry.target_vwc ?? BLANK.target_vwc,
-  water_level: entry.water_level ?? '',
   watering_volume_ml: entry.watering_volume_ml ?? BLANK.watering_volume_ml,
   light_start_time: entry.light_start_time ?? BLANK.light_start_time,
   light_hours: entry.light_hours ?? BLANK.light_hours,
@@ -261,37 +272,22 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
             preferred soil profile.
           </p>
 
-          <div className="field-pair">
-            <label>
-              Water at (% VWC)
-              <input
-                type="number"
-                min="1"
-                max="60"
-                step="1"
-                value={form.target_vwc}
-                onChange={(event) => update('target_vwc', event.target.value)}
-              />
-            </label>
-            <label>
-              Water level
-              <select
-                value={form.water_level}
-                onChange={(event) => update('water_level', event.target.value)}
-              >
-                <option value="">None</option>
-                {WATER_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label>
+            Water at: {form.target_vwc}% VWC ({waterLevelFor(form.target_vwc)})
+            <input
+              type="range"
+              min="1"
+              max="60"
+              step="1"
+              value={form.target_vwc}
+              onChange={(event) => update('target_vwc', event.target.value)}
+            />
+          </label>
           <p className="field-hint">
-            The pot is watered once its soil dries to this moisture. Roughly:
-            Wet 35–40%, Medium 25–30%, Dry 15–20%, Very Dry 6–10% in a rich mix,
-            lower in coarser ones. The water level is only a label.
+            The pot is watered once its soil dries to this moisture. Ultra Dry
+            up to 10%, Very Dry 11–15%, Dry 16–20%, Medium-Dry 21–24%, Medium
+            25–30%, Wet-Medium 31–34%, Wet 35–40%, Very Wet 41–45%, Ultra Wet
+            over 45%.
           </p>
           <label>
             Watering Volume (mL)

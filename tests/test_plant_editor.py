@@ -55,7 +55,6 @@ BODY = {
     "category": "",
     "preferred_soil": "",
     "target_vwc": 21,
-    "water_level": "Medium-Dry",
     "watering_volume_ml": 120,
     "light_start_time": "07:30",
     "light_hours": 13,
@@ -74,7 +73,6 @@ auto = build()
 pot = auto.plants[0]
 pot.name = "From a pot"
 pot.target_vwc = 21
-pot.water_level = "Medium-Dry"
 pot.watering_volume_ml = 120
 pot.light_start_time = clock(7, 30)
 pot.light_hours = 13
@@ -116,7 +114,6 @@ for value, why in (
 print("ok: an unusable target is refused")
 
 for field_name, bad_values in (
-    ("water_level", ("Soggy", 3)),
     ("light_hours", (-1, 25, 1.5, None, "twelve")),
     ("light_brightness", (-1, 101, "bright", None)),
     ("light_start_time", ("25:00", "half seven", "", None, 730)),
@@ -127,12 +124,8 @@ for field_name, bad_values in (
         except ValueError:
             continue
         raise AssertionError(f"accepted {field_name}={bad!r}")
-print("ok: a bad water level, light length, brightness or start time is refused")
+print("ok: a bad light length, brightness or start time is refused")
 
-# Capitalisation and stray spaces in the water level are folded, not refused.
-auto.write_plant_profile("Folded", {**BODY, "water_level": "  medium-DRY "})
-assert state.load_profiles(auto._state_path)["Folded"]["water_level"] == "Medium-Dry"
-print("ok: but a stray space or capital in the water level is folded away")
 
 for volume, why in (
     ("lots", "a non-numeric dose"),
@@ -182,7 +175,7 @@ print("ok: a blank name is refused")
 
 # Nothing partial landed from any of the refusals above.
 names = set(state.load_profiles(auto._state_path))
-assert names == {"Zero", "Folded", "Odd times"}, sorted(names)
+assert names == {"Zero", "Odd times"}, sorted(names)
 print("ok: and a refused write stores nothing at all")
 
 
@@ -309,9 +302,33 @@ else:
     raise AssertionError("accepted a number as a soil note")
 print("ok: a soil note has to be text too")
 
-# Every water level the editor offers has to be accepted.
-assert all(care.check_water_level(level) == level for level in care.WATER_LEVELS)
-print("ok: every water level the editor can offer is accepted")
+# The key, edge to edge.
+for vwc, level in (
+    (60, "Ultra Wet"), (46, "Ultra Wet"), (45, "Very Wet"), (41, "Very Wet"),
+    (40, "Wet"), (35, "Wet"), (34, "Wet-Medium"), (31, "Wet-Medium"),
+    (30, "Medium"), (25, "Medium"), (24, "Medium-Dry"), (21, "Medium-Dry"),
+    (20, "Dry"), (16, "Dry"), (15, "Very Dry"), (11, "Very Dry"),
+    (10, "Ultra Dry"), (1, "Ultra Dry"),
+):
+    assert care.water_level_for(vwc) == level, (vwc, care.water_level_for(vwc), level)
+print("ok: a target maps to the water level the key gives it")
+
+# Never stored: a label in the body, or one saved by an older build, is
+# dropped, and what is reported comes from the target.
+labelled = build()
+labelled.write_plant_profile("Labelled", {**BODY, "target_vwc": 9, "water_level": "Wet"})
+assert "water_level" not in state.load_profiles(labelled._state_path)["Labelled"]
+raw = state.load_state(labelled._state_path)
+raw["plant_profiles"]["Old"] = {**BODY, "target_vwc": 28, "water_level": "Dry"}
+state.save_state(raw, labelled._state_path)
+listed = {entry["name"]: entry for entry in labelled.list_plant_profiles()}
+assert listed["Labelled"]["water_level"] == "Ultra Dry", listed["Labelled"]
+assert listed["Old"]["water_level"] == "Medium", "a stored label outranked the key"
+assert labelled.get_plant_profile("Old")["profile"]["water_level"] == "Medium"
+labelled.apply_plant_profile(labelled.plants[0].plant_id, "Old")
+plant_row = next(p for p in labelled.get_overview()["plants"] if p["plant_id"] == "plant_1")
+assert plant_row["target_vwc"] == 28
+print("ok: the water level is always worked out from the target, never stored")
 
 
 print("\nall plant editor checks passed")

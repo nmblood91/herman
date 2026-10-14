@@ -145,7 +145,7 @@ and Soil tab, or over the API:
 
 ```bash
 curl -X POST http://herman.local/api/v1/plant-profiles -H 'Content-Type: application/json' \
-  -d '{"name":"Basil","category":"Culinary Herbs & Leafy Greens","preferred_soil":"Rich & Retentive Mix","target_vwc":28,"water_level":"Medium","watering_volume_ml":120,"light_start_time":"07:30","light_hours":13,"light_brightness":75,"notes":"South window, dries fast in summer."}'
+  -d '{"name":"Basil","category":"Culinary Herbs & Leafy Greens","preferred_soil":"Rich & Retentive Mix","target_vwc":28,"watering_volume_ml":120,"light_start_time":"07:30","light_hours":13,"light_brightness":75,"notes":"South window, dries fast in summer."}'
 curl http://herman.local/api/v1/plant-profiles/Basil
 ```
 
@@ -156,7 +156,7 @@ What a plant profile carries:
 | Category | Groups the profile in the dropdowns. Optional. |
 | Preferred soil | The soil profile the plant wants. Loading the profile switches the pot to it. |
 | Water at (% VWC) | The pot is watered once its soil dries to this. See *Watering targets* below. |
-| Water level | Wet, Wet-Medium, Medium, Medium-Dry, Dry or Very Dry: the target in words. A label only. |
+| Water level | The target in words, from Ultra Dry to Ultra Wet. Worked out from the target, never stored; see *Watering targets*. |
 | Watering volume | Millilitres per dose. |
 | Lights on at, hours | When this plant's stretch of strip comes on, and for how long. The card and editor show when it goes off; nothing stores a stop time. |
 | Brightness | 0–100% for this plant's stretch of strip. Low 25%, Medium 50%, High 75%, Intense 100%. |
@@ -362,17 +362,26 @@ point % and field capacity %:
 `VWC = wilting point % + available % × (field capacity % − wilting point %)`
 
 **A plant is watered once its pot's VWC drops to its target.** The card shows
-the pot's VWC beside the target. As a guide, in a rich mix:
+the pot's VWC beside the target. The **water level** names the target in words,
+and is always worked out from it by this key — it is never stored, so changing
+the key relabels every plant:
 
-| Water level | Water when soil drops to |
+| Water level | Target |
 |---|---|
-| Wet | 35–40% VWC — keep constantly damp |
+| Ultra Wet | over 45% VWC |
+| Very Wet | 41–45% |
+| Wet | 35–40% — keep constantly damp |
+| Wet-Medium | 31–34% |
 | Medium | 25–30% — top 1–2 inches dry |
-| Dry | 15–20% — mostly dry 2–3 inches down |
-| Very Dry | 6–10% — just above wilting point |
+| Medium-Dry | 21–24% |
+| Dry | 16–20% — mostly dry 2–3 inches down |
+| Very Dry | 11–15% |
+| Ultra Dry | 10% and under — just above wilting point |
 
-Wet-Medium and Medium-Dry sit between. The same water level sits lower in a
-coarser mix, which is why the percentage, not the label, does the watering.
+The key is written for a rich mix. Coarse mixes hold much less water, so a
+plant in Ultra-Coarse Epiphytic Mix reads Ultra Dry at a target that is
+comfortably moist for that mix — the percentage, not the label, does the
+watering.
 
 **A target has to fit the pot's soil profile.** Two cases are caught and shown
 on the card:

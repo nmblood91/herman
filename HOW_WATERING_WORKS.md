@@ -53,18 +53,23 @@ Retentive Mix, for example, field capacity is 50% and wilting point 17.5%, so a
 pot halfway between its two readings is at about 34%.
 
 **Each plant has a target**: water once the soil dries to this % VWC. The plant
-profiles that ship with Herman give one per plant, with a water level naming it
-in words:
+profiles that ship with Herman give one per plant, and the planter names it in
+words with this key:
 
 | Water level | Water when soil drops to |
 | --- | --- |
+| Ultra Wet | over 45% |
+| Very Wet | 41–45% |
 | Wet | 35–40% — keep constantly damp, never dry out |
+| Wet-Medium | 31–34% |
 | Medium | 25–30% — top 1–2 inches dry |
-| Dry | 15–20% — soil mostly dry 2–3 inches down |
-| Very Dry | 6–10% — just above wilting point |
+| Medium-Dry | 21–24% |
+| Dry | 16–20% — soil mostly dry 2–3 inches down |
+| Very Dry | 11–15% |
+| Ultra Dry | 10% and under — just above wilting point |
 
-Wet-Medium and Medium-Dry sit between those. The figures are for a rich mix;
-coarse mixes hold less water, so the same level sits lower in them. The card
+The figures are for a rich mix; coarse mixes hold less water, so a plant in a
+coarse mix can show Ultra Dry at a target that is moist for that mix. The card
 shows the pot's water content next to its target, along with a word for how
 wet it is (very wet, wet, medium, dry, very dry).
 

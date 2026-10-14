@@ -4,17 +4,23 @@ Shared by the plant library, the plant profile editor and the pots, so all
 three validate the same way. Nothing here touches hardware or the state file.
 
 **Watering** is a target volumetric water content, a whole percentage. A pot is
-watered once its soil dries to that figure. The water level is only a label for
-the same thing in words, kept because "Medium" says more at a glance than 28%:
+watered once its soil dries to that figure. The water level is the same thing
+in words, kept because "Medium" says more at a glance than 28%. It is never
+stored: it is always worked out from the target (water_level_for), so changing
+the key below relabels every plant at once.
 
-    Wet        water at about 35-40% VWC  -- keep constantly damp
-    Medium     about 25-30%               -- top 1-2 inches dry
-    Dry        about 15-20%               -- mostly dry 2-3 inches down
-    Very Dry   about 6-10%                -- just above wilting point
+    Ultra Wet    over 45% VWC
+    Very Wet     41-45%
+    Wet          35-40%   -- keep constantly damp
+    Wet-Medium   31-34%
+    Medium       25-30%   -- top 1-2 inches dry
+    Medium-Dry   21-24%
+    Dry          16-20%   -- mostly dry 2-3 inches down
+    Very Dry     11-15%
+    Ultra Dry    10% and under -- just above wilting point
 
-with Wet-Medium and Medium-Dry between them. The figures are for a rich mix;
-the same label sits lower in a coarser one, which is why the percentage is what
-drives watering and the label is never converted into one.
+The figures are for a rich mix; coarser mixes hold less, which is why the
+percentage is what drives watering and the label is never converted into one.
 
 **Lighting** is a start time, a number of hours and a brightness. There is no
 stop time to keep in step with the other two: it is worked out (light_stop).
@@ -23,8 +29,6 @@ stop time to keep in step with the other two: it is worked out (light_stop).
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta
-
-WATER_LEVELS: tuple[str, ...] = ("Wet", "Wet-Medium", "Medium", "Medium-Dry", "Dry", "Very Dry")
 
 # The library's four light intensities, as the strip brightness each one sets.
 # A pot stores the percentage, so a brightness between these is allowed; the
@@ -40,6 +44,27 @@ BRIGHTNESS_FOR = {name: percent for name, percent in LIGHT_LEVELS}
 DEFAULT_TARGET_VWC = 25
 DEFAULT_LIGHT_HOURS = 12
 DEFAULT_LIGHT_BRIGHTNESS = 75
+
+
+# The lowest target % VWC each water level starts at, wettest first: the key
+# in the module docstring. Mirrored in the Plant Profile Editor's slider.
+WATER_LEVEL_FLOORS: tuple[tuple[int, str], ...] = (
+    (46, "Ultra Wet"),
+    (41, "Very Wet"),
+    (35, "Wet"),
+    (31, "Wet-Medium"),
+    (25, "Medium"),
+    (21, "Medium-Dry"),
+    (16, "Dry"),
+    (11, "Very Dry"),
+    (0, "Ultra Dry"),
+)
+WATER_LEVELS: tuple[str, ...] = tuple(name for _, name in WATER_LEVEL_FLOORS)
+
+
+def water_level_for(target_vwc: int) -> str:
+    """The water level a target falls in, for a label."""
+    return next(name for floor, name in WATER_LEVEL_FLOORS if target_vwc >= floor)
 
 
 def light_level_name(brightness: int) -> str:
@@ -81,18 +106,6 @@ def check_target_vwc(value: object) -> int:
     if not 1 <= target <= 60:
         raise ValueError(f"Target moisture must be between 1 and 60% VWC, not {target}")
     return target
-
-
-def check_water_level(value: object) -> str:
-    """A label from WATER_LEVELS, matched loosely, or "" for none."""
-    if value is None or (isinstance(value, str) and not value.strip()):
-        return ""
-    if isinstance(value, str):
-        wanted = value.strip().casefold()
-        for level in WATER_LEVELS:
-            if level.casefold() == wanted:
-                return level
-    raise ValueError("Water level must be one of: " + ", ".join(WATER_LEVELS))
 
 
 def check_light_hours(value: object) -> int:

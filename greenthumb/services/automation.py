@@ -59,17 +59,29 @@ class HardwareBusyError(RuntimeError):
     """Raised when the gantry, pump, or I2C bus is already in use."""
 
 
+# In care_fields for showing, and never stored.
+DERIVED_CARE_FIELDS = ("water_level", "light_stop_time")
+
+
+def _water_level_of(profile: dict) -> dict[str, str]:
+    """A stored plant profile's water level, worked out from its target."""
+    try:
+        return {"water_level": care.water_level_for(care.check_target_vwc(profile.get("target_vwc")))}
+    except ValueError:
+        return {}
+
+
 def care_fields(plant: PlantSpec) -> dict[str, object]:
     """A pot's care settings as stored and reported: what a plant profile sets.
 
     One place for the list, so the state file, the API and a saved plant
-    profile cannot drift apart. The stop time is derived, reported for the UI
-    and never read back.
+    profile cannot drift apart. The water level and the stop time are derived,
+    reported for the UI and never read back (DERIVED_CARE_FIELDS).
     """
     return {
         "preferred_soil": plant.preferred_soil,
         "target_vwc": plant.target_vwc,
-        "water_level": plant.water_level,
+        "water_level": care.water_level_for(plant.target_vwc),
         "watering_volume_ml": plant.watering_volume_ml,
         "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
         "light_hours": plant.light_hours,
@@ -354,7 +366,6 @@ class GreenThumbAutomation:
             # bad value keeps the default rather than failing the restore.
             for field_name, check in (
                 ("target_vwc", care.check_target_vwc),
-                ("water_level", care.check_water_level),
                 ("light_hours", care.check_light_hours),
                 ("light_brightness", care.check_light_brightness),
                 ("light_start_time", care.check_start_time),
@@ -506,7 +517,10 @@ class GreenThumbAutomation:
                     "sweep_max_mm": plant.sweep_max_mm,
                     "soil": plant.soil,
                     "profile": plant.profile,
-                    **care_fields(plant),
+                    **{
+                        key: value for key, value in care_fields(plant).items()
+                        if key not in DERIVED_CARE_FIELDS
+                    },
                 }
                 for plant in self.plants
             ],
@@ -2374,7 +2388,10 @@ class GreenThumbAutomation:
     def list_plant_profiles(self) -> list[dict[str, object]]:
         """Every plant profile, sorted for a picker rather than by recency."""
         profiles = state.load_profiles(self._state_path)
-        entries = [{"name": name, **values} for name, values in profiles.items()]
+        entries = [
+            {"name": name, **values, **_water_level_of(values)}
+            for name, values in profiles.items()
+        ]
         entries.sort(key=lambda entry: str(entry["name"]).casefold())
         return entries
 
@@ -2390,7 +2407,8 @@ class GreenThumbAutomation:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
         fields = care_fields(plant)
-        fields.pop("light_stop_time")
+        for derived in DERIVED_CARE_FIELDS:
+            fields.pop(derived)
         # preferred_soil is the preference the pot was loaded with, not the
         # soil it happens to be in: a pot potted in something else for now
         # must not rewrite what the plant asks for.
@@ -2439,8 +2457,8 @@ class GreenThumbAutomation:
             preferred = key
         entry["preferred_soil"] = preferred
 
+        # A water level in the body is ignored: it is worked out from this.
         entry["target_vwc"] = care.check_target_vwc(settings.get("target_vwc"))
-        entry["water_level"] = care.check_water_level(settings.get("water_level"))
 
         volume = settings.get("watering_volume_ml")
         if isinstance(volume, bool) or not isinstance(volume, (int, float)):
@@ -2471,7 +2489,11 @@ class GreenThumbAutomation:
         key = next((k for k in profiles if k.casefold() == wanted.casefold()), None)
         if key is None:
             raise ValueError(f"No plant profile called {wanted!r}")
-        return {"status": "ok", "name": key, "profile": profiles[key]}
+        return {
+            "status": "ok",
+            "name": key,
+            "profile": {**profiles[key], **_water_level_of(profiles[key])},
+        }
 
     def apply_plant_profile(self, plant_id: str, name: str) -> dict[str, object]:
         """Copy a plant profile onto a pot.
@@ -2511,7 +2533,6 @@ class GreenThumbAutomation:
         fresh = next(p for p in default_plants() if p.plant_id == plant_id)
         for field_name, check in (
             ("target_vwc", care.check_target_vwc),
-            ("water_level", care.check_water_level),
             ("light_start_time", care.check_start_time),
             ("light_hours", care.check_light_hours),
             ("light_brightness", care.check_light_brightness),
@@ -2579,7 +2600,6 @@ class GreenThumbAutomation:
         plant.profile = ""
         for field_name in (
             "target_vwc",
-            "water_level",
             "preferred_soil",
             "watering_volume_ml",
             "light_start_time",
@@ -2860,9 +2880,7 @@ class GreenThumbAutomation:
             "watering_volume_ml": plant.watering_volume_ml,
         }
 
-    def update_target_vwc(
-        self, plant_id: str, target_vwc: object, water_level: object = UNCHANGED
-    ) -> dict[str, object]:
+    def update_target_vwc(self, plant_id: str, target_vwc: object) -> dict[str, object]:
         """Set the soil moisture, as % VWC, at which this plant is watered.
 
         Refused rather than coerced if it is not a whole percentage: a target
@@ -2873,16 +2891,13 @@ class GreenThumbAutomation:
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        target = care.check_target_vwc(target_vwc)
-        level = plant.water_level if water_level is UNCHANGED else care.check_water_level(water_level)
-        plant.target_vwc = target
-        plant.water_level = level
+        plant.target_vwc = care.check_target_vwc(target_vwc)
         self._persist()
 
         return {
             "status": "ok",
             "plant_id": plant_id,
             "target_vwc": plant.target_vwc,
-            "water_level": plant.water_level,
+            "water_level": care.water_level_for(plant.target_vwc),
             "target_problem": self.target_problem(plant),
         }

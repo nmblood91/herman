@@ -41,8 +41,8 @@ print(f"ok: {len(names)} plants in four categories, names distinct")
 by_name = {plant.name: plant for plant in LIBRARY}
 for name, expected in (
     ("Cherry Tomato", (soil_library.LIBRARY[0].name, 15, "Intense", "Medium", 28)),
-    ("Snake Plant (Sansevieria Trifasciata)", ("Fast-Draining Mix", 8, "Low", "Very Dry", 9)),
-    ("Staghorn Fern (Platycerium)", ("Ultra-Coarse Epiphytic Mix", 11, "Medium", "Medium-Dry", 9)),
+    ("Snake Plant (Sansevieria Trifasciata)", ("Fast-Draining Mix", 8, "Low", "Ultra Dry", 9)),
+    ("Staghorn Fern (Platycerium)", ("Ultra-Coarse Epiphytic Mix", 11, "Medium", "Ultra Dry", 9)),
 ):
     plant = by_name[name]
     got = (plant.preferred_soil, plant.light_hours, plant.light_level, plant.water_level, plant.target_vwc)
@@ -81,14 +81,13 @@ assert entry == {
     "category": "Culinary Herbs & Leafy Greens",
     "preferred_soil": "Rich & Retentive Mix",
     "target_vwc": 28,
-    "water_level": "Medium",
     "watering_volume_ml": 100,
     "light_start_time": "07:00",
     "light_hours": 13,
     "light_brightness": 75,
     "notes": "",
 }, entry
-print("ok: installing writes every plant with all its fields")
+print("ok: installing writes every plant with all its fields, and no water level")
 
 for name, entry in stored.items():
     assert "position_mm" not in entry, (name, entry)

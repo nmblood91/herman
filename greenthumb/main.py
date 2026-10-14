@@ -605,10 +605,11 @@ def list_plant_profiles() -> dict[str, object]:
 def write_plant_profile(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """Create or replace a plant profile directly, with no pot involved.
 
-    Expects {"name", "category", "preferred_soil", "target_vwc", "water_level",
+    Expects {"name", "category", "preferred_soil", "target_vwc",
     "watering_volume_ml", "light_start_time", "light_hours",
-    "light_brightness", "notes"}. Name is the key, so saving replaces -- the
-    same rule as the soil library.
+    "light_brightness", "notes"}. The water level is worked out from
+    target_vwc. Name is the key, so saving replaces -- the same rule as the
+    soil library.
     """
     result = automation.write_plant_profile(
         str(payload.get("name", "")), payload
@@ -687,9 +688,7 @@ async def update_light_schedule(plant_id: str, payload: dict[str, object] = Body
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/moisture")
 async def update_target_vwc(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """Set the soil moisture this plant is watered at, e.g. {"target_vwc": 28}."""
-    result = automation.update_target_vwc(
-        plant_id, payload.get("target_vwc"), payload.get("water_level", UNCHANGED)
-    )
+    result = automation.update_target_vwc(plant_id, payload.get("target_vwc"))
     log_event(f"Plant {plant_id} watering target set to {result['target_vwc']}% VWC")
     return result
 

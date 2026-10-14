@@ -14,11 +14,9 @@ class PlantSpec:
     watering_volume_ml: int
     # Water once the soil dries to this, as a whole % volumetric water content.
     # Turned into a point on the pot's own scale through its soil profile's
-    # field capacity and wilting point %; see greenthumb.care.
+    # field capacity and wilting point %; see greenthumb.care. Its water level
+    # in words is worked out from it (care.water_level_for), never stored.
     target_vwc: int = care.DEFAULT_TARGET_VWC
-    # The same target in words ("Medium", "Very Dry"), for showing. Never
-    # converted into a number: the percentage is what waters.
-    water_level: str = ""
     # The soil profile this plant wants. Loading a plant profile switches the
     # pot to it; the card warns if the pot is later given a different one.
     preferred_soil: str = ""

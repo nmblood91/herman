@@ -66,8 +66,9 @@ PROFILE_FIELDS = (
     # Grouping for the library, e.g. "Culinary Herbs & Leafy Greens".
     "category",
     "preferred_soil",
+    # The water level is not here: it is worked out from target_vwc, so a
+    # label saved by an older build is dropped on read and the key decides.
     "target_vwc",
-    "water_level",
     "watering_volume_ml",
     "light_start_time",
     "light_hours",
