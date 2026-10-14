@@ -304,16 +304,6 @@ printf "\nGreenThumb install complete.\n"
 printf "Open: http://$(hostname -I | awk '{print $1}')\n"
 printf "API docs: http://$(hostname -I | awk '{print $1}')/docs\n"
 
-# The two things no installer can do, because both need the hardware in a
-# particular state. Said here rather than left to be discovered as a planter
-# that quietly waters nothing.
-printf "\nStill to do by hand, and watering stays off until both are done:\n"
-printf "  1. Dry-calibrate the probes, in open air:\n"
-printf "     cd /opt/greenthumb && .venv/bin/python -m greenthumb.hardware.soil_sensors --calibrate dry\n"
-printf "  2. Measure each mix's field capacity, in the app under Plants and Soil.\n"
-printf "     Soak a pot of it through, let it drain 24h, then press Measure.\n"
-printf "\nThen set a soil on each pot, and measure the pump's flow rate under Calibration.\n"
-
 if [ "$REBOOT_NEEDED" -eq 1 ]; then
   printf "\n⚠️  Reboot required to finish enabling I2C/SPI, then re-run this script.\n"
 elif [ "$I2C_CLOCK_CHANGED" -eq 1 ]; then

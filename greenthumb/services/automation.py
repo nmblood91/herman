@@ -15,7 +15,12 @@ from pathlib import Path
 
 from greenthumb.config import settings
 from greenthumb.hardware.klipper_client import KlipperClient, MOTION_TIMEOUT
-from greenthumb.hardware.lighting import LedController
+from greenthumb.hardware.lighting import (
+    DEFAULT_BRIGHTNESS,
+    DEFAULT_COLOR,
+    DEFAULT_MODE,
+    LedController,
+)
 from greenthumb.hardware.pump import PumpController
 from greenthumb import sweep
 from greenthumb.hardware.soil_sensors import (
@@ -1985,6 +1990,53 @@ class GreenThumbAutomation:
         state.clear_calibration(self._state_path)
         self.sensor_hub.calibration = {}
         return {"status": "ok", "message": "Calibration cleared, using .env defaults"}
+
+    # The state keys Restore to Defaults drops, so .env applies again. The rest
+    # of the file is the planter's own setup -- plants, positions, soils, saved
+    # plants -- and none of it has a .env default to go back to.
+    SYSTEM_STATE_KEYS = (
+        "watering",
+        "auto_patrol",
+        "startup_home",
+        "quiet",
+        "leds",
+        state.CALIBRATION_KEY,
+    )
+
+    def restore_system_defaults(self) -> dict[str, object]:
+        """Put every setting that has a .env default back to it, live.
+
+        Applied in memory as well as dropped from the state file, so the
+        planter runs on the defaults now rather than after a restart. Plants,
+        their positions and soils, saved plants, field capacity and history are
+        left alone: they are this planter's setup, not system values.
+        """
+        self.auto_watering_enabled = settings.auto_watering_enabled
+        self.pump.flow_ml_per_second = float(settings.pump_flow_ml_per_second)
+        self._flow_measured_at = None
+
+        self.auto_patrol_enabled = settings.auto_patrol_enabled
+        self.home_on_startup = settings.home_on_startup
+
+        self.quiet_hours_enabled = settings.quiet_hours_enabled
+        self.quiet_hours_start = time.fromisoformat(settings.quiet_hours_start)
+        self.quiet_hours_stop = time.fromisoformat(settings.quiet_hours_stop)
+        self.snooze_until = None
+
+        # Chip before order: choosing a chip resets the order to that chip's
+        # usual one, and .env may override it.
+        self.leds.set_chip(settings.led_chip)
+        if settings.led_color_order:
+            self.leds.set_color_order(settings.led_color_order)
+        self.leds.set_brightness(DEFAULT_BRIGHTNESS)
+        self.leds.color = DEFAULT_COLOR
+        self.leds.set_mode(DEFAULT_MODE)
+
+        self.sensor_hub.calibration = {}
+
+        state.clear_keys(self.SYSTEM_STATE_KEYS, self._state_path)
+        logger.info("Restored system values to the .env defaults")
+        return {"status": "ok"}
 
     def set_light_mode(self, mode: str) -> dict[str, object]:
         result = self.leds.set_mode(mode)

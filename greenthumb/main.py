@@ -294,6 +294,14 @@ def reset_moisture_calibration() -> dict[str, object]:
     return result
 
 
+@app.post(f"{settings.api_prefix}/system/restore-defaults")
+def restore_system_defaults() -> dict[str, object]:
+    """Every setting with a .env default goes back to it. Plants are kept."""
+    result = automation.restore_system_defaults()
+    log_event("System values restored to defaults")
+    return result
+
+
 @app.post(f"{settings.api_prefix}/sensors/calibration/{{endpoint}}")
 def calibrate_moisture(endpoint: str, payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
     """Measure the dry or wet point for every sensor.

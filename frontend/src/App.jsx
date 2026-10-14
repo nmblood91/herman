@@ -12,6 +12,7 @@ import { ClockPanel } from './components/ClockPanel'
 import { VersionPanel } from './components/VersionPanel'
 import { PumpPanel } from './components/PumpPanel'
 import { CalibrationPanel } from './components/CalibrationPanel'
+import { SystemValuesPanel } from './components/SystemValuesPanel'
 import { LedStripPanel } from './components/LedStripPanel'
 import { LogsPanel } from './components/LogsPanel'
 import './App.css'
@@ -422,6 +423,7 @@ function App() {
           <PumpPanel />
           <CalibrationPanel />
           <LedStripPanel overview={overview} />
+          <SystemValuesPanel />
           <VersionPanel />
           <LogsPanel />
         </>

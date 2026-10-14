@@ -320,6 +320,15 @@ def clear_calibration(path: str | Path | None = None) -> None:
         save_state(data, path)
 
 
+def clear_keys(keys: tuple[str, ...], path: str | Path | None = None) -> None:
+    """Drop top-level keys, so the code and .env defaults apply again."""
+    data = load_state(path)
+    if any(key in data for key in keys):
+        for key in keys:
+            data.pop(key, None)
+        save_state(data, path)
+
+
 # --- saved plants ---------------------------------------------------------
 #
 # A small library of care settings keyed by plant name, so "Basil - Wet" can be

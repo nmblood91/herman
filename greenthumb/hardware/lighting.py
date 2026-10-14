@@ -28,6 +28,13 @@ def colour_wheel(position: int) -> tuple[int, int, int]:
     return (0, position * 3, 255 - position * 3)
 
 
+# What a new controller starts with, and what Restore to Defaults returns to.
+# Chip and colour order are not here: those come from .env.
+DEFAULT_MODE = "schedule"
+DEFAULT_COLOR = (0, 255, 128)
+DEFAULT_BRIGHTNESS = 75
+
+
 class LedController:
     """Renders lighting modes onto an addressable strip from a background thread."""
 
@@ -41,9 +48,9 @@ class LedController:
         spi_device: int = 0,
     ) -> None:
         self.led_count = max(int(led_count), 1)
-        self.mode: Mode = "schedule"
-        self.color = (0, 255, 128)
-        self.brightness = 75
+        self.mode: Mode = DEFAULT_MODE
+        self.color = DEFAULT_COLOR
+        self.brightness = DEFAULT_BRIGHTNESS
         self.strip = strip if strip is not None else AddressableStrip(
             bus=spi_bus, device=spi_device, chip=chip, color_order=color_order
         )
