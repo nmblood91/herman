@@ -172,6 +172,14 @@ const describeMoisture = (status) => {
 // parked over that plant and the button pressed on the wrong card.
 const CONFUSION_MARGIN_MM = 50
 
+// The jog row under the position fields, the same steps as Controls.
+const JOG_STEPS = [
+  ['Move Left 50', -50],
+  ['Move Left 10', -10],
+  ['Move Right 10', 10],
+  ['Move Right 50', 50],
+]
+
 export function PlantsPanel({
   plants,
   onSave,
@@ -182,7 +190,13 @@ export function PlantsPanel({
   soils,
   onMeasureFieldCapacity,
   onClearFieldCapacity,
+  onMove,
 }) {
+  // Klipper refuses every move until the axis is homed, so the jog row is
+  // disabled rather than left to fail. Undefined counts as not ready, so the
+  // buttons do not flicker enabled before the first poll answers.
+  const motionReady = movement?.ok !== false && movement?.homed === true
+
   const [drafts, setDrafts] = useState({})
   // Which saved plant each card has picked, keyed by plant so one card's
   // choice cannot load onto another.
@@ -429,30 +443,34 @@ export function PlantsPanel({
                       </p>
                     )}
 
+                    {/* Same container as the sweep edges, so the field and its
+                        button are laid out the same in either mode. */}
                     {draft.watering_mode === 'point' && (
-                      <label>
-                        Watering location (mm)
-                        <input
-                          type="number"
-                          step="1"
-                          value={draft.position_mm}
-                          min={zoneOf(plant)?.low}
-                          max={zoneOf(plant)?.high}
-                          onChange={(event) =>
-                            updateDraft(plant, 'position_mm', event.target.value)
-                          }
-                        />
-                        {/* No field argument: this one captures the watering
-                            location, and that is also the only field whose
-                            capture checks for a neighbouring pot. */}
-                        <button type="button" onClick={() => capturePosition(plant)}>
-                          Use current position
-                        </button>
-                      </label>
+                      <div className="position-fields">
+                        <label>
+                          Watering location (mm)
+                          <input
+                            type="number"
+                            step="1"
+                            value={draft.position_mm}
+                            min={zoneOf(plant)?.low}
+                            max={zoneOf(plant)?.high}
+                            onChange={(event) =>
+                              updateDraft(plant, 'position_mm', event.target.value)
+                            }
+                          />
+                          {/* No field argument: this one captures the watering
+                              location, and that is also the only field whose
+                              capture checks for a neighbouring pot. */}
+                          <button type="button" onClick={() => capturePosition(plant)}>
+                            Use current position
+                          </button>
+                        </label>
+                      </div>
                     )}
 
                     {draft.watering_mode === 'sweep' && (
-                      <div className="sweep-fields">
+                      <div className="position-fields">
                         <label>
                           Left edge (mm)
                           <input
@@ -500,6 +518,30 @@ export function PlantsPanel({
                           )
                         })()}
                       </div>
+                    )}
+
+                    {/* Nudge the carriage over the pot without leaving the
+                        card for Controls, then capture where it landed. Every
+                        move reloads the dashboard, so the capture buttons
+                        read the new position rather than the old one. */}
+                    <div className="jog-row">
+                      {JOG_STEPS.map(([label, distance]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          disabled={!motionReady}
+                          onClick={() => onMove(distance)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {!motionReady && (
+                      <p className="field-hint">
+                        {movement?.ok === false
+                          ? 'The motion board is not responding, so the gantry cannot be moved.'
+                          : 'Home the gantry first (under Controls). Until then it refuses every move.'}
+                      </p>
                     )}
 
                     {/* What the capture buttons and the saves actually did.

@@ -523,18 +523,21 @@ option {
 }
 
 /* The two ends of a sweep, side by side so the span reads as one thing. */
-.sweep-fields {
+/* The rail position fields on a plant card, each with its Use current
+   position button underneath: one for a fixed spot, two for a sweep. Shared
+   so the fixed spot's button is not left in the default button style. */
+.position-fields {
   display: grid;
   gap: 12px;
   grid-template-columns: 1fr;
 }
 
-.sweep-fields > p {
+.position-fields > p {
   grid-column: 1 / -1;
   margin: 0;
 }
 
-.sweep-fields button {
+.position-fields button {
   margin-top: 6px;
   width: 100%;
   padding: 8px 12px;
@@ -542,8 +545,29 @@ option {
 }
 
 @media (min-width: 560px) {
-  .sweep-fields {
+  .position-fields {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Move Left 50 / 10, Move Right 10 / 50 under the position fields. Sized
+   like the Use current position buttons above it; one row where there is
+   room, two by two on a phone. */
+.jog-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.jog-row button {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+@media (min-width: 560px) {
+  .jog-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

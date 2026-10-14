@@ -64,6 +64,14 @@ button {
   appearance: none;
 }
 
+/* The browser draws the time picker's clock icon black, for a light page,
+   which all but vanishes on this green. Inverted to white rather than setting
+   color-scheme: dark, which would also restyle every other native control. */
+input[type='time']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
 h1,
 h2 {
   font-weight: 500;

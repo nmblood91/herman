@@ -384,6 +384,7 @@ function App() {
             soils={soils}
             onMeasureFieldCapacity={measureFieldCapacity}
             onClearFieldCapacity={clearFieldCapacity}
+            onMove={moveGantry}
           />
           {/* Below the cards, because both are libraries the cards pick from:
               a plant and a mix are chosen from dropdowns up there, so editing
