@@ -522,10 +522,19 @@ option {
   margin-top: 4px;
 }
 
-/* The two ends of a sweep, side by side so the span reads as one thing. */
+/* Every button inside a plant card is the compact size: a card is a dense
+   settings form, and the full-size page buttons crowded it. One rule here
+   rather than a size per row, so a button added to a card later cannot come
+   out a different size. The header is excluded -- it is the card's whole
+   clickable title bar, not an action. */
+.plant-card button:not(.plant-header) {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
 /* The rail position fields on a plant card, each with its Use current
    position button underneath: one for a fixed spot, two for a sweep. Shared
-   so the fixed spot's button is not left in the default button style. */
+   so both modes lay the field and its button out the same. */
 .position-fields {
   display: grid;
   gap: 12px;
@@ -540,8 +549,6 @@ option {
 .position-fields button {
   margin-top: 6px;
   width: 100%;
-  padding: 8px 12px;
-  font-size: 0.85rem;
 }
 
 @media (min-width: 560px) {
@@ -550,9 +557,8 @@ option {
   }
 }
 
-/* Move Left 50 / 10, Move Right 10 / 50 under the position fields. Sized
-   like the Use current position buttons above it; one row where there is
-   room, two by two on a phone. */
+/* Move Left 50 / 10, Move Right 10 / 50 under the position fields. One row
+   where there is room, two by two on a phone. */
 .jog-row {
   display: grid;
   gap: 8px;
@@ -561,8 +567,6 @@ option {
 
 .jog-row button {
   width: 100%;
-  padding: 8px 12px;
-  font-size: 0.85rem;
 }
 
 @media (min-width: 560px) {
