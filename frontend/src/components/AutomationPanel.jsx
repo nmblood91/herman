@@ -231,10 +231,11 @@ export function AutomationPanel({ overview, onRefresh }) {
             </label>
             <p className="field-hint">
               Every hour, on the hour, the arm homes and then visits each plant
-              in turn. Homing is the point: nothing tells the planter the arm has
-              been nudged or a belt has slipped, so every plant position stays
-              slightly wrong until the next home. The patrol shows you where it
-              now thinks each plant is.
+              in turn, moving the way that plant is watered: a pause over a point
+              pot, a few passes across a sweep. Homing is the point: nothing
+              tells the planter the arm has been nudged or a belt has slipped, so
+              every plant position stays slightly wrong until the next home. The
+              patrol shows you where it now thinks each plant is.
             </p>
             <p className="field-hint">
               Skipped during quiet hours and a snooze, since the arm is the other

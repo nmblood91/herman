@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import threading
 from collections import deque
 from collections.abc import Iterator
@@ -25,7 +26,7 @@ from greenthumb.hardware.soil_sensors import (
 )
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
-from greenthumb.plants import default_plants, label_for
+from greenthumb.plants import default_plants, label_for, zone_for
 from greenthumb import dances, moisture, state
 
 logger = logging.getLogger(__name__)
@@ -302,7 +303,12 @@ class GreenThumbAutomation:
                 value = saved.get(field_name)
                 if isinstance(value, bool) or not isinstance(value, (int, float)):
                     continue
-                setattr(plant, field_name, type(getattr(plant, field_name))(value))
+                if not math.isfinite(value):
+                    continue
+                # All whole numbers. Rounded rather than truncated, so a
+                # position stored with a decimal before positions became whole
+                # millimetres comes back at the nearest one, not the one below.
+                setattr(plant, field_name, round(value))
             for field_name in ("light_start_time", "light_stop_time"):
                 text = saved.get(field_name)
                 if not isinstance(text, str):
@@ -550,13 +556,44 @@ class GreenThumbAutomation:
             return max(float(reported), 1.0)
         return max(float(settings.gantry_travel_mm), 1.0)
 
+    def plant_zone(self, plant: PlantSpec) -> tuple[int, int]:
+        """The stretch of rail this plant's watering may use. See plants.ZONES."""
+        return zone_for(plant.plant_id, self.usable_travel_mm())
+
+    def _outside_zone(self, plant: PlantSpec, *positions: float) -> str | None:
+        """Why these positions are not this plant's to water, or None."""
+        low, high = self.plant_zone(plant)
+        # Written so not-a-number fails too: every comparison against nan is
+        # false, so it never counts as inside.
+        if all(low <= position <= high for position in positions):
+            return None
+        return f"{plant.name} waters between {low} and {high} mm"
+
     def set_plant_position(self, plant_id: str, position_mm: float) -> dict[str, object]:
+        """Record a pot's watering spot.
+
+        Refused outside the plant's zone rather than clamped into it. A spot
+        out there is nearly always captured over the wrong pot, and clamping
+        would quietly water the edge of the zone instead.
+        """
         plant = next((item for item in self.plants if item.plant_id == plant_id), None)
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        bounded_position = max(0.0, min(float(position_mm), self.usable_travel_mm()))
-        plant.position_mm = round(bounded_position, 1)
+        # Whole millimetres, rounded before the range check so the value
+        # checked is the value stored. Infinity and not-a-number have no whole
+        # millimetre, and round() raises on both with a message nobody wants.
+        raw = float(position_mm)
+        if not math.isfinite(raw):
+            raise ValueError("The watering location must be a number")
+        position = round(raw)
+        problem = self._outside_zone(plant, position)
+        if problem:
+            raise ValueError(
+                f"{problem}, so {position} mm is out of range. "
+                "Is this the right plant?"
+            )
+        plant.position_mm = position
         self._persist()
 
         return {
@@ -570,12 +607,11 @@ class GreenThumbAutomation:
     ) -> dict[str, object]:
         """Record the span an oscillating dose travels across.
 
-        Refused rather than clamped, unlike set_plant_position. A position that
-        lands slightly off the rail is still obviously meant for that pot, so
-        clamping it is a kindness; a span clamped to fit would water a
-        different stretch of the planter than the one asked for, and report
-        success. The bounds are swapped if given the wrong way round, which is
-        an ordering, not a value.
+        Refused rather than clamped, like set_plant_position: a span clamped to
+        fit would water a different stretch of the planter than the one asked
+        for, and report success. Both edges have to sit inside the plant's
+        zone. The bounds are swapped if given the wrong way round, which is an
+        ordering, not a value.
         """
         plant = self.get_plant(plant_id)
         if plant is None:
@@ -595,11 +631,20 @@ class GreenThumbAutomation:
         # check: every comparison against nan is false, so both fail here.
         if not (float("-inf") < low <= high < float("inf")):
             raise ValueError("Sweep bounds must be numbers")
+        # Whole millimetres, rounded before any check so the span checked is
+        # the span stored.
+        low, high = round(low), round(high)
 
         limit = self.usable_travel_mm()
         if low < 0 or high > limit:
             raise ValueError(
                 f"A sweep has to stay on the rail, which is 0 to {limit:.0f} mm"
+            )
+        problem = self._outside_zone(plant, low, high)
+        if problem:
+            raise ValueError(
+                f"{problem}, so a sweep from {low} to {high} mm is out "
+                "of range. Is this the right plant?"
             )
         if high - low < sweep.MIN_SPAN_MM:
             raise ValueError(
@@ -607,15 +652,15 @@ class GreenThumbAutomation:
                 "Use point watering for a pot narrower than that."
             )
 
-        plant.sweep_min_mm = round(low, 1)
-        plant.sweep_max_mm = round(high, 1)
+        plant.sweep_min_mm = low
+        plant.sweep_max_mm = high
         self._persist()
         return {
             "status": "ok",
             "plant_id": plant_id,
             "sweep_min_mm": plant.sweep_min_mm,
             "sweep_max_mm": plant.sweep_max_mm,
-            "sweep_span_mm": round(plant.sweep_max_mm - plant.sweep_min_mm, 1),
+            "sweep_span_mm": plant.sweep_max_mm - plant.sweep_min_mm,
         }
 
     def set_watering_mode(self, plant_id: str, mode: str) -> dict[str, object]:
@@ -699,13 +744,38 @@ class GreenThumbAutomation:
         the log says the sweep did not happen, which is the right way round:
         the sweep decides how the water is spread, not whether it arrives.
         """
-        if plant.watering_mode != sweep.SWEEP:
+        resolved = self._resolve_sweep(plant, volume_ml)
+        if resolved is None:
             return float(plant.position_mm), None
+        if isinstance(resolved, str):
+            logger.warning("Watering %s as a point: %s", plant.plant_id, resolved)
+            return float(plant.position_mm), None
+
+        low, high, plan = resolved
+        logger.info(
+            "Sweeping %s across %.0f mm: %d passes at F%d, %.1fs of a %.1fs dose",
+            plant.plant_id, high - low, plan.passes, plan.feedrate_mm_min,
+            plan.predicted_seconds, self._dose_seconds(volume_ml),
+        )
+        return low, sweep.gcode(plan, low, high)
+
+    def _resolve_sweep(
+        self, plant: PlantSpec, volume_ml: int
+    ) -> tuple[float, float, sweep.Plan] | str | None:
+        """Whether a dose of this plant would really sweep, and how.
+
+        None for a point plant. A string when it is set to sweep but this dose
+        cannot -- the reason it falls back to a point. Otherwise the span and
+        the plan. No logging here: the patrol asks the same question every hour
+        to show the motion a dose would make, and a "watering as a point"
+        warning from a patrol would be about a watering that never happened.
+        """
+        if plant.watering_mode != sweep.SWEEP:
+            return None
 
         low = min(plant.sweep_min_mm, plant.sweep_max_mm)
         high = max(plant.sweep_min_mm, plant.sweep_max_mm)
         span = high - low
-        fallback = float(plant.position_mm)
 
         limit = self.usable_travel_mm()
         if low < 0 or high > limit:
@@ -713,39 +783,54 @@ class GreenThumbAutomation:
             # re-measured from time to time, and Klipper refuses an
             # out-of-range move outright, which would abort the dose rather
             # than spread it differently.
-            logger.warning(
-                "Watering %s as a point: its sweep of %.0f to %.0f mm is off "
-                "the usable rail (0 to %.0f mm)",
-                plant.plant_id, low, high, limit,
+            return (
+                f"its sweep of {low:.0f} to {high:.0f} mm is off the usable "
+                f"rail (0 to {limit:.0f} mm)"
             )
-            return fallback, None
+        # Saves are refused outside the zone, but a span stored before the
+        # zones existed, or by hand, can still be out there.
+        problem = self._outside_zone(plant, low, high)
+        if problem:
+            return f"its sweep of {low:.0f} to {high:.0f} mm is outside its zone ({problem})"
 
         limits = self._motion_limits()
         if limits is None:
-            logger.warning(
-                "Watering %s as a point: Klipper did not report its motion "
-                "limits, so the passes cannot be timed against the dose",
-                plant.plant_id,
+            return (
+                "Klipper did not report its motion limits, so the passes "
+                "cannot be timed against the dose"
             )
-            return fallback, None
 
         duration = self._dose_seconds(volume_ml)
         plan = sweep.plan(span, duration, limits[0], limits[1])
         if plan is None:
-            logger.warning(
-                "Watering %s as a point: %d mL runs the pump for %.1fs, which "
-                "is not long enough to cross %.0f mm. Stretching the dose to "
-                "fit the motion would over-water it.",
-                plant.plant_id, volume_ml, duration, span,
+            return (
+                f"{volume_ml} mL runs the pump for {duration:.1f}s, which is not "
+                f"long enough to cross {span:.0f} mm. Stretching the dose to fit "
+                "the motion would over-water it."
             )
-            return fallback, None
+        return low, high, plan
 
-        logger.info(
-            "Sweeping %s across %.0f mm: %d passes at F%d, %.1fs of a %.1fs dose",
-            plant.plant_id, span, plan.passes, plan.feedrate_mm_min,
-            plan.predicted_seconds, duration,
-        )
-        return low, sweep.gcode(plan, low, high)
+    def _patrol_stops(self) -> list[dances.PatrolStop]:
+        """Each plant as the patrol should visit it: the way its dose moves.
+
+        A plant that would sweep is swept across, at the speed its own dose
+        would use; everything else, including a sweep that would fall back to
+        a point, is a pause at its point position. Asked of _resolve_sweep so
+        the patrol cannot show a motion the watering would not make.
+        """
+        stops = []
+        for plant in self.plants:
+            resolved = self._resolve_sweep(plant, plant.watering_volume_ml)
+            if isinstance(resolved, tuple):
+                low, high, plan = resolved
+                stops.append(dances.PatrolStop(
+                    low, sweep_to_mm=high, feedrate=plan.feedrate_mm_min,
+                ))
+            elif not self._outside_zone(plant, float(plant.position_mm)):
+                stops.append(dances.PatrolStop(plant.position_mm))
+            # A spot outside its zone is skipped: watering refuses it, so
+            # visiting it would show a stop the planter will never water at.
+        return stops
 
     @contextmanager
     def _exclusive(self, what: str) -> Iterator[None]:
@@ -1409,6 +1494,18 @@ class GreenThumbAutomation:
         # Resolved before the move, because a sweep starts at one end of its
         # span rather than at the pot's point position.
         start_mm, motion = self._sweep_motion(plant, volume)
+        # A sweep was already checked against the zone. A point is checked
+        # here, because a spot stored before the ranges existed would otherwise
+        # water whichever pot sits under it.
+        if motion is None:
+            problem = self._outside_zone(plant, start_mm)
+            if problem:
+                error = (
+                    f"its watering spot of {start_mm:g} mm is out of range "
+                    f"({problem}). Set it again in the Plants tab."
+                )
+                logger.warning("Not watering %s: %s", plant.plant_id, error)
+                return {"status": "error", "plant_id": plant.plant_id, "error": error}
         move = self.klipper.move_gantry_absolute(start_mm)
         if not move.get("ok"):
             logger.warning(
@@ -1925,8 +2022,12 @@ class GreenThumbAutomation:
 
     def run_dance(self, name: str, home_first: bool = False) -> dict[str, object]:
         """Run one routine now. Not gated by quiet hours -- see auto_patrol."""
+        # Only a routine that visits the plants needs them resolved, and doing
+        # so asks Klipper for its motion limits once per sweeping plant.
+        dance = dances.DANCES.get(name)
+        visits = dance is not None and dance.visits_plants
         steps = dances.steps_for(
-            name, self.usable_travel_mm(), [plant.position_mm for plant in self.plants]
+            name, self.usable_travel_mm(), self._patrol_stops() if visits else None
         )
 
         with self._exclusive(f"Dance {name}"):

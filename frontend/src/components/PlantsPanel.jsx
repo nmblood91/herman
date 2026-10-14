@@ -60,24 +60,65 @@ const describeSweep = (draft) => {
 // enough that nobody walks away from a card they think they have finished.
 const SAVE_DEBOUNCE_MS = 700
 
+const POSITION_FIELDS = ['position_mm', 'sweep_min_mm', 'sweep_max_mm']
+
 // Which drafts are not worth sending yet, and what to say instead. There is no
 // Save button any more, so an edit either reaches the planter or says why it
 // did not: a draft that sits unsaved and unmentioned is the one failure this
 // has to avoid.
-const reasonToHold = (draft) => {
+const reasonToHold = (draft, plant) => {
   // Number('') is 0, which is finite and is also the left end of the rail, so
   // without this, clearing the box to retype would park the watering spot
   // there the moment the debounce fired.
   if (String(draft.position_mm).trim() === '' || !Number.isFinite(Number(draft.position_mm))) {
     return 'Watering location is blank, so nothing has been saved.'
   }
+  // Positions are whole millimetres. Held rather than rounded quietly, so the
+  // card never saves a different number from the one on screen.
+  const fractional = POSITION_FIELDS.find(
+    (field) => (field === 'position_mm' || draft.watering_mode === 'sweep') &&
+      !Number.isInteger(Number(draft[field])),
+  )
+  if (fractional) {
+    return `Use whole millimetres — ${draft[fractional]} has a decimal. Not saved.`
+  }
+  // The planter refuses these too. Held here so a half-typed number reads as
+  // "not yet" under the field rather than a red failure in the status bar.
+  const out = outsideZone(plant, Number(draft.position_mm))
+  if (out) return `Watering location ${out} Not saved.`
   if (draft.watering_mode === 'sweep') {
     const summary = describeSweep(draft)
     // The API refuses a sweep whose span is too narrow to be one, so sending
     // this would be a red error for a card the user is still filling in.
     if (summary.warn) return `${summary.text} Not saved yet.`
+    const edge = outsideZone(plant, Number(draft.sweep_min_mm)) ||
+      outsideZone(plant, Number(draft.sweep_max_mm))
+    if (edge) return `Sweep edge ${edge} Not saved.`
   }
   return ''
+}
+
+// Each plant may only be watered inside its own stretch of rail, and the
+// planter reports it (greenthumb.plants.ZONES). Null when it has not said, in
+// which case the planter's own refusal is the only check.
+const zoneOf = (plant) => {
+  if (plant?.zone_min_mm == null || plant?.zone_max_mm == null) return null
+  const low = Number(plant.zone_min_mm)
+  const high = Number(plant.zone_max_mm)
+  if (!Number.isFinite(low) || !Number.isFinite(high)) return null
+  return { low, high }
+}
+
+const describeZone = (plant) => {
+  const zone = zoneOf(plant)
+  return zone ? `${zone.low}–${zone.high} mm` : ''
+}
+
+// "250 mm is outside Plant 1's range (0–200 mm)." or '' when it is inside.
+const outsideZone = (plant, value) => {
+  const zone = zoneOf(plant)
+  if (!zone || (value >= zone.low && value <= zone.high)) return ''
+  return `${value} mm is outside ${plant.name}'s range (${describeZone(plant)}).`
 }
 
 // -1 is "no reading", not dry. The backend uses it for a probe that is
@@ -171,7 +212,7 @@ export function PlantsPanel({
       // lands while the request is in flight registers as pending again and
       // the refresh below cannot overwrite it.
       delete saveTimers.current[plant.plant_id]
-      const held = reasonToHold(draft)
+      const held = reasonToHold(draft, plant)
       setHoldNote((current) => ({ ...current, [plant.plant_id]: held }))
       if (!held) onSave({ ...plant, ...draft })
     }, SAVE_DEBOUNCE_MS)
@@ -199,6 +240,13 @@ export function PlantsPanel({
     const limit = Number(movement.max_x)
     if (Number.isFinite(limit) && (here < 0 || here > limit)) {
       say(`${here} mm is outside the usable rail (0 to ${limit} mm).`)
+      return
+    }
+    // The carriage is over some other plant's stretch of rail, which is the
+    // wrong-card mistake caught outright rather than saved and then refused.
+    const out = outsideZone(plant, Math.round(here))
+    if (out) {
+      say(`${out} The carriage is over another plant — jog over this one and try again.`)
       return
     }
 
@@ -364,13 +412,21 @@ export function PlantsPanel({
                         <option value="sweep">Sweep Range</option>
                       </select>
                     </label>
+                    {describeZone(plant) && (
+                      <p className="field-hint">
+                        This plant waters between {describeZone(plant)} on the rail.
+                      </p>
+                    )}
 
                     {draft.watering_mode === 'point' && (
                       <label>
                         Watering location (mm)
                         <input
                           type="number"
+                          step="1"
                           value={draft.position_mm}
+                          min={zoneOf(plant)?.low}
+                          max={zoneOf(plant)?.high}
                           onChange={(event) =>
                             updateDraft(plant, 'position_mm', event.target.value)
                           }
@@ -390,7 +446,10 @@ export function PlantsPanel({
                           Left edge (mm)
                           <input
                             type="number"
+                            step="1"
                             value={draft.sweep_min_mm}
+                            min={zoneOf(plant)?.low}
+                            max={zoneOf(plant)?.high}
                             onChange={(event) =>
                               updateDraft(plant, 'sweep_min_mm', event.target.value)
                             }
@@ -406,7 +465,10 @@ export function PlantsPanel({
                           Right edge (mm)
                           <input
                             type="number"
+                            step="1"
                             value={draft.sweep_max_mm}
+                            min={zoneOf(plant)?.low}
+                            max={zoneOf(plant)?.high}
                             onChange={(event) =>
                               updateDraft(plant, 'sweep_max_mm', event.target.value)
                             }

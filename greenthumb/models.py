@@ -19,6 +19,9 @@ class PlantSpec:
     watering_volume_ml: int
     light_start_time: time = time(8, 0)
     light_stop_time: time = time(20, 0)
+    # Whole millimetres, like the sweep bounds below. The carriage cannot be
+    # placed over a pot to a fraction of a millimetre by eye, so a decimal
+    # here would only be noise on the card.
     position_mm: int = 0
     # Which soil library entry this pot is filled with. Empty means not set,
     # which is distinct from a mix whose figures are unusable -- callers report
@@ -57,8 +60,8 @@ class PlantSpec:
     # point mode. Equal values mean no span, which is why the mode cannot be
     # set to sweep until they are apart -- a sweep with no width would read as
     # configured and behave as a point.
-    sweep_min_mm: float = 0.0
-    sweep_max_mm: float = 0.0
+    sweep_min_mm: int = 0
+    sweep_max_mm: int = 0
     # Free text about this plant, saved and loaded with the rest of its care
     # settings. A property of the plant, not the pot: the reason you water
     # something at a given band travels with it.

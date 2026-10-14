@@ -16,6 +16,7 @@ from greenthumb.config import settings
 from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_stream
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
 from greenthumb import system_clock, version
+from greenthumb.plants import zone_for
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
 
 setup_logging()
@@ -437,11 +438,16 @@ async def set_light_brightness(payload: dict[str, int] = Body(default_factory=di
 @app.get(f"{settings.api_prefix}/plants")
 async def list_plants() -> list[dict[str, object]]:
     plants = automation.plants
+    # Once, not per plant: it is a round trip to Klipper.
+    travel = automation.usable_travel_mm()
     return [
         {
             "plant_id": plant.plant_id,
             "name": plant.name,
             "position_mm": plant.position_mm,
+            # Where this plant may be watered, so the card can say so before
+            # a save is refused. See plants.ZONES.
+            **dict(zip(("zone_min_mm", "zone_max_mm"), zone_for(plant.plant_id, travel))),
             "watering_mode": plant.watering_mode,
             "sweep_min_mm": plant.sweep_min_mm,
             "sweep_max_mm": plant.sweep_max_mm,
@@ -670,7 +676,7 @@ async def update_watering_volume(plant_id: str, payload: dict[str, int] = Body(d
 async def set_plant_position(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
     position_mm = float(payload.get("position_mm", 0.0))
     result = automation.set_plant_position(plant_id, position_mm)
-    log_event(f"Plant {plant_id} position set to {position_mm} mm")
+    log_event(f"Plant {plant_id} position set to {result['position_mm']} mm")
     return result
 
 

@@ -263,13 +263,13 @@ before = fresh(shared)
 default_target = before.get_plant("plant_1").moisture_target
 before.update_moisture_target("plant_1", "very dry")
 before.update_watering_volume("plant_2", 250)
-before.set_plant_position("plant_3", 500)
+before.set_plant_position("plant_3", 550)
 before.update_plant_name("plant_4", "Monstera")
 
 after = fresh(shared)
 assert after.get_plant("plant_1").moisture_target == "very dry", after.get_plant("plant_1").moisture_target
 assert after.get_plant("plant_2").watering_volume_ml == 250
-assert after.get_plant("plant_3").position_mm == 500
+assert after.get_plant("plant_3").position_mm == 550
 assert after.get_plant("plant_4").name == "Monstera"
 assert default_target != 61, "test would pass vacuously if 61 were the default"
 print("ok: plant edits survive a restart")

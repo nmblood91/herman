@@ -108,9 +108,33 @@ the volume you set is the volume delivered, and the arm simply moves during it
 rather than standing still. Nothing about a sweep makes a pot wetter or drier
 than the same dose at one spot; it changes *where* the water lands.
 
+### Each plant has its own stretch of rail
+
+A watering location and both sweep edges have to sit inside the plant's zone.
+A new planter starts each plant watering at the middle of its zone, with a
+sweep span 50 mm either side of that middle already filled in, so switching a
+pot to Sweep Range works straight away. Both are starting points: set them
+anywhere in the zone once the pots are placed.
+
+| Plant | Zone | Default spot | Default sweep |
+| --- | --- | --- | --- |
+| Plant 1 | 0–200 mm | 100 mm | 50–150 mm |
+| Plant 2 | 200–445 mm | 322 mm | 272–372 mm |
+| Plant 3 | 445–690 mm | 567 mm | 517–617 mm |
+| Plant 4 | 690–890 mm | 790 mm | 740–840 mm |
+
+Positions are whole millimetres; a middle that falls on a half is rounded
+down. The card shows the plant's range, and a value outside it, or one with a
+decimal, is not saved. A
+"Use current position" press with the arm over a different plant is refused
+too, since that is nearly always the wrong card. If an older saved setting
+falls outside its zone, the planter will not water at that spot (and a sweep
+drops back to the spot), so set it again on the card. The zones are defined in
+`greenthumb/plants.py`.
+
 ### What a sweep will not do
 
-Three cases make a pot water at its spot instead, and the log says which:
+Four cases make a pot water at its spot instead, and the log says which:
 
 * **The dose is too small to cross the span.** A few millilitres over 400 mm
   would mean running the pump longer to fit the motion, which would over-water
@@ -118,12 +142,14 @@ Three cases make a pot water at its spot instead, and the log says which:
 * **The span has fallen off the rail.** If the rail is re-measured shorter than
   a saved span, the arm would be sent somewhere it cannot go and the whole
   dose would fail. Watering at the spot is better than not watering.
+* **The span reaches outside the plant's zone**, from a setting saved before
+  the zones existed. It would water the neighbouring pot.
 * **The motion board has not said how fast it can move.** A sweep is timed
   against the board's own speed and acceleration figures, because a pass costs
   the time it spends speeding up and slowing down at each end. Guessing those
   too high would leave the pump running past the end of the motion.
 
-In all three the plant still drinks. A sweep decides how the water is spread,
+In all four the plant still drinks, as long as its spot is inside its zone. A sweep decides how the water is spread,
 not whether it arrives.
 
 ### Why it is one instruction and not two
@@ -220,8 +246,15 @@ reason. Switching it on takes effect the next time the planter starts, not
 right away.
 
 **Hourly auto-patrol.** Every hour, on the hour, the arm homes and then visits
-each plant's saved position in turn, pausing at every pot. Homing is the point;
-the patrol shows you where the planter now thinks each plant is.
+each plant in turn, moving the way that plant is watered. A point plant gets a
+short pause over its position. A sweep plant gets three passes across its span
+at the speed its own dose would use, finishing at the far end before moving
+on. A real dose runs as many passes as fit the pump time, so three is a
+preview, not the whole thing. If a plant is set to sweep but its dose would
+fall back to a point (the span is off the rail, or the dose is too short to
+cross it), the patrol pauses over its point position instead, so it never shows
+a motion the watering would not make. Homing is the point; the patrol shows you
+where the planter now thinks each plant is.
 
 Rules both follow:
 

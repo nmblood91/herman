@@ -136,6 +136,78 @@ finally:
     auto._hardware_lock.release()
 
 
+# --- the patrol moves the way each plant waters ---
+
+from greenthumb import sweep
+
+stops = [
+    dances.PatrolStop(600.0),
+    dances.PatrolStop(100.0, sweep_to_mm=250.0, feedrate=2400),
+]
+steps = dances.steps_for("patrol", TRAVEL, stops)
+assert steps == [
+    (100.0, dances.CRUISE, 0),
+    (250.0, 2400, 0),
+    (100.0, 2400, 0),
+    (250.0, 2400, dances.SWEEP_DWELL_MS),
+    (600.0, dances.CRUISE, dances.POINT_DWELL_MS),
+    (0.0, dances.CRUISE, 0),
+], steps
+print("ok: a sweeping plant gets passes across its span, ending at the far side, then it moves on")
+
+
+class Limits(Klip):
+    """A board that reports the motion limits a sweep is timed against."""
+
+    velocity = 300.0
+
+    def status(self):
+        return {**super().status(), "max_velocity": self.velocity, "max_accel": 3000.0}
+
+
+auto, klip = build(klip=Limits())
+swept, pointed = auto.plants[0], auto.plants[1]
+auto.set_plant_sweep(swept.plant_id, 20.0, 180.0)
+auto.set_watering_mode(swept.plant_id, sweep.SWEEP)
+_, _, plan = auto._resolve_sweep(swept, swept.watering_volume_ml)
+auto.run_dance("patrol")
+gcode = klip.gcode[-1]
+assert f"G1 X180 F{plan.feedrate_mm_min}" in gcode, gcode
+assert f"G1 X20 F{plan.feedrate_mm_min}" in gcode, gcode
+assert f"G1 X{pointed.position_mm} F{dances.CRUISE}" in gcode, gcode
+print("ok: a sweep plant is swept at the speed its own dose would use; point plants still pause")
+
+# The patrol must not show a sweep the watering would not make. A dose too
+# short to cross the span waters as a point, so the patrol pauses instead.
+# Plant 3, on a slow board, so 1 mL clearly cannot cross its whole zone.
+wide = auto.plants[2]
+klip.velocity = 100.0
+auto.set_plant_sweep(wide.plant_id, 445.0, 690.0)
+auto.set_watering_mode(wide.plant_id, sweep.SWEEP)
+wide.watering_volume_ml = 1
+assert isinstance(auto._resolve_sweep(wide, 1), str), "1 mL crossed 245 mm"
+auto.run_dance("patrol")
+gcode = klip.gcode[-1]
+assert "X690" not in gcode, gcode
+assert f"G1 X{wide.position_mm} F{dances.CRUISE}" in gcode, gcode
+print("ok: a sweep that would fall back to a point is patrolled as a point")
+
+# A spot stored outside its zone -- before the zones existed, or by hand -- is
+# one watering refuses, so the patrol does not stop there either.
+wide.watering_mode = sweep.POINT
+wide.position_mm = 900.0
+assert len(auto._patrol_stops()) == len(auto.plants) - 1
+print("ok: a watering spot outside its zone is left out of the patrol")
+
+# Without the motion limits a dose cannot be timed and waters as a point; the
+# patrol follows suit.
+auto, klip = build()
+auto.plants[0].watering_mode = sweep.SWEEP
+auto.plants[0].sweep_min_mm, auto.plants[0].sweep_max_mm = 20.0, 180.0
+assert all(stop.sweep_to_mm is None for stop in auto._patrol_stops())
+print("ok: no motion limits from Klipper, no sweep in the patrol either")
+
+
 # --- the hourly auto-patrol ---
 #
 # auto_patrol is what the scheduler calls at minute 0. Called directly here
@@ -147,7 +219,7 @@ AT_TWO = datetime(2026, 10, 14, 14, 0)
 
 def patrol_gcode(auto):
     return dances.gcode_for(dances.steps_for(
-        "patrol", auto.usable_travel_mm(), [plant.position_mm for plant in auto.plants]
+        "patrol", auto.usable_travel_mm(), auto._patrol_stops()
     ))
 
 

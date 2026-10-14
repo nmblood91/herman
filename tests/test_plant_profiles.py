@@ -78,11 +78,11 @@ auto = build()
 first, second = ids(auto)[0], ids(auto)[1]
 auto.update_plant_name(first, "Basil")
 auto.set_plant_position(first, 130)
-auto.set_plant_position(second, 580)
+auto.set_plant_position(second, 350)
 auto.save_plant_profile(first)
 
 auto.apply_plant_profile(second, "Basil")
-assert auto.get_plant(second).position_mm == 580, (
+assert auto.get_plant(second).position_mm == 350, (
     "loading a profile moved the pot to the other plant's coordinate"
 )
 assert auto.get_plant(first).position_mm == 130

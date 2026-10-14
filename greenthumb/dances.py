@@ -96,7 +96,10 @@ DANCES: dict[str, Dance] = {
     ),
     "patrol": Dance(
         title="Patrol",
-        description="Visits each plant in turn, pausing at every pot.",
+        description=(
+            "Visits each plant in turn, moving the way its watering does: a "
+            "pause over a point pot, a few passes across a sweep."
+        ),
         visits_plants=True,
     ),
 }
@@ -104,17 +107,41 @@ DANCES: dict[str, Dance] = {
 DEFAULT_ORDER = ("stretch", "wave", "shuffle", "patrol")
 
 
+@dataclass(frozen=True)
+class PatrolStop:
+    """One plant as the patrol visits it.
+
+    A point plant is just `position_mm`. A sweeping plant also has
+    `sweep_to_mm`, the far end of its span, and the feedrate its dose would
+    cross it at -- so the patrol shows the real motion, not a stand-in.
+    """
+
+    position_mm: float
+    sweep_to_mm: float | None = None
+    feedrate: int = 0
+
+
+# Passes across a sweeping plant. Enough to read as a sweep and show both
+# ends; a real dose runs as many as fit the pump time, which could be minutes.
+# Odd so the carriage finishes at the far end and carries on to the next pot
+# rather than doubling back over the one it just did.
+PATROL_SWEEP_PASSES = 3
+POINT_DWELL_MS = 500
+SWEEP_DWELL_MS = 300
+
+
 def steps_for(
     name: str,
     travel_mm: float,
-    plant_positions: list[float] | None = None,
+    plants: list[PatrolStop | float] | None = None,
 ) -> list[tuple[float, int, int]]:
     """Resolve a routine to absolute (position_mm, feedrate, dwell_ms) steps.
 
-    Positions are clamped to the rail. A plant configured outside usable travel
-    is a real possibility -- the rail can be re-measured shorter than a saved
-    position -- and a patrol should shuffle that plant to the end rather than
-    handing Klipper a move it will refuse and killing the whole routine.
+    `plants` is what a patrol visits; a bare number is a point plant. Positions
+    are clamped to the rail. A plant configured outside usable travel is a real
+    possibility -- the rail can be re-measured shorter than a saved position --
+    and a patrol should shuffle that plant to the end rather than handing
+    Klipper a move it will refuse and killing the whole routine.
     """
     dance = DANCES.get(name)
     if dance is None:
@@ -122,17 +149,38 @@ def steps_for(
 
     limit = max(float(travel_mm), 1.0)
 
-    def clamp(mm: float) -> float:
-        return round(min(max(mm, 0.0), limit), 1)
+    # Whole millimetres, like every stored position. Floored at the top end
+    # rather than rounded, so a rail reported as 889.6 cannot be sent to 890.
+    def clamp(mm: float) -> int:
+        return min(round(max(mm, 0.0)), int(limit))
 
     if dance.visits_plants:
-        positions = sorted(plant_positions or [])
-        if not positions:
+        stops = [
+            stop if isinstance(stop, PatrolStop) else PatrolStop(float(stop))
+            for stop in plants or []
+        ]
+        if not stops:
             # No plants configured yet. Fall back rather than return an empty
             # routine, so the button still does something visible.
             return steps_for("stretch", travel_mm)
-        steps = [(clamp(mm), CRUISE, 500) for mm in positions]
-        steps.append((0.0, CRUISE, 0))
+
+        # Left to right by where each visit starts, so the carriage makes one
+        # trip down the rail rather than criss-crossing it.
+        steps = []
+        for stop in sorted(stops, key=lambda s: s.position_mm):
+            if stop.sweep_to_mm is None or stop.feedrate <= 0:
+                steps.append((clamp(stop.position_mm), CRUISE, POINT_DWELL_MS))
+                continue
+            near, far = clamp(stop.position_mm), clamp(stop.sweep_to_mm)
+            steps.append((near, CRUISE, 0))
+            for index in range(PATROL_SWEEP_PASSES):
+                last = index == PATROL_SWEEP_PASSES - 1
+                steps.append((
+                    far if index % 2 == 0 else near,
+                    stop.feedrate,
+                    SWEEP_DWELL_MS if last else 0,
+                ))
+        steps.append((0, CRUISE, 0))
         return steps
 
     return [(clamp(step.at * limit), step.feedrate, step.dwell_ms) for step in dance.steps]
