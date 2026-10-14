@@ -165,40 +165,43 @@ carriage into the end of the rail at full homing speed.
    a different build, measure your own and set both to it, plus
    `GANTRY_TRAVEL_MM` in `.env`. Do not jog to X0 until you have.
 
-## 8. Calibrate the sensors
+## 8. Mix the soil and calibrate the sensors
 
-Watering stays off until the first two of these are done. The installer prints
-the same reminder.
+**Mix the soil.** Herman ships with three soil profiles, each a recipe made from
+hardware-store ingredients. [SOIL_PROFILES.md](SOIL_PROFILES.md) has the
+recipes and which plants go in which:
 
-**Dry point, once per probe.** Hold all four in open air, clean and dry:
+- **Rich & Retentive Mix** — vegetables, leafy greens, herbs, thirsty houseplants
+- **Fast-Draining Mix** — cacti, succulents, drought-tolerant houseplants, woody herbs
+- **Ultra-Coarse Epiphytic Mix** — orchids, aroids, jungle epiphytes
+
+**Air readings, once.** Hold all four probes in open air, clean and dry, and
+press **Calibrate dry (air)** on the **Calibration** tab, or run:
 
 ```bash
 cd /opt/greenthumb && .venv/bin/python -m greenthumb.hardware.soil_sensors --calibrate dry
 ```
 
-**Field capacity, once per soil mix.** In the app, under **Plants and Soil**:
+Each probe's air reading is its 0% water point, which wilting point is worked
+out from. It is also a probe check: one that reads far from the others needs a
+look.
 
-1. Soak a pot of the mix all the way through.
-2. Let it drain for 24 hours.
-3. Put a probe in it, pick that pot in the dropdown, and press
-   **Measure field capacity**.
+**Field capacity is already set.** Each built-in soil profile ships with a
+default field capacity reading, so nothing else needs measuring. Wilting point
+is worked out for each pot from that reading, its probe's air reading and the
+soil profile's percentages.
 
-The figure is stored on the mix and copied to every pot filled with it. A pot
-with no field capacity reads `-1` and is never watered. The status bar names the
-mixes it is waiting on.
-
-**Wilting point (optional).** The same panel can record a wilting-point reading
-for a mix. Let a pot of it dry out until the plant is at its limit, then press
-**Measure wilting point**. For now it is recorded and compared with what the
-percentages predict, but nothing in the watering logic uses it.
-
-Re-measure after a repot. Mixes lose capacity as they age and compact.
+If a mix waters too early or too late, measure your own field capacity: in the
+Soil Profile Editor under **Plants and Soil**, pick the soil profile and a pot
+whose probe sits in that mix. Soak that pot through, let it drain for 24 hours,
+and press **Measure field capacity**. A soil profile you add yourself needs this
+before its pots are watered.
 
 ## 9. Set up the pots
 
 In **Plants and Soil**:
 
-1. **Soil.** Choose a soil profile on each pot's card.
+1. **Soil.** Choose the soil profile each pot is filled with on its card (see SOIL_PROFILES.md).
 2. **Plant.** Load a plant profile into each pot, or write your own in the Plant Profile
    Editor.
 3. **Position.** Jog the carriage until the nozzle is over the pot, then press

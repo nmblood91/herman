@@ -22,7 +22,7 @@ from greenthumb import moisture, plant_library, soil_library, state
 from greenthumb.config import settings
 from greenthumb.hardware.soil_sensors import unavailable_sample
 from greenthumb.services.automation import GreenThumbAutomation
-from tests.helpers import temp_state, temp_store
+from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 settings.auto_watering_enabled = False
 settings.auto_patrol_enabled = False
@@ -34,7 +34,7 @@ class Klip:
     def __getattr__(self, n): return lambda *a, **k: {"ok": True}
 
 
-class Hub:
+class Hub(CalibrationSurface):
     addresses = [0x36, 0x37, 0x38, 0x39]
     def read_one(self, a): return unavailable_sample(a)
 
@@ -276,7 +276,7 @@ print(f"ok: and all {len(soil_library.LIBRARY)} library soils do too")
 
 # A note is reachable through the API shape the UI reads, not just in state.
 listed = {entry["name"]: entry for entry in build(fresh).list_soils()}
-assert listed["Coco coir"]["notes"].strip()
+assert listed["Fast-Draining Mix"]["notes"].strip()
 print("ok: and a soil's note reaches the listing the UI reads")
 
 

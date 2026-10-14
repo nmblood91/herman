@@ -31,23 +31,9 @@ class PlantSpec:
     # rest of them for that reason: the mix is physically in the pot, so
     # loading a plant profile leaves it alone.
     soil: str = ""
-    # Where field capacity sits on this probe's scale, as a raw count. Copied
-    # from the soil when a mix is assigned, or measured in this pot to override
-    # that. None means nothing has been measured and the pot's readings cannot
-    # be turned into a percentage at all -- which is deliberate: a plausible
-    # number computed against a figure nobody took is the one failure here that
-    # nothing downstream can catch.
-    field_capacity_raw: int | None = None
-    # "" when unset, "soil" when inherited from the mix, "pot" when measured
-    # here. Load-bearing rather than decorative: it is what lets assigning a
-    # mix overwrite an inherited figure while refusing to discard a measured
-    # one.
-    field_capacity_source: str = ""
-    # Which mix an inherited figure came from, so a stale inheritance is
-    # visible after that mix is re-measured.
-    field_capacity_soil: str = ""
-    field_capacity_measured_at: str = ""
-    field_capacity_address: int | None = None
+    # No field capacity of its own: a pot reads against its soil profile's
+    # readings, looked up live (GreenThumbAutomation._sync_scales).
+    #
     # How the dose is laid down. "point" empties it at position_mm, which suits
     # a small pot. "sweep" walks the nozzle between the two bounds below for
     # the length of the dose, so a wide pot is watered across its width instead
@@ -103,3 +89,6 @@ class PlantStatus:
     # showing a percentage that is not yet trusted to act on.
     sample_count: int = 0
     window_size: int = 0
+    # Why the pot has no reading, when it has no scale to read on: no soil
+    # profile, or one missing a sensor reading. None when it has one.
+    scale_problem: str | None = None

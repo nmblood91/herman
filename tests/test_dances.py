@@ -17,7 +17,7 @@ from greenthumb import dances
 from greenthumb.config import settings
 from greenthumb.hardware.soil_sensors import unavailable_sample
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
-from tests.helpers import temp_state, temp_store
+from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 settings.auto_watering_enabled = False
 settings.auto_patrol_enabled = False
@@ -51,7 +51,7 @@ class Klip:
         return True
 
 
-class Hub:
+class Hub(CalibrationSurface):
     # The real hub answers with an unavailable sample rather than None when a
     # sensor does not reply, and the control loop relies on that.
     addresses = [0x36, 0x37, 0x38, 0x39]

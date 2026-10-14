@@ -55,24 +55,25 @@ class SoilSensorHub:
         raw_dry: int = 320,
         calibration: dict[int, dict[str, int]] | None = None,
         field_capacity: dict[int, int] | None = None,
+        wilting_point: dict[int, int] | None = None,
     ) -> None:
         self.addresses = addresses or [0x36, 0x37, 0x38, 0x39]
         self.raw_dry = raw_dry
         # Per-address dry points measured by --calibrate, overriding raw_dry for
-        # the sensors that have them. Sensors read meaningfully differently from
-        # each other in identical conditions, so one global figure puts that
-        # spread straight into the reported percentage.
+        # the sensors that have them. Not an end of the reading's scale: a
+        # probe in open air reads below even bone-dry soil. It is the 0% water
+        # content point that an estimated wilting point is measured up from
+        # (see wilting_point_for), and a check on the probe itself.
         self.calibration = calibration or {}
-        # The other end of the scale, per address, and it is kept separately
-        # because it is a different kind of fact. A dry reading is a property of
-        # the probe -- prongs in open air. Field capacity is a property of the
-        # *mix*, measured in a pot, and the same mix in another pot gives
-        # roughly the same figure. So it hangs off the plant rather than the
-        # probe, and the automation layer syncs this map from the plants.
+        # The two ends of each pot's scale: field capacity at the top, a sensor
+        # reading taken in that pot's soil, and wilting point at the bottom,
+        # the soil profile's reading or an estimate from the field capacity.
+        # The automation layer syncs these maps from the pots and soils.
         #
-        # There is deliberately no fallback. A pot with nothing here reads -1,
-        # not a percentage against a number nobody measured.
+        # There is deliberately no fallback for field capacity. A pot without
+        # one reads -1, not a percentage against a number nobody measured.
         self.field_capacity = field_capacity or {}
+        self.wilting_point = wilting_point or {}
         self.bus: smbus2.SMBus | None = None
         self._initialized_sensors: set[int] = set()
 
@@ -143,11 +144,11 @@ class SoilSensorHub:
         return struct.unpack(">I", bytes(raw))[0] / 65536.0
 
     def dry_for(self, address: int | None) -> int:
-        """This probe's dry point, or the configured default.
+        """This probe's reading in open air, or the configured default.
 
-        The default is defensible here in a way it is not for the other end:
-        dry is the floor of the scale, so being wrong about it compresses a
-        reading rather than inventing a ceiling for it.
+        The 0% water content point an estimated wilting point is worked out
+        from, and a floor for checking a measurement is above it. The reading's
+        scale runs from wilting point to field capacity; see span_for.
         """
         entry = self.calibration.get(address) if address is not None else None
         if entry and "dry" in entry:
@@ -155,44 +156,42 @@ class SoilSensorHub:
         return self.raw_dry
 
     def span_for(self, address: int | None) -> tuple[int, int] | None:
-        """The two ends of this probe's scale, or None if they are unusable.
+        """(wilting point, field capacity) for this pot, or None if unusable.
 
-        Renamed from endpoints_for rather than re-pointed, on purpose. The old
-        name always returned a pair, so every caller would have gone on
-        compiling against a function that had quietly changed what it means.
+        None in three cases, all of which have to stay distinguishable from a
+        real reading:
 
-        None in two cases, and both have to stay distinguishable from a real
-        reading:
-
-        * No field capacity for this pot. Nothing has been measured, so there
-          is no top of the scale.
-        * The two ends are too close together. Field capacity is measured once
-          per mix on one probe and then used by the others, so a pot whose own
-          dry point sits near that figure produces a span that would read as a
-          permanent 0% or 100%. The old code clamped, and the 100% end of that
-          clamp reads as "just watered" and stops watering for ever.
+        * No field capacity reading for this pot: no top to the scale.
+        * No wilting point, read or estimated: no bottom to it.
+        * The two are too close together, or the wrong way round. A field
+          capacity barely above the probe's air reading estimates a wilting
+          point just under it, and a reading taken on one probe can land close
+          on another that reads differently. A narrow span turns a few counts
+          of noise into whole bands.
         """
-        capacity = self.field_capacity.get(address) if address is not None else None
-        if capacity is None:
+        if address is None:
             return None
-
-        dry = self.dry_for(address)
-        if int(capacity) - dry < MIN_CALIBRATION_SPAN:
+        capacity = self.field_capacity.get(address)
+        wilting = self.wilting_point.get(address)
+        if capacity is None or wilting is None:
             return None
-        return dry, int(capacity)
+        if int(capacity) - int(wilting) < MIN_CALIBRATION_SPAN:
+            return None
+        return int(wilting), int(capacity)
 
     def raw_to_percent(self, raw: float, address: int | None = None) -> float:
-        """A raw count as a percentage of field capacity, or -1 for cannot say.
+        """A raw count as plant-available water, 0-100, or -1 for cannot say.
 
-        -1 is the same sentinel an unreadable probe gives, and that is the
-        point: both mean "no judgement available", and everything downstream
-        already refuses to water on it.
+        100 at the soil's field capacity reading, 0 at its wilting point
+        reading. -1 is the same sentinel an unreadable probe gives, and that is
+        the point: both mean "no judgement available", and everything
+        downstream already refuses to water on it.
         """
         span = self.span_for(address)
         if span is None:
             return -1.0
-        dry, capacity = span
-        percent = (raw - dry) / (capacity - dry) * 100.0
+        wilting, capacity = span
+        percent = (raw - wilting) / (capacity - wilting) * 100.0
         return round(max(0.0, min(percent, 100.0)), 1)
 
     def read_all(self) -> list[SensorSample]:
@@ -323,10 +322,39 @@ def _soak(hub: SoilSensorHub, seconds: int, interval: float) -> int:
     return 0 if worst < 1 else 1
 
 
-# Below this, a measured wet point is not plausibly wetter than the dry point --
-# almost always a prong that never reached the water, or a sensor still sitting
-# in air. Writing it would make the plant read 100% permanently.
+# The narrowest gap allowed between the two ends of a scale: a measurement and
+# the end it is checked against, or a pot's wilting point and field capacity.
+# Closer than this is almost always the wrong probe, the wrong pot, or a probe
+# still in air, and a span this narrow turns a few counts of noise into whole
+# bands.
 MIN_CALIBRATION_SPAN = 50
+
+
+def wilting_point_for(soil: dict | None, capacity_raw: int | None, dry_raw: int) -> int | None:
+    """A pot's wilting point reading: its soil profile's own, or an estimate.
+
+    A wilting point reading is hard to take -- the pot has to be dried by
+    weight to a number nobody can see -- so it is optional. Without one, it is
+    worked out from the pot's field capacity reading and the soil's % figures:
+    taking the probe in open air as 0% water content and its field capacity
+    reading as the soil's field capacity %, wilting point lies the same
+    fraction of the way up as wilting point % is of field capacity %.
+
+    The probe's response is not truly straight, so this is an estimate. It
+    only has to place the bottom of the scale near enough for the bands; a
+    soil profile with a measured reading uses that instead.
+
+    None when there is neither a reading nor what an estimate needs.
+    """
+    if not isinstance(soil, dict):
+        return None
+    reading = soil.get("wilting_point_raw")
+    if isinstance(reading, (int, float)) and not isinstance(reading, bool):
+        return int(reading)
+    fraction = state.available_water_fraction(soil)
+    if fraction is None or capacity_raw is None:
+        return None
+    return round(dry_raw + (int(capacity_raw) - dry_raw) * fraction)
 
 # Quality thresholds for a sampling run, both relative to the reading itself.
 #
@@ -536,11 +564,10 @@ def calibrate(
 def _print_calibration(hub: SoilSensorHub, state_path=None) -> int:
     """Both ends of every probe's scale, and where each one came from.
 
-    The two halves no longer come from the same place: dry is measured per
-    probe and lives in moisture_calibration, field capacity is measured per
-    mix and reaches the hub from the pots. Printing them side by side with
-    their provenance is the only way to see a pot that has one and not the
-    other -- which reads as -1 rather than as a percentage.
+    The halves do not come from the same place: dry is measured per probe and
+    lives in moisture_calibration, field capacity is on the pot's soil
+    profile. Printing them side by side with their provenance is the only way
+    to see a pot missing one -- which reads as -1 rather than as a percentage.
     """
     stored = state.load_calibration(state_path)
     plants = {
@@ -549,39 +576,42 @@ def _print_calibration(hub: SoilSensorHub, state_path=None) -> int:
         if isinstance(plant, dict)
     }
 
-    print(f"{'sensor':<20} {'dry':>6} {'source':<16} {'capacity':>9} {'span':>6}  from")
+    print(
+        f"{'sensor':<20} {'dry':>6} {'source':<16} {'wilting':>8} {'capacity':>9} "
+        f"{'span':>6}  from"
+    )
     for address in hub.addresses:
         dry = hub.dry_for(address)
         dry_source = "calibrated" if "dry" in stored.get(address, {}) else "MOISTURE_RAW_DRY"
 
         capacity = hub.field_capacity.get(address)
+        wilting = hub.wilting_point.get(address)
         span = hub.span_for(address)
+        wilting_shown = "-" if wilting is None else str(wilting)
         if capacity is None:
             shown, width, origin = "-", "-", "not measured"
         else:
             shown = str(capacity)
-            width = str(capacity - dry) if span else "too narrow"
-            entry = plants.get(address) or {}
-            source = entry.get("field_capacity_source")
-            if source == "pot":
-                origin = "measured in this pot"
-            elif source == "soil":
-                origin = f"soil {entry.get('field_capacity_soil') or '?'!r}"
+            if span:
+                width = str(span[1] - span[0])
             else:
-                origin = "unknown"
+                width = "none" if wilting is None else "too narrow"
+            entry = plants.get(address) or {}
+            origin = f"soil {entry.get('soil') or '?'!r}"
 
         print(
             f"{label_for(address, state_path=state_path):<20} {dry:>6} "
-            f"{dry_source:<16} {shown:>9} {width:>6}  {origin}"
+            f"{dry_source:<16} {wilting_shown:>8} {shown:>9} {width:>6}  {origin}"
         )
 
     if not stored:
         print("\nNo dry point measured yet. Every probe is using MOISTURE_RAW_DRY.")
-    if not hub.field_capacity:
+    if not hub.field_capacity or not hub.wilting_point:
         print(
-            "\nNo field capacity anywhere, so every pot reads -1 and nothing is "
-            "watered automatically. Measure it per soil mix under Plants and "
-            "Soil in the app."
+            "\nA pot's soil profile needs a field capacity reading and its field "
+            "capacity and wilting point % (or a wilting point reading), or the "
+            "pot reads -1 and is never watered automatically. Set them in the "
+            "Soil Profile Editor in the app."
         )
     return 0
 
@@ -609,9 +639,8 @@ if __name__ == "__main__":
         choices=("dry",),
         help=(
             "record the dry point for every sensor, with the probes in open "
-            "air. The other end of the scale is field capacity, which belongs "
-            "to the soil mix rather than the probe -- measure that under "
-            "Plants and Soil in the app"
+            "air. Each probe's 0%% water content point, which a soil "
+            "profile without a wilting point reading estimates one from"
         ),
     )
     parser.add_argument(
@@ -636,23 +665,31 @@ if __name__ == "__main__":
         format="%(levelname)s %(name)s: %(message)s",
     )
 
+    # Both ends of each pot's scale, taken from the stored pots and their soil
+    # profiles the same way the running service syncs them. The CLI has no
+    # automation instance, so without this --show-calibration would report no
+    # scale on a planter that has one.
+    stored_plants = [
+        plant for plant in (state.load_state().get("plants") or [])
+        if isinstance(plant, dict) and isinstance(plant.get("sensor_address"), int)
+    ]
+    soils = {name.casefold(): entry for name, entry in state.load_soils().items()}
+
     hub = SoilSensorHub(
         addresses=settings.moisture_sensor_addresses_list,
         raw_dry=settings.moisture_raw_dry,
         calibration=state.load_calibration(),
-        # Taken from the pots, the same way the running service syncs it. The
-        # CLI has no automation instance, so it reads the stored plants
-        # directly -- without this, --show-calibration would report no field
-        # capacity on a planter that has plenty.
-        field_capacity={
-            plant["sensor_address"]: int(plant["field_capacity_raw"])
-            for plant in (state.load_state().get("plants") or [])
-            if isinstance(plant, dict)
-            and isinstance(plant.get("sensor_address"), int)
-            and isinstance(plant.get("field_capacity_raw"), (int, float))
-            and not isinstance(plant.get("field_capacity_raw"), bool)
-        },
     )
+    for plant in stored_plants:
+        address = plant["sensor_address"]
+        soil = soils.get(str(plant.get("soil") or "").casefold()) or {}
+        top = soil.get("field_capacity_raw")
+        if isinstance(top, bool) or not isinstance(top, (int, float)):
+            continue
+        hub.field_capacity[address] = int(top)
+        wilting = wilting_point_for(soil, int(top), hub.dry_for(address))
+        if wilting is not None:
+            hub.wilting_point[address] = wilting
 
     if args.show_calibration:
         sys.exit(_print_calibration(hub))

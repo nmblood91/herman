@@ -464,10 +464,6 @@ async def list_plants() -> list[dict[str, object]]:
             # Which plant profile the care settings came from; "" until one is
             # loaded, which the card shows instead of the placeholders.
             "profile": plant.profile,
-            "field_capacity_raw": plant.field_capacity_raw,
-            "field_capacity_source": plant.field_capacity_source,
-            "field_capacity_soil": plant.field_capacity_soil,
-            "field_capacity_measured_at": plant.field_capacity_measured_at,
             "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
             "light_stop_time": plant.light_stop_time.isoformat(timespec="minutes"),
             "moisture_target": plant.moisture_target,
@@ -701,29 +697,6 @@ async def set_plant_position(plant_id: str, payload: dict[str, float] = Body(def
     position_mm = float(payload.get("position_mm", 0.0))
     result = automation.set_plant_position(plant_id, position_mm)
     log_event(f"Plant {plant_id} position set to {result['position_mm']} mm")
-    return result
-
-
-@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/field-capacity")
-def calibrate_plant_field_capacity(
-    plant_id: str, payload: dict[str, object] = Body(default_factory=dict)
-) -> dict[str, object]:
-    """Measure field capacity for one pot, overriding what it inherited."""
-    result = automation.calibrate_plant_field_capacity(
-        plant_id, int(payload.get("seconds", 20) or 20)
-    )
-    if result.get("written"):
-        log_event(f"Field capacity for {plant_id} is {result['value']}, measured in the pot")
-    else:
-        log_event(f"Field capacity for {plant_id} not stored: {result.get('reason')}")
-    return result
-
-
-@app.delete(f"{settings.api_prefix}/plants/{{plant_id}}/field-capacity")
-def clear_plant_field_capacity(plant_id: str) -> dict[str, object]:
-    """Drop a pot's own figure and go back to inheriting from its mix."""
-    result = automation.clear_plant_field_capacity(plant_id)
-    log_event(f"Cleared the measured field capacity on {plant_id}")
     return result
 
 

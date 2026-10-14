@@ -18,7 +18,7 @@ from greenthumb.config import settings
 from greenthumb.hardware.soil_sensors import unavailable_sample
 from greenthumb.services.automation import GreenThumbAutomation
 from greenthumb.soil_library import LIBRARY
-from tests.helpers import temp_state, temp_store
+from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 settings.auto_watering_enabled = False
 settings.auto_patrol_enabled = False
@@ -30,7 +30,7 @@ class Klip:
     def __getattr__(self, n): return lambda *a, **k: {"ok": True}
 
 
-class Hub:
+class Hub(CalibrationSurface):
     addresses = [0x36, 0x37, 0x38, 0x39]
     def read_one(self, a): return unavailable_sample(a)
 
@@ -62,17 +62,21 @@ names = [soil.name for soil in LIBRARY]
 assert len(set(n.casefold() for n in names)) == len(names), names
 print(f"ok: names are distinct -> {', '.join(names)}")
 
-# Ordered widest window first, which is the ordering that says something.
-widths = [soil.available_points for soil in LIBRARY]
-assert widths == sorted(widths, reverse=True), widths
-assert LIBRARY[0].name == "Coco coir" and LIBRARY[-1].name == "Cactus / sandy mix"
-print("ok: ordered widest usable window to narrowest")
+# Exactly the three recipes in SOIL_PROFILES.md, wettest to driest, with the
+# midpoints of their published ranges. Pinned so the library and the document
+# users follow cannot drift apart.
+assert [(s.name, s.field_capacity_vwc, s.wilting_point_vwc) for s in LIBRARY] == [
+    ("Rich & Retentive Mix", 50, 17.5),
+    ("Fast-Draining Mix", 25, 8),
+    ("Ultra-Coarse Epiphytic Mix", 15, 4),
+], [(s.name, s.field_capacity_vwc, s.wilting_point_vwc) for s in LIBRARY]
+print("ok: the library is exactly the three recipes, wettest to driest")
 
-# The published peat figure is what the band design rests on, so pin it: a
-# quiet edit here would silently move every band.
-peat = next(s for s in LIBRARY if s.name == "Peat potting mix")
-assert 0.55 <= peat.wilting_fraction <= 0.60, peat.wilting_fraction
-print(f"ok: peat wilting point stays at {peat.wilting_fraction*100:.0f}% of field capacity")
+# Each note carries its recipe, so it reaches the editor and not just the docs.
+for soil, recipe in zip(LIBRARY, ("Recipe 1", "Recipe 2", "Recipe 3")):
+    assert soil.note.startswith(recipe), soil.note
+    assert "parts" in soil.note and "For:" in soil.note, soil.note
+print("ok: every soil profile's note carries its recipe and its plants")
 
 
 # --- the ratio helper ---
@@ -102,19 +106,19 @@ assert set(outcome.values()) == {"written"}, outcome
 assert set(state.load_soils(path)) == set(names), sorted(state.load_soils(path))
 print("ok: installing writes every soil")
 
-state.save_soil("Peat potting mix", {"field_capacity_vwc": 33, "wilting_point_vwc": 19}, path)
+state.save_soil("Rich & Retentive Mix", {"field_capacity_vwc": 33, "wilting_point_vwc": 19}, path)
 outcome = soil_library.install(path=path)
-assert outcome["Peat potting mix"] == "kept", outcome
-assert state.load_soils(path)["Peat potting mix"]["field_capacity_vwc"] == 33
+assert outcome["Rich & Retentive Mix"] == "kept", outcome
+assert state.load_soils(path)["Rich & Retentive Mix"]["field_capacity_vwc"] == 33
 print("ok: re-installing keeps a mix you measured yourself")
 
-state.save_soil("coco coir", {"field_capacity_vwc": 50, "wilting_point_vwc": 14}, path)
-assert soil_library.install(path=path)["Coco coir"] == "kept"
+state.save_soil("fast-draining mix", {"field_capacity_vwc": 50, "wilting_point_vwc": 14}, path)
+assert soil_library.install(path=path)["Fast-Draining Mix"] == "kept"
 assert len(state.load_soils(path)) == len(names), sorted(state.load_soils(path))
 print("ok: a differently capitalised mix still counts as yours")
 
 assert set(soil_library.install(overwrite=True, path=path).values()) == {"written"}
-assert state.load_soils(path)["Peat potting mix"]["field_capacity_vwc"] == 28
+assert state.load_soils(path)["Rich & Retentive Mix"]["field_capacity_vwc"] == 50
 print("ok: --overwrite restores the library figures")
 
 
@@ -128,13 +132,13 @@ first, second = auto.plants[0].plant_id, auto.plants[1].plant_id
 assert auto.get_plant(first).soil == "", "a plant started with a soil already set"
 print("ok: a plant starts with no soil, which is distinct from a bad one")
 
-auto.update_plant_soil(first, "peat potting mix")
-assert auto.get_plant(first).soil == "Peat potting mix", auto.get_plant(first).soil
+auto.update_plant_soil(first, "rich & retentive mix")
+assert auto.get_plant(first).soil == "Rich & Retentive Mix", auto.get_plant(first).soil
 print("ok: setting a soil matches case-insensitively and stores the library's spelling")
 
 # An unknown mix supplies no ratio, so storing it would read as "set" while
 # behaving exactly like "not set".
-for bad in ("Moon dust", "peat pottingmix"):
+for bad in ("Moon dust", "rich retentive mix"):
     try:
         auto.update_plant_soil(second, bad)
     except ValueError:
@@ -151,8 +155,8 @@ print("ok: an empty name clears it, which is how you say the mix is unknown")
 
 # --- it belongs to the pot, not to the plant profile ---
 
-auto.update_plant_soil(first, "Coco coir")
-auto.update_plant_soil(second, "Peat potting mix")
+auto.update_plant_soil(first, "Fast-Draining Mix")
+auto.update_plant_soil(second, "Rich & Retentive Mix")
 auto.update_plant_name(first, "Fern")
 auto.save_plant_profile(first)
 result = auto.apply_plant_profile(second, "Fern")
@@ -162,12 +166,12 @@ result = auto.apply_plant_profile(second, "Fern")
 # you did repot, you pick the mix again from a dropdown you are looking at. If
 # it travelled and you did not, the pot bands every reading against the wrong
 # wilting point and waters to it, and nothing looks broken.
-assert auto.get_plant(second).soil == "Peat potting mix", auto.get_plant(second).soil
+assert auto.get_plant(second).soil == "Rich & Retentive Mix", auto.get_plant(second).soil
 print("ok: loading a plant profile leaves the pot's soil alone")
 
 # Reported back, so the caller can say it was left rather than leave someone
 # wondering whether the profile changed the mix.
-assert result["soil"] == "Peat potting mix", result
+assert result["soil"] == "Rich & Retentive Mix", result
 print("ok: and the load reports the soil it did not touch")
 
 # Not written into the entry at all, rather than written and then ignored.
@@ -181,20 +185,20 @@ raw = state.load_state(shared)
 raw["plant_profiles"]["Legacy"] = {
     "moisture_target": "dry",
     "watering_volume_ml": 50,
-    "soil": "Cactus / sandy mix",
+    "soil": "Ultra-Coarse Epiphytic Mix",
 }
 state.save_state(raw, shared)
 assert "soil" not in state.load_profiles(shared)["Legacy"]
 
-auto.update_plant_soil(second, "Loam")
+auto.update_plant_soil(second, "Fast-Draining Mix")
 auto.apply_plant_profile(second, "Legacy")
-assert auto.get_plant(second).soil == "Loam", auto.get_plant(second).soil
+assert auto.get_plant(second).soil == "Fast-Draining Mix", auto.get_plant(second).soil
 print("ok: a profile saved with a soil in it does not apply it")
 
-auto.update_plant_soil(second, "Peat potting mix")
+auto.update_plant_soil(second, "Rich & Retentive Mix")
 restored = build(shared)
-assert restored.get_plant(first).soil == "Coco coir"
-assert restored.get_plant(second).soil == "Peat potting mix"
+assert restored.get_plant(first).soil == "Fast-Draining Mix"
+assert restored.get_plant(second).soil == "Rich & Retentive Mix"
 print("ok: each pot keeps its own soil across a restart")
 
 
@@ -210,9 +214,9 @@ print("ok: listing reports the ratio and window, widest first")
 # Deleting a soil must not rewrite plants that name it. The name stays and
 # simply stops resolving, which is visible; silently clearing it would hide
 # that a pot's mix is no longer described.
-restored.delete_soil("Coco coir")
-assert restored.get_plant(first).soil == "Coco coir"
-assert "Coco coir" not in state.load_soils(shared)
+restored.delete_soil("Fast-Draining Mix")
+assert restored.get_plant(first).soil == "Fast-Draining Mix"
+assert "Fast-Draining Mix" not in state.load_soils(shared)
 print("ok: deleting a soil leaves plants naming it alone, so the gap is visible")
 
 assert soil_library.main([]) == 0
@@ -271,15 +275,24 @@ for blank in ("", "   "):
         raise AssertionError(f"accepted a blank name {blank!r}")
 print("ok: a blank name is refused")
 
-# Anything saved must be usable by the band maths, which is the point of the
-# validation rather than tidiness.
-from greenthumb import moisture
-
+# The % VWC pair is optional now -- watering runs on the two sensor readings --
+# but when given it must still make a usable ratio, since it is what suggests
+# where wilting point should read.
 saved = state.load_soils(own._state_path)["my mix"]
-ratio = state.available_water_fraction(saved)
-assert ratio is not None, saved
-assert moisture.band_for(90, ratio) in moisture.ORDER
-print("ok: a saved soil always yields a ratio the bands can use")
+assert state.available_water_fraction(saved) is not None, saved
+print("ok: a saved % pair always yields a usable ratio")
+
+blank = own.save_soil("Readings only", None, None, field_capacity_raw=800, wilting_point_raw=450)
+stored = state.load_soils(own._state_path)["Readings only"]
+assert stored["field_capacity_vwc"] is None and stored["wilting_point_vwc"] is None, stored
+assert blank["available_points"] is None, blank
+try:
+    own.save_soil("Half a pair", 30, None)
+except ValueError:
+    pass
+else:
+    raise AssertionError("accepted one % figure without the other")
+print("ok: a soil profile can be saved on its sensor readings alone, but not half a % pair")
 
 
 # --- a field capacity entered by hand ------------------------------------
@@ -291,19 +304,32 @@ print("ok: a saved soil always yields a ratio the bands can use")
 path = temp_state()
 soil_library.install(path=path)
 
-floor = settings.moisture_raw_dry + soil_library.MIN_CALIBRATION_SPAN
+# With no wilting point yet, a probe in open air is the floor: soil never
+# reads below it.
 for raw, why in (
-    (floor - 1, "one count below the usable span"),
-    (settings.moisture_raw_dry, "the dry floor itself"),
+    (settings.moisture_raw_dry, "the air reading itself"),
     (0, "zero"),
 ):
     try:
-        soil_library.set_field_capacity("Coco coir", raw, path=path)
+        soil_library.set_field_capacity("Fast-Draining Mix", raw, path=path)
     except ValueError:
         pass
     else:
         raise AssertionError(f"accepted {why}: {raw}")
-    assert state.load_soils(path)["Coco coir"].get("field_capacity_raw") is None, raw
+    assert state.load_soils(path)["Fast-Draining Mix"].get("field_capacity_raw") is None, raw
+
+# With one, field capacity has to clear it by a usable span, or every pot on
+# the soil profile reads -1.
+state.save_soil("Ultra-Coarse Epiphytic Mix", {"wilting_point_raw": 600}, path)
+floor = 600 + soil_library.MIN_CALIBRATION_SPAN
+try:
+    soil_library.set_field_capacity("Ultra-Coarse Epiphytic Mix", floor - 1, path=path)
+except ValueError as error:
+    assert "wilting point" in str(error), error
+else:
+    raise AssertionError("accepted a field capacity too close to the wilting point")
+assert soil_library.set_field_capacity("Ultra-Coarse Epiphytic Mix", floor, path=path)
+print("ok: a field capacity below the air reading, or too close to wilting point, is refused")
 # The refusal matters because the stored result would be indistinguishable
 # from never having measured: span_for returns None under the span, every pot
 # on the mix reads -1, and nothing is watered.
@@ -317,9 +343,9 @@ else:
     raise AssertionError("accepted a mix that is not installed")
 print("ok: an unknown mix is refused, and says what is installed")
 
-key = soil_library.set_field_capacity("coco COIR", 742, path=path)
-assert key == "Coco coir", key
-entry = state.load_soils(path)["Coco coir"]
+key = soil_library.set_field_capacity("fast-DRAINING mix", 742, path=path)
+assert key == "Fast-Draining Mix", key
+entry = state.load_soils(path)["Fast-Draining Mix"]
 assert entry["field_capacity_raw"] == 742, entry
 print("ok: a hand-entered figure is written, matched on the name case-insensitively")
 
@@ -329,22 +355,64 @@ assert entry["field_capacity_measured_at"] == "", entry
 assert entry["field_capacity_samples"] == 0, entry
 print("ok: no measurement date and no samples, since nothing was measured")
 
-# The merge trap: save_soil replacing the whole entry would drop the ratio the
-# bands need, leaving a mix that looks configured and bands nothing.
-assert entry["field_capacity_vwc"] == 55, entry
-assert entry["wilting_point_vwc"] == 15, entry
+# The merge trap: save_soil replacing the whole entry would drop the % figures
+# and the note, which were installed beside it.
+assert entry["field_capacity_vwc"] == 25, entry
+assert entry["wilting_point_vwc"] == 8, entry
 assert entry["notes"], entry
 assert state.available_water_fraction(entry) is not None, entry
 print("ok: the VWC figures and the note survive, so the mix still bands")
 
-# And a pot takes it the way it takes a measured one.
+# And a pot reads against it the way it reads against a measured one.
 own = build(path)
-own.update_plant_soil("plant_1", "Coco coir")
+own.update_plant_soil("plant_1", "Fast-Draining Mix")
 plant = own.plants[0]
-assert plant.field_capacity_raw == 742, plant.field_capacity_raw
-assert plant.field_capacity_source == "soil", plant.field_capacity_source
-assert plant.field_capacity_soil == "Coco coir", plant.field_capacity_soil
-print("ok: a pot inherits a hand-entered figure like any other")
+assert own.sensor_hub.field_capacity[plant.sensor_address] == 742, own.sensor_hub.field_capacity
+print("ok: a pot reads against a hand-entered figure like any other")
+
+
+# --- a default field capacity reading shipped with the library ---
+#
+# Measured once on the reference build, so a new planter can water straight
+# away. Patched in here, since the shipped values may not be filled in yet.
+
+import dataclasses
+
+shipped = soil_library.LIBRARY
+try:
+    soil_library.LIBRARY = tuple(
+        dataclasses.replace(soil, field_capacity_raw=600 + 50 * i)
+        for i, soil in enumerate(shipped)
+    )
+    path = temp_state()
+    soil_library.install(path=path)
+    entry = state.load_soils(path)["Rich & Retentive Mix"]
+    assert entry["field_capacity_raw"] == 600, entry
+    assert entry["field_capacity_measured_at"] == "", "a shipped default claims to be measured here"
+    print("ok: install writes the default field capacity reading, marked as not measured")
+
+    fresh = build(path)
+    fresh.update_plant_soil("plant_1", "Rich & Retentive Mix")
+    assert fresh.scale_problem(fresh.plants[0]) is None, fresh.scale_problem(fresh.plants[0])
+    print("ok: with the defaults a pot can be judged as soon as its soil profile is chosen")
+
+    # A soil profile already installed without one gets the default; one with
+    # a reading of its own keeps it.
+    path = temp_state()
+    soil_library.LIBRARY = shipped
+    soil_library.install(path=path)
+    state.save_soil("Fast-Draining Mix", {"field_capacity_raw": 777}, path)
+    soil_library.LIBRARY = tuple(
+        dataclasses.replace(soil, field_capacity_raw=600) for soil in shipped
+    )
+    outcome = soil_library.install(path=path)
+    assert outcome["Rich & Retentive Mix"] == "kept, default field capacity added", outcome
+    assert outcome["Fast-Draining Mix"] == "kept", outcome
+    assert state.load_soils(path)["Rich & Retentive Mix"]["field_capacity_raw"] == 600
+    assert state.load_soils(path)["Fast-Draining Mix"]["field_capacity_raw"] == 777
+    print("ok: re-installing fills in a missing default and never replaces a reading")
+finally:
+    soil_library.LIBRARY = shipped
 
 
 # --- typed sensor readings on a soil profile ---
@@ -361,21 +429,19 @@ first, second, third = (p.plant_id for p in typed.plants[:3])
 typed.update_plant_soil(first, "Typed mix")
 typed.update_plant_soil(second, "Typed mix")
 typed.update_plant_soil(third, "Typed mix")
-typed.get_plant(third).field_capacity_raw = 640
-typed.get_plant(third).field_capacity_source = "pot"
+
+def capacity_of(plant_id):
+    return typed.sensor_hub.field_capacity.get(typed.get_plant(plant_id).sensor_address)
 
 result = typed.save_soil("Typed mix", 30, 14, field_capacity_raw=700, wilting_point_raw=450)
 stored = state.load_soils(typed._state_path)["Typed mix"]
 assert (stored["field_capacity_raw"], stored["wilting_point_raw"]) == (700, 450), stored
 assert stored["field_capacity_measured_at"] is None, "a typed figure claims to be measured"
-assert typed.get_plant(first).field_capacity_raw == 700
-assert typed.get_plant(first).field_capacity_source == "soil"
-assert typed.get_plant(third).field_capacity_raw == 640, "overwrote a pot's own measurement"
+assert [capacity_of(p) for p in (first, second, third)] == [700, 700, 700]
 assert sorted(result["inherited_by"]) == sorted(
-    [typed.get_plant(first).name, typed.get_plant(second).name]
+    typed.get_plant(p).name for p in (first, second, third)
 ), result["inherited_by"]
-assert typed.sensor_hub.field_capacity[typed.get_plant(first).sensor_address] == 700
-print("ok: typed readings save, and field capacity reaches the pots like a measured one")
+print("ok: typed readings save, and field capacity reaches every pot using it at once")
 
 # Saving the percentages alone leaves a measured reading and its date alone.
 state.save_soil(
@@ -390,12 +456,11 @@ assert stored["field_capacity_measured_at"] == "2026-10-01T12:00:00", stored
 assert stored["field_capacity_vwc"] == 31
 print("ok: saving without the readings keeps a measurement and when it was taken")
 
-# Cleared: the pots that inherited it lose it too, and read nothing again.
+# Cleared: every pot using it reads nothing again.
 typed.save_soil("Typed mix", 31, 14, field_capacity_raw=None)
 assert state.load_soils(typed._state_path)["Typed mix"]["field_capacity_raw"] is None
-assert typed.get_plant(first).field_capacity_raw is None
-assert typed.get_plant(third).field_capacity_raw == 640, "cleared a pot's own measurement"
-print("ok: clearing the reading clears what the pots inherited, not what they measured")
+assert [capacity_of(p) for p in (first, second, third)] == [None, None, None]
+print("ok: clearing the reading leaves every pot using it with no scale")
 
 for capacity, wilting, why in (
     (500, 500, "wilting point equal to field capacity"),

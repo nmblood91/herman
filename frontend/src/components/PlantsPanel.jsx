@@ -127,9 +127,16 @@ const outsideZone = (plant, value) => {
 // invite watering a plant whose sensor simply fell out.
 const describeMoisture = (status) => {
   if (!status) return { text: '—', hint: 'no data yet' }
+  // No scale to read on: no soil profile, or one missing a sensor reading.
+  // Said before the probe check, because it is the likelier cause and the
+  // planter knows exactly which step is missing.
+  if (status.scale_problem) {
+    return { text: 'no reading', hint: status.scale_problem, warn: true }
+  }
   if (status.moisture_percent == null || status.moisture_percent < 0) {
     return { text: 'no reading', hint: 'probe unplugged or unreadable', warn: true }
   }
+  // Plant-available water: 100% at field capacity, 0% at wilting point.
   const text = `${status.moisture_percent.toFixed(0)}%`
   // Below a full window the loop will not water, so say so rather than show a
   // number that looks actionable.
@@ -139,19 +146,10 @@ const describeMoisture = (status) => {
       hint: `gathering history, ${status.sample_count}/${status.window_size}`,
     }
   }
-  // The band leads and the percentage follows as detail. On a peat mix the
-  // whole actionable range is a narrow strip near the top of the scale, so the
-  // number alone invites reading precision the sensor cannot deliver.
+  // The band leads and the percentage follows as detail: a few percent of
+  // probe error moves the number without meaning anything.
   const band = status.moisture_band
   const target = status.target_moisture
-
-  if (band === 'unknown') {
-    return {
-      text: 'no soil set',
-      hint: `${text} — set a soil so the reading can be read`,
-      warn: true,
-    }
-  }
 
   if (band && target) {
     // Drier than the target means due a drink. Band order is wettest first,
@@ -185,14 +183,16 @@ const describeSoil = (soil, name) => {
       </>
     )
   }
-  const capacity = soil.field_capacity_vwc
-  const wilting = soil.wilting_point_vwc
+  // The two sensor readings, since those are what the pot is read against.
+  // Wilting point is estimated when the soil profile has no reading of its own.
+  const capacity = soil.field_capacity_raw
+  const wilting =
+    soil.wilting_point_raw ??
+    (soil.wilting_fraction != null ? 'estimated' : 'not set')
   return (
     <>
-      <strong>{soil.name}</strong>
-      {capacity != null && wilting != null
-        ? ` — field capacity ${capacity}% VWC, wilting point ${wilting}% VWC.`
-        : ''}
+      <strong>{soil.name}</strong> — field capacity reading{' '}
+      {capacity ?? 'not set'}, wilting point reading {wilting}.
     </>
   )
 }
@@ -214,8 +214,6 @@ export function PlantsPanel({
   onLoadProfile,
   onClearProfile,
   soils,
-  onMeasureFieldCapacity,
-  onClearFieldCapacity,
   onMove,
 }) {
   // Klipper refuses every move until the axis is homed, so the jog row is
@@ -645,61 +643,6 @@ export function PlantsPanel({
                         </div>
                       </>
                     )}
-                    <label>Field Capacity</label>
-                    <div>
-                      {plant.field_capacity_raw != null ? (
-                        <>
-                          <p className="field-hint">
-                            Set: <strong>{plant.field_capacity_raw}</strong>
-                            {plant.field_capacity_source === 'pot'
-                              ? ' — measured in this pot'
-                              : plant.field_capacity_soil
-                                ? ` — from ${plant.field_capacity_soil}`
-                                : ''}
-                            . Automatic watering is on.
-                          </p>
-                          <div className="motion-grid two-up">
-                            <button
-                              type="button"
-                              onClick={() => onMeasureFieldCapacity(plant.plant_id)}
-                            >
-                              Calibrate this pot (20s)
-                            </button>
-                            {/* Only when this pot overrides the mix: with an
-                                inherited figure there is nothing to fall back
-                                to. */}
-                            {plant.field_capacity_source === 'pot' && (
-                              <button
-                                type="button"
-                                onClick={() => onClearFieldCapacity(plant.plant_id)}
-                              >
-                                Use the mix's figure
-                              </button>
-                            )}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="field-hint warning">
-                            Not set. This soil needs to have Field Capacity set
-                            to be watered automatically.
-                          </p>
-                          <p className="field-hint">
-                            To find Field Capacity, soak planter until it
-                            drains from the bottom. Wait 24 hours and calibrate
-                            using button below.
-                          </p>
-                          <div className="motion-grid">
-                            <button
-                              type="button"
-                              onClick={() => onMeasureFieldCapacity(plant.plant_id)}
-                            >
-                              Calibrate this pot (20s)
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
                   </div>
 
                 </>

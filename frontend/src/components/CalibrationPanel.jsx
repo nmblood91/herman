@@ -3,10 +3,10 @@ import { API_BASE } from '../api'
 
 const SAMPLE_SECONDS = 20
 
-// Dry only. The other end of the scale is field capacity, which is a property
-// of the soil mix rather than of the probe -- two pots of different mix want
-// different figures with identical sensors -- so it is measured per mix under
-// Plants and Soil. This panel reports it but does not take it.
+// The probes' dry points, in open air: each probe's 0% water point, which an
+// estimated wilting point is placed up from. The moisture scale itself runs
+// from wilting point to a soil profile's field capacity reading, set in the
+// Soil Profile Editor. This panel reports each pot's scale but does not take it.
 export function CalibrationPanel() {
   const [calibration, setCalibration] = useState(null)
   const [busy, setBusy] = useState('')
@@ -105,8 +105,8 @@ export function CalibrationPanel() {
     try {
       await fetch(`${API_BASE}/sensors/calibration/reset`, { method: 'POST' })
       setMessage(
-        'Dry points cleared. Every sensor is back on MOISTURE_RAW_DRY. Field ' +
-          'capacity is untouched — it belongs to the mixes and the pots.',
+        'Air readings cleared. Every probe is back on MOISTURE_RAW_DRY. The ' +
+          'soil profiles’ readings are untouched, so no pot’s moisture moved.',
       )
       await load()
     } catch (error) {
@@ -127,16 +127,19 @@ export function CalibrationPanel() {
     return remaining > 0 ? `Sampling… ${remaining}s` : 'Finishing…'
   }
 
-  const capacityNote = (sensor) => {
-    if (sensor.field_capacity_raw == null) return 'field capacity not measured'
-    const where =
-      sensor.field_capacity_source === 'pot'
-        ? 'measured in this pot'
-        : sensor.field_capacity_soil
-          ? `from ${sensor.field_capacity_soil}`
-          : 'source unknown'
-    const span = sensor.field_capacity_raw - sensor.dry
-    return `capacity ${sensor.field_capacity_raw} (${where}) · span ${span}`
+  // The pot's scale: wilting point up to field capacity.
+  const scaleNote = (sensor) => {
+    if (sensor.scale_problem) return sensor.scale_problem
+    const where = sensor.soil ? `from ${sensor.soil}` : 'no soil profile'
+    const span = sensor.field_capacity_raw - sensor.wilting_point_raw
+    const bottom =
+      sensor.wilting_point_source === 'estimated'
+        ? `~${sensor.wilting_point_raw} estimated`
+        : sensor.wilting_point_raw
+    return (
+      `scale ${bottom}–${sensor.field_capacity_raw} ` +
+      `(${where}) · span ${span}`
+    )
   }
 
   return (
@@ -145,9 +148,12 @@ export function CalibrationPanel() {
 
       <div className="general-settings-form">
         <p className="field-hint">
-          Measures each probe's dry reading, in open air. Probes read measurably
-          differently from one another in identical conditions, so this is per
-          sensor and is the floor of its scale.
+          Measures each probe&apos;s reading in open air, its 0% water
+          content point. A pot whose soil profile has no wilting point reading
+          estimates one up from it, so calibrate before relying on those. It is
+          also a health check: a probe whose air reading is far from the
+          others, or that reads nothing, needs looking at. Every field capacity
+          and wilting point measured with it has to read above it.
         </p>
 
         <div className="field-row">
@@ -170,11 +176,10 @@ export function CalibrationPanel() {
             and connections.
           </p>
           <p className="field-hint">
-            The top of the scale is <strong>field capacity</strong>, and it is
-            not here. It is a property of the mix rather than the probe — the
-            same mix in another pot gives roughly the same figure, and a
-            different mix does not — so it is measured once per soil under
-            Plants and Soil.
+            The moisture scale itself is not here. A pot reads 100% at its soil
+            profile&apos;s <strong>field capacity</strong> reading and 0% at its
+            <strong> wilting point</strong> — properties of the soil rather
+            than the probe — so they are set in the Soil Profile Editor.
           </p>
         </div>
 
@@ -203,8 +208,8 @@ export function CalibrationPanel() {
               className={`field-hint${sensor.usable ? '' : ' warning'}`}
               key={sensor.address}
             >
-              <strong>{sensor.label || sensor.address}</strong> dry {sensor.dry}
-              {sensor.calibrated_dry ? '' : ' (default)'} · {capacityNote(sensor)}
+              <strong>{sensor.label || sensor.address}</strong> air {sensor.dry}
+              {sensor.calibrated_dry ? '' : ' (default)'} · {scaleNote(sensor)}
             </p>
           ))}
           {unmeasured.length > 0 && (
@@ -212,9 +217,7 @@ export function CalibrationPanel() {
               {unmeasured.length === 1 ? 'One pot has' : `${unmeasured.length} pots have`}{' '}
               no usable scale, so {unmeasured.length === 1 ? 'it reads' : 'they read'}{' '}
               nothing and {unmeasured.length === 1 ? 'is' : 'are'} never watered
-              automatically. Either the field capacity has not been measured for
-              that mix, or it sits too close to this probe's dry point to divide
-              by — measure that pot's own under Plants and Soil.
+              automatically. Each line above says what is missing.
             </p>
           )}
         </div>
@@ -224,9 +227,8 @@ export function CalibrationPanel() {
             Reset dry calibration
           </button>
           <p className="field-hint">
-            Returns every sensor to MOISTURE_RAW_DRY. Field capacity is not
-            affected: re-doing a dry pass should not throw away a measurement of
-            somebody's potting mix.
+            Returns every probe&apos;s air reading to MOISTURE_RAW_DRY. The soil
+            profiles&apos; readings are not affected.
           </p>
         </div>
       </div>

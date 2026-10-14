@@ -14,7 +14,7 @@ export function SystemValuesPanel() {
     const ok = window.confirm(
       'Restore the planter to its defaults, as if freshly installed?\n\n' +
         'Every pot goes back to its default: name, watering location, sweep, ' +
-        'soil and field capacity. Every setting goes back too, including the ' +
+        'soil profile. Every setting goes back too, including the ' +
         "pump flow rate and the probes' dry calibration.\n\n" +
         'Kept: the plant profile and soil libraries, and the history.',
     )

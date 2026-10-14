@@ -158,8 +158,8 @@ export function SoilPanel({ soils, plants, onRefresh }) {
         `${picked} reads ${data.value} at ${label}, measured with ` +
           `${data.measured_with}. ` +
           (applied.length
-            ? `Applied to ${applied.join(', ')}.`
-            : 'No pot is filled with it yet, so nothing changed.'),
+            ? `Used by ${applied.join(', ')}.`
+            : 'No pot is filled with it yet.'),
       )
       onRefresh?.()
     } catch (error) {
@@ -198,8 +198,10 @@ export function SoilPanel({ soils, plants, onRefresh }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name,
-          field_capacity_vwc: Number(form.capacity),
-          wilting_point_vwc: Number(form.wilting),
+          // Optional reference figures: blank is sent as none rather than as
+          // Number('') -- which is 0, and refused.
+          field_capacity_vwc: String(form.capacity).trim() === '' ? null : Number(form.capacity),
+          wilting_point_vwc: String(form.wilting).trim() === '' ? null : Number(form.wilting),
           notes: form.notes,
           ...readings,
         }),
@@ -211,9 +213,8 @@ export function SoilPanel({ soils, plants, onRefresh }) {
       }
       const applied = data.inherited_by ?? []
       setMessage(
-        `Saved soil profile ${data.name}: ${data.available_points} points of usable water, ` +
-          `wilting at ${Math.round((data.wilting_fraction ?? 0) * 100)}% of field capacity.` +
-          (applied.length ? ` New field capacity applied to ${applied.join(', ')}.` : ''),
+        `Saved soil profile ${data.name}.` +
+          (applied.length ? ` New field capacity used by ${applied.join(', ')}.` : ''),
       )
       setRawBase({
         capacityRaw: String(form.capacityRaw).trim(),
@@ -267,7 +268,9 @@ export function SoilPanel({ soils, plants, onRefresh }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => cancelHold, [picked])
 
-  const formReady = form.name.trim() && form.capacity !== '' && form.wilting !== ''
+  // Only a name: every figure is optional, and a soil profile can be saved
+  // first and measured afterwards.
+  const formReady = Boolean(form.name.trim())
 
   return (
     <section className="panel-section">
@@ -332,6 +335,48 @@ export function SoilPanel({ soils, plants, onRefresh }) {
           )}
         </div>
 
+        {/* The two sensor readings first: they are the scale every pot using
+            this soil profile is read on. Watering needs field capacity; wilting
+            point is estimated from it and the % pair unless one is given. */}
+        <div className="field-row">
+          <div className="soil-form">
+            <label>
+              Field capacity (sensor reading)
+              <input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Not set"
+                value={form.capacityRaw}
+                onChange={(event) => update('capacityRaw', event.target.value)}
+              />
+            </label>
+            <label>
+              Wilting point (sensor reading, optional)
+              <input
+                type="number"
+                min="1"
+                step="1"
+                placeholder={
+                  pickedSoil?.estimated_wilting_raw != null
+                    ? `Estimated ${pickedSoil.estimated_wilting_raw}`
+                    : 'Estimated'
+                }
+                value={form.wiltingRaw}
+                onChange={(event) => update('wiltingRaw', event.target.value)}
+              />
+            </label>
+          </div>
+          <p className="field-hint">
+            A pot using this soil profile is watered automatically once it has
+            a field capacity reading: its moisture is read as 100% at field
+            capacity and 0% at wilting point. Leave wilting point blank and it
+            is estimated for each pot from its field capacity and the
+            percentages below; fill it in only if you have measured it. Every
+            pot using this soil profile reads against these at once.
+          </p>
+        </div>
+
         <div className="field-row">
           <div className="soil-form">
             <label>
@@ -354,45 +399,19 @@ export function SoilPanel({ soils, plants, onRefresh }) {
                 onChange={(event) => update('wilting', event.target.value)}
               />
             </label>
-            {/* The same two ends as raw probe counts, typed rather than
-                measured with the buttons below. Optional: blank means not
-                known yet, and a pot of this mix reads nothing until field
-                capacity has a figure one way or the other. */}
-            <label>
-              Field capacity (sensor reading)
-              <input
-                type="number"
-                min="1"
-                step="1"
-                placeholder="Not set"
-                value={form.capacityRaw}
-                onChange={(event) => update('capacityRaw', event.target.value)}
-              />
-            </label>
-            <label>
-              Wilting point (sensor reading)
-              <input
-                type="number"
-                min="1"
-                step="1"
-                placeholder="Not set"
-                value={form.wiltingRaw}
-                onChange={(event) => update('wiltingRaw', event.target.value)}
-              />
-            </label>
           </div>
           <p className="field-hint">
-            The sensor readings can be typed here or measured below. A field
-            capacity typed here is copied onto every pot using this soil
-            profile, except pots that measured their own.
+            The published water contents for this mix (see SOIL_PROFILES.md).
+            They place wilting point between the probe&apos;s air reading and
+            its field capacity reading, so without a wilting point reading
+            both are needed. Fill in both or neither.
           </p>
         </div>
 
         {/* Measured, not typed -- so it lives beside the picker rather than
-            inside the field grid above, the same way a pot's own field
-            capacity sits apart from the care settings on its card. Only
-            shown once a mix is picked: a brand new one has nothing in the
-            database yet to attach a measurement to. */}
+            inside the field grid above. Only shown once a mix is picked: a
+            brand new one has nothing in the database yet to attach a
+            measurement to. */}
         {mode === 'existing' && picked && (
           <div className="field-row">
             <p className={pickedSoil?.field_capacity_raw != null ? 'field-hint' : 'field-hint warning'}>
@@ -401,33 +420,46 @@ export function SoilPanel({ soils, plants, onRefresh }) {
                   Field capacity reads <strong>{pickedSoil.field_capacity_raw}</strong>
                   {pickedSoil.field_capacity_measured_at
                     ? `, measured ${pickedSoil.field_capacity_measured_at.slice(0, 10)}`
-                    : ''}
+                    : ' (default or typed in, not measured on this planter)'}
                   .
                 </>
               ) : (
-                'Not measured. Pots of this mix read nothing and are never watered automatically.'
+                'Field capacity not set. Pots using this soil profile read nothing and are never watered automatically.'
               )}
             </p>
-            {/* Not a warning when missing: nothing reads it yet, so an unmeasured
-                wilting point costs nothing and should not look like a fault. */}
-            <p className="field-hint">
+            {/* A warning only when there is neither a reading nor what an
+                estimate needs: then it is missing the bottom of the scale. */}
+            <p
+              className={
+                pickedSoil?.wilting_point_raw != null ||
+                pickedSoil?.wilting_fraction != null
+                  ? 'field-hint'
+                  : 'field-hint warning'
+              }
+            >
               {pickedSoil?.wilting_point_raw != null ? (
                 <>
                   Wilting point reads <strong>{pickedSoil.wilting_point_raw}</strong>
                   {pickedSoil.wilting_point_measured_at
                     ? `, measured ${pickedSoil.wilting_point_measured_at.slice(0, 10)}`
                     : ''}
-                  {pickedSoil.predicted_wilting_raw != null &&
-                    `; the percentages predict ${pickedSoil.predicted_wilting_raw}`}
+                  {pickedSoil.estimated_wilting_raw != null &&
+                    `; the percentages would estimate ${pickedSoil.estimated_wilting_raw}`}
                   .
                 </>
+              ) : pickedSoil?.wilting_fraction != null ? (
+                pickedSoil.estimated_wilting_raw != null ? (
+                  <>
+                    Wilting point estimated at about{' '}
+                    <strong>{pickedSoil.estimated_wilting_raw}</strong> from the
+                    field capacity reading. Each pot works out its own from its
+                    probe.
+                  </>
+                ) : (
+                  'Wilting point will be estimated once field capacity is set.'
+                )
               ) : (
-                <>
-                  Wilting point not measured
-                  {pickedSoil?.predicted_wilting_raw != null &&
-                    `; the percentages predict ${pickedSoil.predicted_wilting_raw}`}
-                  .
-                </>
+                'Wilting point not set, and no percentages to estimate it from. Pots using this soil profile read nothing and are never watered automatically.'
               )}
             </p>
             <div className="soil-capacity">
@@ -501,20 +533,18 @@ export function SoilPanel({ soils, plants, onRefresh }) {
 
         <div className="field-row">
           <p className="field-hint">
-            The percentages do not convert into sensor readings, which is why
-            each mix also needs <strong>field capacity measured once</strong>,
-            above. Soak a pot of it through, let it drain 24 hours, pick the
-            probe sitting in that pot, and measure. That figure is copied onto
-            every pot filled with the mix, and gives the top of their scale.
-            Re-measure after a repot: mixes lose capacity as they age and
-            compact.
+            <strong>Field capacity:</strong> the built-in soil profiles come
+            with a default reading. To measure your own, soak a pot of the mix
+            through, let it drain 24 hours, pick the probe sitting in that pot,
+            and measure. Re-measure after a repot: mixes lose capacity as they
+            age and compact.
           </p>
           <p className="field-hint">
-            To measure your own: weigh the pot soaked and drained 24 hours,
-            then again bone dry, and the difference is the water it holds.
-            Bagged mixes vary by manufacturer and by how firmly they were
-            packed, and they lose capacity as they age and compact — so a
-            measured mix beats a looked-up one.
+            <strong>Wilting point (optional):</strong> no plant needs to wilt.
+            Weigh the pot at field capacity, work out how much water it holds
+            at wilting point from the mix&apos;s percentages and the pot&apos;s
+            volume, and let it dry until it has lost the rest. Then measure,
+            with the same probe.
           </p>
         </div>
       </div>

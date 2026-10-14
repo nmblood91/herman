@@ -15,10 +15,10 @@ sys.modules["spidev"] = types.ModuleType("spidev")
 from greenthumb.config import settings
 from greenthumb.history import HistoryStore
 from greenthumb.services.automation import GreenThumbAutomation
-from tests.helpers import temp_state, temp_store
+from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 
-class Hub:
+class Hub(CalibrationSurface):
     addresses = [0x36, 0x37, 0x38, 0x39]
     def read_one(self, a): return None
 

@@ -1,25 +1,24 @@
-"""Moisture as five descriptive bands, computed per soil.
+"""Moisture as five descriptive bands.
 
-A reading is a percentage of the span between the dry endpoint and field
-capacity. That number is kept — the history chart needs it, and the *rate* of
-drying is a better signal than the level, because it follows light, temperature
-and growth stage on its own where a fixed threshold cannot. What the bands add
-is a way to say what the number means without implying precision the hardware
-cannot deliver.
+A reading is a percentage of plant-available water: 100% at the soil's field
+capacity reading, 0% at its wilting point. So the scale already is the usable
+window -- there is no soil ratio left to apply, and the bands are fixed slices
+of it. That number is kept too: the history chart needs it, and the *rate* of
+drying is a better signal than the level.
 
-**Why they have to be per soil.** The bottom of the usable range is wilting
-point, and where that sits as a fraction of field capacity differs sharply by
-mix: about 27% for coco coir, 57% for a peat potting mix. So coir's plants work
-across nearly the whole scale while a peat pot's live in the top 43% of it. A
-fixed table of thresholds would put half of coir's bands below wilting point
-and squash a peat pot's into two.
+**Where the wilting point comes from.** Field capacity is measured with a probe
+in the soil. Wilting point is usually estimated (soil_sensors.wilting_point_for):
+placed between the probe's air reading and field capacity by the ratio of the
+soil's two published water contents. That assumes air reads like bone-dry soil
+and that the probe responds in a straight line. Neither quite holds, and both
+errors put real wilting point a little above the estimate, so a pot reads a
+little wet and is watered late rather than early. Measuring wilting point by
+weight is the remedy, but it is slow, so it is optional: a soil profile with a
+wilting point reading uses that instead.
 
-**Why bands rather than the number.** On a peat mix the difference between
-comfortable and needing water is about eight points of a 0-100 display, and the
-whole actionable range is a narrow strip at the top. A few percent of
-calibration error moves you two bands. A percentage invites reading precision
-off a scale that cannot support it; a band states the decision and hides a
-distinction the sensor cannot make.
+**Why bands rather than the number.** A few percent of probe error moves a
+reading across a boundary. A band states the decision and hides a distinction
+the sensor cannot make.
 
 Bands are expressed as depletion of plant-available water, which is what
 irrigation practice uses. The DRY boundary at 50% depletion is the conventional
@@ -90,12 +89,12 @@ def is_wetter_or_equal(name: str, target: str) -> bool:
     return band.index <= wanted.index
 
 
-def depletion(percent: float, wilting_fraction: float) -> float | None:
+def depletion(percent: float) -> float | None:
     """Fraction of plant-available water used up, from a reading.
 
-    `percent` is the 0-100 reading against field capacity; `wilting_fraction`
-    is where wilting point sits on that same scale, from the soil library.
-    None when there is nothing usable to work from.
+    `percent` is plant-available water, 0-100. None for the -1 sentinel, which
+    means no judgement is available -- an unreadable probe, or a pot with no
+    scale to read against.
 
     Clamped to 0-1: a reading above field capacity means the pot was caught
     still draining, and one below wilting point means the soil is drier than
@@ -104,29 +103,21 @@ def depletion(percent: float, wilting_fraction: float) -> float | None:
     """
     if percent is None or percent < 0:
         return None
-    if wilting_fraction is None or not 0.0 < wilting_fraction < 1.0:
-        return None
-
-    bottom = wilting_fraction * 100.0
-    window = 100.0 - bottom
-    used = (100.0 - float(percent)) / window
+    used = (100.0 - float(percent)) / 100.0
     return max(0.0, min(used, 1.0))
 
 
-def band_for(
-    percent: float, wilting_fraction: float | None, previous: str | None = None
-) -> str:
-    """Which band a reading falls in, given the soil.
+def band_for(percent: float, previous: str | None = None) -> str:
+    """Which band a reading falls in.
 
     `previous` applies the hysteresis: pass the band last reported for this
     plant and the answer only changes once the reading has cleared the boundary
     properly, rather than on every wobble across it.
 
-    UNKNOWN when the reading is unavailable or the soil supplies no usable
-    ratio. Both mean "cannot say", which is not the same as "very dry" and must
-    not collapse into it.
+    UNKNOWN when the reading is unavailable. That means "cannot say", which is
+    not the same as "very dry" and must not collapse into it.
     """
-    used = depletion(percent, wilting_fraction)
+    used = depletion(percent)
     if used is None:
         return UNKNOWN
 
@@ -147,27 +138,8 @@ def describe(name: str) -> str:
     """One line on what a band means, for the UI."""
     band = BY_NAME.get(name)
     if band is None:
-        return "No usable reading. Check the probe, and that the pot has a soil set."
+        return (
+            "No usable reading. Check the probe, and that the pot's soil profile "
+            "has both its sensor readings."
+        )
     return band.description
-
-
-def window_for(wilting_fraction: float | None) -> list[dict[str, object]]:
-    """Each band as a reading range, for showing the scale a soil actually has.
-
-    Returns the percentages a band spans on the 0-100 display, which is what
-    makes the squeeze visible: on a peat mix every band lands above 57%.
-    """
-    if wilting_fraction is None or not 0.0 < wilting_fraction < 1.0:
-        return []
-
-    bottom = wilting_fraction * 100.0
-    window = 100.0 - bottom
-    return [
-        {
-            "name": band.name,
-            "percent_from": round(100.0 - band.depleted_to * window, 1),
-            "percent_to": round(100.0 - band.depleted_from * window, 1),
-            "description": band.description,
-        }
-        for band in BANDS
-    ]

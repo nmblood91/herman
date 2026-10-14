@@ -1,4 +1,7 @@
-"""Moisture bands: five descriptions computed per soil.
+"""Moisture bands: five descriptions of plant-available water.
+
+A reading is plant-available water, 0-100: 100 at the soil's field capacity
+reading and 0 at its wilting point reading. The bands are fixed slices of that.
 
 The band logic has three places it can go quietly wrong, and each gets its own
 section. A gap or overlap at a boundary makes a reading fall in no band or two.
@@ -15,10 +18,6 @@ sys.modules["spidev"] = types.ModuleType("spidev")
 
 from greenthumb import moisture
 from greenthumb.moisture import BANDS, DRY, MEDIUM, ORDER, UNKNOWN, VERY_DRY, VERY_WET, WET
-from greenthumb.soil_library import LIBRARY
-
-PEAT = 0.57
-COIR = 0.27
 
 
 # --- the scale is continuous and ordered ---
@@ -39,53 +38,38 @@ print("ok: dry begins at 50% depletion, the standard watering trigger")
 
 # Every reading lands in exactly one band.
 for step in range(0, 101):
-    name = moisture.band_for(step, PEAT)
+    name = moisture.band_for(step)
     assert name in ORDER, (step, name)
 print("ok: every reading from 0 to 100 resolves to exactly one band")
 
 
-# --- the soil decides, which is the whole point ---
+# --- the reading is the usable window ---
 
-# The same reading means different things in different mixes, because wilting
-# point sits in a different place. If this ever stops being true, the bands
-# have silently become a fixed table again.
-assert moisture.band_for(80, PEAT) == MEDIUM
-assert moisture.band_for(80, COIR) == WET
-print("ok: 80% is medium in peat and wet in coir, because the soil differs")
+# 100 is field capacity and 0 is wilting point, so the bands sit at the same
+# percentages for every soil -- the soil is already in the two readings.
+assert moisture.band_for(100) == VERY_WET
+assert moisture.band_for(0) == VERY_DRY
+assert moisture.band_for(60) == MEDIUM
+assert moisture.band_for(40) == DRY
+print("ok: field capacity is very wet, wilting point is very dry, the middle is the trigger")
 
-assert moisture.band_for(100, PEAT) == VERY_WET
-assert moisture.band_for(57, PEAT) == VERY_DRY
-print("ok: field capacity is very wet, wilting point is very dry")
+assert moisture.depletion(100) == 0.0
+assert moisture.depletion(50) == 0.5
+assert moisture.depletion(0) == 1.0
+print("ok: depletion is the share of plant-available water used up")
 
 # A reading above field capacity means the pot was caught still draining, and
-# one below wilting point is drier than the plant can work with. Both are real
-# and neither should escape the range.
-assert moisture.depletion(140, PEAT) == 0.0
-assert moisture.depletion(10, PEAT) == 1.0
-print("ok: readings beyond either end clamp rather than running off the scale")
-
-# No band may collapse to nothing, even for the narrowest mix in the library.
-for soil in LIBRARY:
-    spans = moisture.window_for(soil.wilting_fraction)
-    assert len(spans) == len(BANDS), soil.name
-    for span in spans:
-        width = span["percent_to"] - span["percent_from"]
-        assert width > 0.5, f"{soil.name}: {span['name']} is only {width} wide"
-    # And they must cover the usable range without crossing.
-    assert spans[0]["percent_to"] == 100.0, soil.name
-    assert abs(spans[-1]["percent_from"] - soil.wilting_fraction * 100) < 0.5, soil.name
-print(f"ok: all {len(LIBRARY)} library soils give five bands, none of them zero-width")
+# one below wilting point is drier than the plant can work with. The hub
+# clamps, but depletion must not run off the scale even if handed one.
+assert moisture.depletion(140) == 0.0
+print("ok: readings beyond the top clamp rather than running off the scale")
 
 
 # --- cannot say is not a band ---
 
 for reading in (-1, -1.0, None):
-    assert moisture.band_for(reading, PEAT) == UNKNOWN, reading
+    assert moisture.band_for(reading) == UNKNOWN, reading
 print("ok: an unavailable reading is unknown, not very dry")
-
-for ratio in (None, 0.0, 1.0, 1.4, -0.2):
-    assert moisture.band_for(80, ratio) == UNKNOWN, ratio
-print("ok: a missing or impossible soil ratio is unknown, not a guess")
 
 # The consequence that matters: unknown must not read as thirsty. Watering on a
 # reading we do not have is the failure this prevents.
@@ -115,15 +99,12 @@ print("ok: an unrecognised target withholds water rather than dosing on it")
 
 # A reading sitting on a boundary must not flip every poll. Walk a value across
 # the medium/dry edge in small steps and count how often the band changes.
-edge = moisture.BY_NAME[DRY].depleted_from   # 0.50 depleted
-bottom = PEAT * 100
-window = 100 - bottom
-at_edge = 100 - edge * window
+at_edge = 100 - moisture.BY_NAME[DRY].depleted_from * 100   # 50%
 
 changes = 0
-held = moisture.band_for(at_edge + 1.0, PEAT)
+held = moisture.band_for(at_edge + 1.0)
 for offset in (0.3, -0.3, 0.2, -0.2, 0.1, -0.1, 0.25, -0.25):
-    now = moisture.band_for(at_edge + offset, PEAT, previous=held)
+    now = moisture.band_for(at_edge + offset, previous=held)
     if now != held:
         changes += 1
     held = now
@@ -131,24 +112,24 @@ assert changes == 0, f"the band changed {changes} times while hovering on the bo
 print("ok: a reading wobbling on a boundary does not change band")
 
 # But a genuine move across it does change, once.
-held = moisture.band_for(at_edge + 2.0, PEAT)
+held = moisture.band_for(at_edge + 2.0)
 assert held == MEDIUM, held
-drier = moisture.band_for(at_edge - 3.0, PEAT, previous=held)
+drier = moisture.band_for(at_edge - 4.0, previous=held)
 assert drier == DRY, drier
 print("ok: a reading that properly crosses the boundary does change band")
 
 # And it comes back, rather than sticking in the drier band forever.
-back = moisture.band_for(at_edge + 3.0, PEAT, previous=drier)
+back = moisture.band_for(at_edge + 4.0, previous=drier)
 assert back == MEDIUM, back
 print("ok: and it changes back, so hysteresis is not a one-way latch")
 
 # Without a previous band there is nothing to hold, so the raw answer stands.
-assert moisture.band_for(at_edge - 0.1, PEAT) == DRY
+assert moisture.band_for(at_edge - 0.1) == DRY
 print("ok: with no previous band the reading is taken at face value")
 
 # An unknown previous band must not block a real answer.
-assert moisture.band_for(80, PEAT, previous=UNKNOWN) == MEDIUM
-assert moisture.band_for(80, PEAT, previous="nonsense") == MEDIUM
+assert moisture.band_for(60, previous=UNKNOWN) == MEDIUM
+assert moisture.band_for(60, previous="nonsense") == MEDIUM
 print("ok: an unusable previous band does not hold back a good reading")
 
 
@@ -198,17 +179,16 @@ auto = give_every_plant_soil(
 )
 pot = auto.plants[0]
 
-# Peat: wilting at 57% of field capacity, so the medium/dry edge sits at 79%.
 reading = [0.0]
 auto.percent_for_plant = lambda plant: reading[0]
 
-reading[0] = 80.0
+reading[0] = 52.0
 assert auto.band_for_plant(pot) == MEDIUM, auto.band_for_plant(pot)
 
-# The medium/dry edge sits at 78.5%. This is past it, so without the previous
+# The medium/dry edge sits at 50%. This is past it, so without the previous
 # band threaded through it would read dry -- but it is inside the hysteresis
 # margin, so it must not.
-reading[0] = 78.0
+reading[0] = 49.0
 assert auto.band_for_plant(pot) == MEDIUM, (
     "band_for_plant did not pass the previous band through, so a reading "
     "hovering on a boundary would relabel every poll"
@@ -216,16 +196,22 @@ assert auto.band_for_plant(pot) == MEDIUM, (
 print("ok: band_for_plant threads the previous band through, so wobble is damped")
 
 # A real move still gets through, or the damping would just be a freeze.
-reading[0] = 70.0
+reading[0] = 40.0
 assert auto.band_for_plant(pot) == DRY, auto.band_for_plant(pot)
 print("ok: and a genuine change in moisture still changes the band")
 
-# A pot with no soil cannot be judged, and must never read as thirsty.
+# A pot with no soil profile has no wilting point, so no scale: it cannot be
+# judged, and must never read as thirsty. Driven through the real reading,
+# not the stand-in above, since the stand-in would happily give it a number.
+del auto.percent_for_plant
 bare = auto.plants[1]
+auto._history[bare.sensor_address].extend([400.0] * settings.moisture_window_size)
 auto.update_plant_soil(bare.plant_id, "")
+assert auto.scale_problem(bare) == "No soil profile set."
+assert auto.percent_for_plant(bare) == -1.0
 assert auto.band_for_plant(bare) == UNKNOWN
-assert auto.thirsty(bare) is False, "a pot with no soil was judged thirsty"
-print("ok: a pot with no soil is unknown and never thirsty")
+assert auto.thirsty(bare) is False, "a pot with no soil profile was judged thirsty"
+print("ok: a pot with no soil profile is unknown and never thirsty")
 
 
 print("\nall moisture band checks passed")

@@ -108,64 +108,53 @@ assert kept["field_capacity_vwc"] == 32, kept
 print("ok: editing a soil's percentages keeps the capacity measured in a pot")
 
 
-# --- per-sensor conversion ---
+# --- the scale: wilting point to field capacity ---
 
 hub = SoilSensorHub.__new__(SoilSensorHub)  # no I2C bus needed for the maths
 hub.addresses = [0x36, 0x37]
 hub.raw_dry = 350
 hub.calibration = {}
 hub.field_capacity = {}
+hub.wilting_point = {}
 
-# Dry falls back to the configured figure; the other end does not fall back at
-# all, so there is no scale yet.
+# Neither end falls back to anything, so there is no scale yet.
 assert hub.dry_for(0x36) == 350
 assert hub.span_for(0x36) is None
 assert hub.raw_to_percent(683, 0x36) == -1.0
-print("ok: with no field capacity there is no scale, and no percentage")
+print("ok: with neither reading there is no scale, and no percentage")
 
-hub.field_capacity = {0x36: 1016}
-assert hub.span_for(0x36) == (350, 1016)
-assert hub.raw_to_percent(683, 0x36) == 50.0
-print("ok: a measured field capacity gives the top of the scale")
-
-hub.calibration = {0x36: {"dry": 300}}
-hub.field_capacity = {0x36: 500}
-assert hub.span_for(0x36) == (300, 500)
-assert hub.raw_to_percent(400, 0x36) == 50.0
-assert hub.span_for(0x37) is None, "another pot's capacity is not borrowed"
-print("ok: the dry point applies per sensor and the capacity per pot")
-
-# Two sensors reading the same raw value should report different percentages
-# once calibrated differently -- that is the entire point of per-sensor.
-hub.calibration = {0x36: {"dry": 320}, 0x37: {"dry": 345}}
-hub.field_capacity = {0x36: 700, 0x37: 700}
-assert hub.raw_to_percent(500, 0x36) != hub.raw_to_percent(500, 0x37)
-print("ok: identical raw values differ once sensors are calibrated apart")
-
-# And the same probe reads differently in two pots of different mix, which is
-# the reason field capacity moved off the probe in the first place.
-hub.calibration = {0x36: {"dry": 320}}
-hub.field_capacity = {0x36: 700}
-wetter = hub.raw_to_percent(600, 0x36)
+# One end is not enough either: the bottom is no longer the probe in air.
 hub.field_capacity = {0x36: 900}
-assert hub.raw_to_percent(600, 0x36) < wetter
-print("ok: the same raw count means less in a mix that holds more")
-
-# Field capacity is measured on one probe and used by the others, so a pot
-# whose own dry point sits near that figure has no usable scale. This used to
-# clamp, and the top of that clamp reads as "just watered" -- which stops
-# watering for ever.
-hub.calibration = {0x36: {"dry": 500}}
-hub.field_capacity = {0x36: 500}
+assert hub.span_for(0x36) is None, "used the dry point as the bottom"
+assert hub.raw_to_percent(683, 0x36) == -1.0
+hub.field_capacity = {}
+hub.wilting_point = {0x36: 500}
 assert hub.span_for(0x36) is None
-assert hub.raw_to_percent(500, 0x36) == -1.0
-hub.field_capacity = {0x36: 540}
-assert hub.span_for(0x36) is None, "a span under MIN_CALIBRATION_SPAN is not usable"
+print("ok: field capacity or wilting point alone gives no scale")
+
 hub.field_capacity = {0x36: 900}
-assert hub.calibration == {0x36: {"dry": 500}}
-hub.field_capacity = {0x36: 100}
+hub.wilting_point = {0x36: 500}
+assert hub.span_for(0x36) == (500, 900)
+assert hub.raw_to_percent(700, 0x36) == 50.0
+assert hub.raw_to_percent(900, 0x36) == 100.0
+assert hub.raw_to_percent(500, 0x36) == 0.0
+assert hub.raw_to_percent(950, 0x36) == 100.0, "a pot still draining is clamped"
+assert hub.raw_to_percent(420, 0x36) == 0.0, "drier than wilting point is clamped"
+assert hub.span_for(0x37) is None, "another pot's readings are not borrowed"
+print("ok: the reading is plant-available water, 100 at field capacity and 0 at wilting point")
+
+# The dry point is a check on the probe, not part of the scale.
+hub.calibration = {0x36: {"dry": 300}}
+assert hub.raw_to_percent(700, 0x36) == 50.0
+print("ok: calibrating the dry point does not move the reading")
+
+# A too-narrow or inverted span is refused rather than clamped: clamped, the
+# top reads as "just watered", which stops watering for ever.
+hub.wilting_point = {0x36: 860}
+assert hub.span_for(0x36) is None, "a span under MIN_CALIBRATION_SPAN is not usable"
+hub.wilting_point = {0x36: 950}
 assert hub.span_for(0x36) is None, "an inverted span is refused, not flipped"
-assert hub.raw_to_percent(300, 0x36) == -1.0
+assert hub.raw_to_percent(900, 0x36) == -1.0
 print("ok: a too-narrow or inverted span is refused rather than clamped")
 
 print("\nall state and calibration checks passed")
@@ -189,6 +178,7 @@ class _Hub:
     raw_dry = 320
     calibration = {0x36: {"dry": 500}}
     field_capacity: dict = {}
+    wilting_point: dict = {}
     dry_for = SoilSensorHub.dry_for
     span_for = SoilSensorHub.span_for
     raw_to_percent = SoilSensorHub.raw_to_percent
@@ -209,18 +199,22 @@ auto._history[0x36].extend([600.0] * 5)
 pot = auto.plant_for_address(0x36)
 assert pot is not None, "no plant claims 0x36, so there is nothing to average for"
 
-# Set on the pot, not on the hub. The hub's map is owned by the automation
-# layer and rebuilt from the plants, so a figure poked straight into the hub is
-# wiped by the next sync -- which is the behaviour that keeps the two from
-# drifting.
-pot.field_capacity_raw = 700
-auto._sync_field_capacity()
-assert auto.sensor_hub.field_capacity == {0x36: 700}
-# 600 sits midway between this sensor's calibrated dry of 500 and its pot's
-# field capacity of 700.
+# Set on the soil profile, not on the hub. The hub's maps are owned by the
+# automation layer and rebuilt from it, so a figure poked straight into the
+# hub is wiped by the next sync -- which keeps the two from drifting.
+state.save_soil(
+    "Test mix", {"field_capacity_raw": 800, "wilting_point_raw": 400}, auto._state_path
+)
+pot.soil = "Test mix"
+auto._sync_scales()
+assert auto.sensor_hub.field_capacity == {0x36: 800}
+assert auto.sensor_hub.wilting_point == {0x36: 400}
+# 600 sits midway between the soil's wilting point of 400 and its field
+# capacity of 800. With a wilting point reading, the probe's dry point of 500
+# plays no part.
 got = auto.percent_for_plant(pot)
-assert got == 50.0, f"expected the calibrated 50.0, got {got} (the default dry would give ~40)"
-print("ok: the averaged moisture uses the sensor's own dry point and its pot's capacity")
+assert got == 50.0, f"expected 50.0 between wilting point and field capacity, got {got}"
+print("ok: the averaged moisture runs from the soil's wilting point to its field capacity")
 
 # And it is deliberately impossible to get a percentage from an address alone.
 assert not hasattr(auto, "smoothed_percent"), (

@@ -1,32 +1,24 @@
-"""Starting entries for the soil library.
+"""The soil profiles a planter ships with: three soilless substrate recipes.
 
-A soil holds the two water contents that bound what a plant can actually use:
-**field capacity**, what the mix holds once free drainage stops, and **wilting
-point**, where the remaining water is gripped too tightly for roots to pull
-out. The difference is plant-available water.
+Three mixes cover every plant this planter is meant for, each built from
+hardware-store ingredients: a rich, retentive mix for vegetables, herbs and
+thirsty tropicals; a fast-draining mix for desert plants, succulents and woody
+herbs; and an ultra-coarse epiphytic mix for orchids and jungle epiphytes.
+SOIL_PROFILES.md is the user-facing write-up -- recipes, figures and which
+plants go in which.
 
-**What transfers from this table, and what does not.** Only the *ratio* of
-wilting point to field capacity leaves here usefully. It is dimensionless, so a
-published figure applies to any pot of that mix. The absolute water contents do
-*not* convert into raw sensor counts -- a capacitive probe reads dielectric
-permittivity, and that relationship depends on texture, organic matter, bulk
-density and salinity, so turning water content into a reading needs a response
-curve for that specific medium. Which is why field capacity is also *measured*,
-once per mix in a real pot: this table supplies the *shape* of the usable
-window, the measurement supplies its *position*.
+Each carries its published **field capacity** and **permanent wilting point**
+as % volumetric water content. Watering also needs a field capacity *sensor
+reading*, which this table cannot supply -- a capacitive probe's reading
+depends on the exact mix, how firmly it was packed and the probe itself, so it
+is measured in a real pot. The ratio of the two % figures then places each
+pot's wilting point between its probe's air reading and that field capacity
+(soil_sensors.wilting_point_for), so these figures are working numbers, not
+just reference.
 
-That same soil-dependence is the reason recording the mix matters at all. Two
-identical probes in two different mixes will disagree, and without the mix
-written down that spread looks like sensor variation.
-
-**Two things to know before trusting these.** Published figures for mineral
-soils come from standard tensions (-33 kPa and -1500 kPa) and are reasonably
-settled. Container substrates are not: they are mostly organic, far more
-porous, release water at lower tensions, and vary by manufacturer and by how
-firmly they were packed. And they **change with use** -- unused peat holds
-measurably more water than the same mix after a season, as it compacts and
-breaks down. So re-measure after a repot rather than assuming the entry still
-describes the pot.
+The figures are ranges in the source. The midpoint of each is stored, and the
+range is kept in the note so it reaches the editor. Mixes **change with use**
+as they compact and break down, so re-measure field capacity after a repot.
 """
 
 from __future__ import annotations
@@ -42,10 +34,16 @@ from greenthumb.config import settings
 @dataclass(frozen=True)
 class LibrarySoil:
     name: str
-    # Volumetric water content, as a percentage.
+    # Volumetric water content, as a percentage: the midpoint of the published
+    # range, which is kept in the note.
     field_capacity_vwc: float
     wilting_point_vwc: float
     note: str
+    # The default field capacity sensor reading, measured on the reference
+    # build with the recipe mixed as written. None until it has been. It is
+    # what lets a new planter water straight away; a batch that reads
+    # differently is re-measured in the Soil Profile Editor.
+    field_capacity_raw: int | None = None
 
     @property
     def available_points(self) -> float:
@@ -58,64 +56,53 @@ class LibrarySoil:
         return self.wilting_point_vwc / self.field_capacity_vwc
 
 
-# Ordered by how much usable water they hold, widest first.
+# The only three a planter ships with. Ordered wettest to driest, which is also
+# the order of the recipes in SOIL_PROFILES.md.
 LIBRARY: tuple[LibrarySoil, ...] = (
     LibrarySoil(
-        name="Coco coir",
-        field_capacity_vwc=55,
-        wilting_point_vwc=15,
+        name="Rich & Retentive Mix",
+        field_capacity_vwc=50,
+        wilting_point_vwc=17.5,
         note=(
-            "The widest window here and the most forgiving to automate: it "
-            "holds a great deal of water and releases most of it. Wilting "
-            "point sits at only about a quarter of field capacity, so a "
-            "reading has a long way to fall before the plant is in trouble."
+            "Recipe 1, for vegetables and tropicals. 2 parts potting mix, "
+            "1 part peat or coir, 1 part perlite, 1 part vermiculite. Fine "
+            "organic matter and vermiculite hold water and nutrients so "
+            "fast-growing plants never dry out. Field capacity 45-55% VWC, "
+            "permanent wilting point 15-20%, about 30% available water. "
+            "Dries out in 5-10 days indoors. "
+            "For: tomatoes, peppers, bush beans, strawberries, cucumbers; "
+            "lettuce, spinach, kale, basil, parsley, mint, cilantro; ferns, "
+            "calatheas, peace lilies, begonias, fittonia."
         ),
     ),
     LibrarySoil(
-        name="Clay loam",
-        field_capacity_vwc=36,
-        wilting_point_vwc=18,
+        name="Fast-Draining Mix",
+        field_capacity_vwc=25,
+        wilting_point_vwc=8,
         note=(
-            "Holds the most water of the mineral soils but grips half of it "
-            "below wilting point, so its usable window is no wider than "
-            "loam's. The classic trap: wettest on paper, not the most "
-            "forgiving in practice."
+            "Recipe 2, for desert plants and succulents. 2 parts potting mix, "
+            "2 parts perlite, 1 part coarse sand (or fine orchid bark). Large "
+            "pores drain water almost at once, protecting dryland plants from "
+            "root rot. Field capacity 20-30% VWC, permanent wilting point "
+            "6-10%, about 15% available water. Dries out in 3-5 days indoors. "
+            "For: echeveria, aloe vera, jade, haworthia, cacti; snake plants, "
+            "ZZ plants, ponytail palms; rosemary, thyme, lavender, oregano."
         ),
     ),
     LibrarySoil(
-        name="Loam",
-        field_capacity_vwc=28,
-        wilting_point_vwc=11,
+        name="Ultra-Coarse Epiphytic Mix",
+        field_capacity_vwc=15,
+        wilting_point_vwc=4,
         note=(
-            "The reference mineral soil, and the figures most irrigation "
-            "guidance assumes. Rarely what is in a houseplant pot, but useful "
-            "as the benchmark the container mixes are compared against."
-        ),
-    ),
-    LibrarySoil(
-        name="Peat potting mix",
-        field_capacity_vwc=28,
-        wilting_point_vwc=16,
-        note=(
-            "What most bagged potting compost is, and the default to assume. "
-            "Wilting point sits at about 57% of field capacity, so the whole "
-            "usable range is the top 43% of a field-capacity-referenced "
-            "scale -- and published work notes the transition from field "
-            "capacity to wilting is fast. Comfortable to needing water is a "
-            "small change in water content, which is why a percentage reads "
-            "as more precise than it is."
-        ),
-    ),
-    LibrarySoil(
-        name="Cactus / sandy mix",
-        field_capacity_vwc=12,
-        wilting_point_vwc=5,
-        note=(
-            "The narrowest window by far: it holds little and loses it "
-            "quickly. Suits plants that want to dry out, which is the point, "
-            "but it leaves very little margin -- the same absolute error in "
-            "calibration spans a far larger share of the usable range here "
-            "than in coir."
+            "Recipe 3, for orchids and jungle epiphytes. 3 parts coarse bark, "
+            "1 part chunk coir or peat, 1 part coarse perlite (or pumice). "
+            "Maximum air around thick, fleshy roots; water is held only inside "
+            "the bark and the coir fibres. Field capacity 12-18% VWC, "
+            "permanent wilting point 3-5%, about 10% available water. Dries "
+            "out in 1-3 days indoors. "
+            "For: phalaenopsis, cattleya, dendrobium, oncidium orchids; "
+            "anthuriums, monsteras, philodendrons, syngoniums; Christmas and "
+            "Thanksgiving cactus, hoyas, staghorn ferns, tillandsia."
         ),
     ),
 )
@@ -125,14 +112,22 @@ def install(overwrite: bool = False, path=None) -> dict[str, str]:
     """Write the library into the soil store.
 
     Existing entries are kept unless `overwrite` is set, so this never quietly
-    replaces a mix somebody has measured for themselves.
+    replaces a mix somebody has measured for themselves. The one exception is
+    a kept entry with no field capacity reading at all: it is given the
+    default, since there is nothing of anyone's to lose and without it the
+    planter cannot water.
     """
-    existing = {name.casefold() for name in state.load_soils(path)}
+    existing = {name.casefold(): entry for name, entry in state.load_soils(path).items()}
     outcome: dict[str, str] = {}
 
     for soil in LIBRARY:
-        if soil.name.casefold() in existing and not overwrite:
-            outcome[soil.name] = "kept"
+        stored = existing.get(soil.name.casefold())
+        if stored is not None and not overwrite:
+            if soil.field_capacity_raw is not None and stored.get("field_capacity_raw") is None:
+                state.save_soil(soil.name, _default_reading(soil), path)
+                outcome[soil.name] = "kept, default field capacity added"
+            else:
+                outcome[soil.name] = "kept"
             continue
         state.save_soil(
             soil.name,
@@ -144,11 +139,27 @@ def install(overwrite: bool = False, path=None) -> dict[str, str]:
                 # the reasoning stayed in the source and never reached anyone
                 # reading the library in the app.
                 "notes": soil.note,
+                **(_default_reading(soil) if soil.field_capacity_raw is not None else {}),
             },
             path,
         )
         outcome[soil.name] = "written"
     return outcome
+
+
+def _default_reading(soil: LibrarySoil) -> dict[str, object]:
+    """The shipped field capacity reading, marked as not measured here.
+
+    No date and no samples, the same tell as a figure typed by hand: the app
+    shows a date beside a reading taken on this planter and nothing beside
+    this one.
+    """
+    return {
+        "field_capacity_raw": int(soil.field_capacity_raw),
+        "field_capacity_samples": 0,
+        "field_capacity_measured_at": "",
+        "field_capacity_address": None,
+    }
 
 
 # Mirrors soil_sensors.MIN_CALIBRATION_SPAN. Copied rather than imported: that
@@ -176,16 +187,21 @@ def set_field_capacity(name: str, raw: int, path=None) -> str:
         known = ", ".join(sorted(soils)) or "none installed"
         raise ValueError(f"No soil profile called {name.strip()!r}. Installed: {known}")
 
-    # A figure at or below the dry floor cannot produce a reading: span_for
-    # returns None under MIN_CALIBRATION_SPAN, every pot on that mix reads -1,
-    # and nothing is ever watered. Refused here rather than stored, because
-    # from the app that state is indistinguishable from never having measured.
-    floor = settings.moisture_raw_dry + MIN_CALIBRATION_SPAN
+    # A figure too close to the soil profile's wilting point cannot produce a
+    # reading: span_for returns None under MIN_CALIBRATION_SPAN, every pot on
+    # it reads -1, and nothing is ever watered. Refused here rather than
+    # stored, because from the app that state is indistinguishable from never
+    # having measured. With no wilting point yet, the probes' air reading is
+    # the floor: soil never reads below it.
+    wilting = soils[key].get("wilting_point_raw")
+    if isinstance(wilting, (int, float)) and not isinstance(wilting, bool):
+        floor, what = int(wilting) + MIN_CALIBRATION_SPAN, f"its wilting point of {int(wilting)}"
+    else:
+        floor, what = settings.moisture_raw_dry + 1, f"a probe in open air ({settings.moisture_raw_dry})"
     if raw < floor:
         raise ValueError(
-            f"{raw} is too low to read against: the dry floor is "
-            f"{settings.moisture_raw_dry} and a usable span needs at least "
-            f"{MIN_CALIBRATION_SPAN} counts above it, so {floor} or more."
+            f"{raw} is too low: field capacity has to read above {what}, "
+            f"so {floor} or more."
         )
 
     state.save_soil(
@@ -203,11 +219,12 @@ def set_field_capacity(name: str, raw: int, path=None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Starting entries for the soil library.",
+        description="The three soil profiles a planter ships with. See SOIL_PROFILES.md.",
         epilog=(
-            "Only the wilting-point-to-field-capacity ratio transfers between "
-            "pots. Field capacity itself is measured per mix in the app, under "
-            "Plants and Soil, and must be re-measured after a repot."
+            "Watering runs on each soil profile's field capacity sensor "
+            "reading, with wilting point estimated from it and the %% VWC "
+            "figures. A shipped default reading is used until you measure your "
+            "own in the Soil Profile Editor in the app."
         ),
     )
     parser.add_argument(
@@ -234,10 +251,7 @@ def main(argv: list[str] | None = None) -> int:
             print(error)
             return 1
         print(f"{key}: field capacity set to {int(raw)} by hand, not measured.")
-        print(
-            "Pots already filled with it keep the figure they have -- the copy "
-            "is deliberate. Re-pick the mix on a pot's card to take this one."
-        )
+        print("Every pot filled with it reads against this once the service restarts.")
         return 0
 
     if not args.install:
@@ -249,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"   usable {soil.available_points} pts"
                 f"   (wilting at {soil.wilting_fraction * 100:.0f}% of field capacity)"
             )
+            reading = soil.field_capacity_raw
+            print(f"  default field capacity reading {reading if reading is not None else 'not set yet'}")
             print(f"  {soil.note}")
         print("\nRe-run with --install to add these to the soil library.")
         return 0
@@ -260,9 +276,9 @@ def main(argv: list[str] | None = None) -> int:
     if kept:
         print(f"\n{kept} left as they were. Re-run with --overwrite to replace them.")
     print(
-        "\nSet a soil on each pot under Plants and Soil, then measure each "
-        "mix's field capacity there. A pot is not watered automatically until "
-        "both are done."
+        "\nSet a soil profile on each pot under Plants and Soil. A soil profile "
+        "without a field capacity reading needs one measured in the Soil "
+        "Profile Editor before its pots are watered automatically."
     )
     return 0
 

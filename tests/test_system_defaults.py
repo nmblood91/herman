@@ -71,8 +71,7 @@ def placement(plant):
     """Everything on a pot that a restore puts back."""
     return (
         plant.name, plant.profile, plant.position_mm, plant.watering_mode, plant.sweep_min_mm,
-        plant.sweep_max_mm, plant.soil, plant.field_capacity_raw,
-        plant.field_capacity_source, plant.moisture_target, plant.watering_volume_ml,
+        plant.sweep_max_mm, plant.soil, plant.moisture_target, plant.watering_volume_ml,
     )
 
 
@@ -103,16 +102,17 @@ state.save_calibration_point(0x36, "dry", 410, path=path)
 
 # ...and every pot.
 soil = next(iter(soils_before))
+state.save_soil(soil, {"field_capacity_raw": 777}, path)
+soils_before = state.load_soils(path)  # a reading is library data, so it stays
 for plant in auto.plants:
     auto.update_plant_name(plant.plant_id, f"Renamed {plant.plant_id}")
     auto.update_plant_soil(plant.plant_id, soil)
-    plant.field_capacity_raw = 777
-    plant.field_capacity_source = "pot"
+assert auto.sensor_hub.field_capacity, "the pots never got a scale to lose"
 auto.set_plant_position("plant_2", 300)
 auto.set_plant_sweep("plant_3", 450, 680)
 auto.set_watering_mode("plant_3", "sweep")
 auto._persist()
-auto._sync_field_capacity()
+auto._sync_scales()
 auto.save_plant_profile("plant_1")
 profiles_before = state.load_profiles(path)
 assert profiles_before, "the plant profile did not save"
@@ -130,8 +130,8 @@ auto.restore_system_defaults()
 assert [placement(plant) for plant in auto.plants] == FRESH, [
     placement(plant) for plant in auto.plants
 ]
-assert auto.sensor_hub.field_capacity == {}, "a wiped pot's field capacity is still in use"
-print("ok: every pot is back to its default name, spot, sweep, soil and field capacity")
+assert auto.sensor_hub.field_capacity == {}, "a pot with no soil profile still has a scale"
+print("ok: every pot is back to its default name, spot, sweep and soil profile")
 
 # --- and every setting ---
 

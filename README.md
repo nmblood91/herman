@@ -30,6 +30,7 @@ This repository is intentionally structured as a product-ready foundation for a 
 | Document | Covers |
 |---|---|
 | [HOW_WATERING_WORKS.md](HOW_WATERING_WORKS.md) | The watering rules and the reasoning, in plain language |
+| [SOIL_PROFILES.md](SOIL_PROFILES.md) | The three soil recipes, which plants go in which, and how to take each one's readings |
 | [frontend/README.md](frontend/README.md) | Web UI build and layout |
 
 **Product direction**
@@ -234,7 +235,7 @@ that has fallen off a re-measured rail, or Klipper not reporting its motion
 limits. The plant still drinks either way: the sweep decides how the water is
 spread, not whether it arrives.
 
-The mode and the two bounds are **not** part of a plant profile profile, for the
+The mode and the two bounds are **not** part of a plant profile, for the
 same reason `position_mm` is not. They are rail coordinates, so they cannot
 travel between pots, and a profile carrying the mode without them would load as
 a sweep over a span of zero.
@@ -256,123 +257,134 @@ matter, bulk density and salinity all shift that relationship — so two
 identical probes in two different mixes genuinely disagree. Without the mix
 written down, that spread looks like sensor variation.
 
-A soil entry holds field capacity and wilting point as volumetric water
-content. **Only their ratio transfers**: it is dimensionless, so a published
-figure applies to any pot of that mix, and it is what says where the bottom of
-the usable range sits. The absolute figures do *not* convert into raw sensor
-counts — that needs a response curve for the specific medium — which is why
-field capacity is also **measured** per mix, in raw sensor counts, from a real
-pot. The published figures supply the *shape* of the usable window; the
-measurement supplies its *position* on the scale a probe reports.
+**A soil profile's working figures are one sensor reading and two
+percentages**: its field capacity reading (what a probe reads in that soil
+soaked and drained 24 hours), and the mix's field capacity and wilting point as
+% volumetric water content, the table below. Every pot using the soil profile is
+read between field capacity and wilting point — see *Moisture bands* below.
 
-| Mix | Field capacity | Wilting point | Usable |
+Wilting point is not measured. Each pot estimates it from its field capacity
+reading and its probe's air reading, counted as 0% water. It is placed the
+same fraction of the way up as the mix's wilting point % is of its field
+capacity %. A soil profile can hold a measured wilting point reading instead,
+which then wins over the estimate.
+
+**Three soil profiles ship, and no others** — three soilless recipes made from
+hardware-store ingredients that between them cover every plant this planter is
+meant for. **[SOIL_PROFILES.md](SOIL_PROFILES.md)** has the recipes, the
+figures, which plants go in which, and how to take the field capacity reading.
+
+| Soil profile | For | Field capacity | Wilting point |
 |---|---|---|---|
-| Coco coir | 55% VWC | 15% | 40 pts |
-| Clay loam | 36% | 18% | 18 pts |
-| Loam | 28% | 11% | 17 pts |
-| Peat potting mix | 28% | 16% | 12 pts |
-| Cactus / sandy mix | 12% | 5% | 7 pts |
+| Rich & Retentive Mix | vegetables, herbs, thirsty tropicals | 45–55% VWC | 15–20% |
+| Fast-Draining Mix | cacti, succulents, woody herbs | 20–30% VWC | 6–10% |
+| Ultra-Coarse Epiphytic Mix | orchids, aroids, jungle epiphytes | 12–18% VWC | 3–5% |
 
-Clay loam is the instructive one: it holds the most water of the mineral soils
-but grips half of it below wilting point, so its usable window is no wider than
-loam's. Wettest on paper is not most forgiving in practice.
+The midpoint of each range is stored on the soil profile, and the full recipe,
+ranges and plant list are in its note in the editor.
 
-Two caveats. Mineral-soil figures come from standard tensions and are settled;
-container substrates are not, varying by manufacturer and by how firmly they
-were packed. And mixes **lose capacity as they age and compact** — unused peat
-holds measurably more than the same mix after a season — so re-measure after a
-repot rather than trusting the old figure.
+Every batch comes out a little different with the brand of potting mix and how
+firmly it is packed, and mixes **lose capacity as they age and compact** — so
+re-measure field capacity after a repot rather than trusting the old reading.
 
-### Measuring a mix's field capacity
+### Setting a soil profile's field capacity reading
 
-Plants and Soil → Soils. Soak a pot of the mix through, let it drain 24 hours,
-pick which pot's probe to read it with, and press Measure.
+The three built-in soil profiles ship with a default field capacity reading,
+taken on the reference build with each recipe mixed as written, so a new
+planter can water as soon as each pot has a soil profile. Take the probes' air
+readings too (Calibration → Moisture probes → Calibrate dry), since each pot's
+wilting point is estimated up from its own probe's.
+
+To replace a default with your own, or set one on a soil profile you added,
+go to the Soil Profile Editor on the Plants and Soil tab. Either type the
+reading in, or soak a pot of the mix through, let it drain 24 hours, pick that
+pot's probe and press Measure field capacity.
 
 ```bash
-curl -X POST http://herman.local/api/v1/soils/Coco%20coir/field-capacity \
+curl -X POST "http://herman.local/api/v1/soils/Rich%20%26%20Retentive%20Mix/field-capacity" \
   -H 'Content-Type: application/json' -d '{"plant_id":"plant_2","seconds":20}'
 ```
 
-**Once per mix, not once per pot.** Probes of the same kind read closely enough
-that one good figure beats four nobody got round to taking, so the result is
-copied onto every pot filled with that mix. A pot that disagrees can measure
-its own on its card, which overrides the mix's for that pot; assigning a
-different mix drops the override, since a reading taken in coir says nothing
-about cactus mix.
+**Optional: a measured wilting point.** The estimate errs slightly wet, so a
+pot is watered a little late rather than early. To replace it, use a pot of the
+mix with no plant. Weigh it at field capacity and work out how much water it
+holds at wilting point from the mix's % figures and the pot's volume. Let it
+dry until it has lost the rest, then press Measure wilting point with the same
+probe (or `POST .../wilting-point`). Clear the field to go back to the
+estimate.
 
-**This moved off the probe, and the old per-address wet endpoint is gone.** It
-recorded a wet reading with no note of which mix it was taken against, so two
-pots of different soil wanted different figures and there was nowhere to put
-them. Files written by older builds keep their `wet` keys; they are never read
-and never rewritten. Nothing is migrated, because there is no honest derivation
-— the old figure could have been taken in any mix, and the pot may have been
-repotted since.
+**Once per soil profile, not once per pot.** Probes of the same kind read
+closely enough that one good figure beats four nobody got round to taking, so
+the reading serves every pot using that soil profile, and moving a pot to
+another soil profile moves it onto that one's scale. There is deliberately no
+per-pot override: one figure per soil profile is far easier to reason about.
 
-**A pot with no field capacity reads -1 and is never watered automatically**,
-the same as an unplugged probe. The status bar names the mixes and pots waiting
-on a measurement. There is deliberately no fallback: a placeholder would give
-an unmeasured pot a plausible percentage against a number nobody took, which is
-the one error in this system that nothing downstream can catch.
+**A pot without a field capacity reading reads -1 and is never watered
+automatically**, the same as an unplugged probe. So does one whose soil profile
+has neither its % figures nor a wilting point reading. The card and the status
+bar say what is missing. There is deliberately no fallback for field capacity:
+a placeholder would give a pot a plausible percentage against a number nobody
+took, which is the one error in this system that nothing downstream can catch.
 
-An unknown soil name is refused rather than stored, since a mix that is not in
-the library supplies no ratio and would read as "set" while behaving exactly
-like "not set".
+An unknown soil profile name is refused rather than stored on a pot.
 
-**Add your own mix** in the Soils panel on the Plants and Soil tab, or over the API:
+**Add your own** in the Soil Profile Editor, or over the API. Only the name is
+required, so a profile can be saved first and measured later; watering needs
+the field capacity reading and the % pair (or a wilting point reading in place
+of the pair). Readings left out keep what is stored, and `null` clears one:
 
 ```bash
-curl -X POST http://herman.local/api/v1/soils -H 'Content-Type: application/json'   -d '{"name":"My potting mix","field_capacity_vwc":30,"wilting_point_vwc":14}'
+curl -X POST http://herman.local/api/v1/soils -H 'Content-Type: application/json' \
+  -d '{"name":"My potting mix","field_capacity_vwc":40,"wilting_point_vwc":14,"field_capacity_raw":820}'
 ```
 
-A soil takes a note too, for where its figures came from.
-
-Saving replaces any soil of that name. Figures that cannot support a ratio are
-refused rather than stored: one that saved happily and then yielded no ratio
-would behave exactly like no soil at all, so the pot would read as configured
-and never be watered.
-
-A measured mix beats a looked-up one, and the measurement needs only a kitchen
-scale: weigh the pot soaked and drained 24 hours, weigh it again bone dry, and
-the difference is the water it holds. That matters because bagged mixes vary by
-manufacturer and by packing, and lose capacity as they age.
+A soil profile takes a note too, for where its figures came from. Saving
+replaces any soil profile of that name; a % pair must be given whole or not at
+all, and wilting point must read below field capacity.
 
 ## Moisture bands
 
-A plant is watered when its pot reaches a **band**, not a percentage:
+A pot's moisture is **plant-available water**: 100% at its soil profile's
+field capacity reading, 0% at its wilting point (estimated, or the soil
+profile's reading).
 
-| Band | Depletion of plant-available water |
-|---|---|
-| very wet | 0-10% — just watered |
-| wet | 10-30% |
-| medium | 30-50% |
-| **dry** | **50-75% — the conventional watering trigger** |
-| very dry | 75-100% — near the limit of what roots can pull out |
+`moisture % = (reading − wilting point) ÷ (field capacity − wilting point)`
+
+A plant is watered when its pot reaches a **band**, not a percentage. The bands
+are fixed slices of that scale, the same for every soil — the soil is already
+in the two ends:
+
+| Band | Available water | Depletion |
+|---|---|---|
+| very wet | 90-100% | 0-10% — just watered |
+| wet | 70-90% | 10-30% |
+| medium | 50-70% | 30-50% |
+| **dry** | **25-50%** | **50-75% — the conventional watering trigger** |
+| very dry | 0-25% | 75-100% — near the limit of what roots can pull out |
 
 The percentage is still kept and still charted — the *rate* of drying says more
 than the level, because it follows light, temperature and growth stage on its
 own where a fixed threshold cannot. The band is what a target is expressed in.
 
-**Bands are computed per soil, which is the point.** The bottom of the usable
-range is wilting point, and that sits at about 27% of field capacity for coco
-coir but 57% for a peat mix. So the same reading means different things: 80% is
-*medium* in peat and *wet* in coir. A fixed table of thresholds would put half
-of coir's bands below wilting point and squash a peat pot's into two.
+**How far to trust the estimated wilting point.** Soil reads a little above
+air even bone dry, and capacitive probes are not perfectly linear. Both put
+real wilting point slightly above the estimate, so a pot reads a little wetter
+than it is and is watered a little late, never early. Measuring wilting point
+by weight removes that, but it is slow; for most plants, setting the target
+one band wetter does the same job.
 
-**Why bands rather than the number.** On a peat mix the whole actionable range
-is the top 43% of the scale, and the step from comfortable to needing water is
-about eight points of a 0-100 display. A few percent of calibration error moves
-you two bands. A percentage invites reading precision the sensor cannot
-deliver; a band states the decision and hides a distinction the hardware cannot
-make.
+**Why bands rather than the number.** A few percent of probe error moves a
+reading without meaning anything. A band states the decision and hides a
+distinction the hardware cannot make.
 
 Readings hold their band until one clears a boundary properly, so a value
 parked on a threshold does not relabel on every poll.
 
-**A pot with no soil set is never watered automatically.** Without the mix
-there is no wilting point, so a reading cannot become a band at all — and
+**A pot without a scale is never watered automatically** — no soil profile,
+no field capacity reading, or nothing to place wilting point from. A reading cannot become a band at all, and
 "cannot say" must not collapse into "very dry", or an unplugged probe would
-read as the thirstiest plant on the rail. The status bar names any pot in that
-state. Manual watering is unaffected.
+read as the thirstiest plant on the rail. The card and status bar say which is
+missing. Manual watering is unaffected.
 
 ### Starter profiles
 

@@ -95,18 +95,19 @@ MOISTURE_SENSOR_ADDRESSES=54,55,56,57
 
 ## Calibration
 
-Raw capacitance readings only become a percentage once each sensor's dry and wet
-endpoints are known. Measure them per sensor rather than globally: four sensors
-in identical conditions read measurably differently — on this build they span
-about 25 counts in open air — and one global pair puts that spread straight into
-every reported percentage.
+A raw reading becomes a moisture percentage against two readings taken in the
+pot's soil: **field capacity** at 100% and **wilting point** at 0%. Both are
+properties of the *soil* — the same mix in another pot reads roughly the same,
+and a different mix does not — so they live on the soil profile and are shared
+by every pot using it. They are typed or measured in the app; see below.
 
-**The two ends of the scale come from different places, and that is the whole
-design.** The dry end is a property of the *probe* — prongs in open air — so it
-is measured per sensor. The wet end is field capacity, which is a property of
-the *mix*: the same soil in another pot gives roughly the same reading, and a
-different soil does not. So it is measured once per mix and shared by every pot
-filled with it.
+The **dry pass** records what each probe reads in open air: its 0% water
+point. Each pot's wilting point is estimated up from it, so take it before
+relying on automatic watering. Four probes in identical conditions read
+measurably differently — on this build they span about 25 counts in open air —
+which is why each pot uses its own probe's. It doubles as a probe check: one far
+from the others is worth a look, and every field capacity or wilting point
+reading taken with a probe has to sit above its air reading.
 
 The dry pass, all four at once, sampling for 20 seconds and taking the median
 so one bad read cannot skew it:
@@ -120,15 +121,21 @@ cd /opt/greenthumb
 .venv/bin/python -m greenthumb.hardware.soil_sensors --show-calibration
 ```
 
-**Field capacity is measured in the app**, under Plants and Soil → Soils. Pick
-the mix, pick which pot's probe to read it with, and press Measure. There is no
-CLI pass for it, because it has to be attached to a soil entry and the CLI has
-no notion of one.
+**Field capacity belongs to the soil profile.** The three built-in soil
+profiles ship with a default reading, taken on the reference build with the
+recipe mixed as written. To use your own, go to the Soil Profile Editor on the
+Plants and Soil tab: type it in, or pick which pot's probe to read with and
+press Measure field capacity. There is no CLI pass for measuring it, because it
+has to be attached to a soil profile and the CLI has no notion of one. Every
+pot using the soil profile reads against the same figure; there is no per-pot
+override. Wilting point is estimated from it, the probe's air reading and the
+soil profile's % figures, unless the soil profile has a measured wilting point
+reading.
 
-A pot that disagrees with the rest can measure its own on its card, which
-overrides the mix's figure for that pot only. Assigning a *different* mix to
-that pot drops the override, since a reading taken in coir says nothing about
-cactus mix.
+> **Measuring wilting point (optional) without wilting a plant:** use a pot of the mix with no plant
+> in it. Weigh it at field capacity, work out from the mix's published % figures
+> and the pot's volume how much water it holds at wilting point, and let it dry
+> until it has lost the rest. Then measure with the same probe.
 
 > **Field capacity means soaked and then left alone for 24 hours.** Water until
 > it runs from the bottom, let it drain, and come back a day later. Measuring
@@ -139,28 +146,27 @@ cactus mix.
 > the PCB or the connector end destroys the sensor.
 
 Results are written to `data/state.json`, which is gitignored and survives both
-restarts and `git pull`. The two ends are stored separately — dry under
-`moisture_calibration` by address, field capacity on the soil and on the pot —
-so either can be redone without losing the other.
+restarts and `git pull`. Air readings are stored under `moisture_calibration`
+by address; field capacity and wilting point on the soil profile.
 
-**Only the dry end falls back.** A probe with no measured dry point uses
-`MOISTURE_RAW_DRY`, which is defensible because dry is the floor: being wrong
-about it compresses a reading rather than inventing a ceiling. A pot with no
-field capacity has no scale at all and reads **-1**, the same value an
-unplugged probe gives — and -1 is never watered. That is deliberate. A
-configured placeholder there would hand a never-measured pot a plausible
-percentage against a number nobody took, and nothing downstream could tell it
-from a real one.
+**Field capacity does not fall back.** A pot missing its field capacity
+reading has no scale and reads **-1**, the same value an unplugged probe gives
+— and -1 is never watered. That is deliberate. A configured placeholder would
+hand a never-measured pot a plausible percentage against a number nobody took,
+and nothing downstream could tell it from a real one. The air reading does have
+a default, `MOISTURE_RAW_DRY`, used for any probe without a dry pass, and the
+wilting point estimate moves with it.
 
 Two consequences worth knowing:
 
-- **A fresh install waters nothing until a field capacity is measured.** The
-  status bar says so, naming the mixes and the pots waiting on them.
-- **A span can be too narrow to use.** The mix's figure is taken on one probe
-  and used by the others, so a pot whose own dry point sits close to it has no
-  usable range. That pot reads -1 rather than being clamped to 0% or 100% —
-  the 100% end of such a clamp reads as "just watered" and would stop watering
-  for ever. Measure that pot's own field capacity on its card.
+- **A fresh install waters nothing until a soil profile has a field capacity
+  reading.** The card and the status bar say what is missing.
+- **A span can be too narrow to use.** A field capacity barely above the
+  probe's air reading leaves almost no room for a scale, and a measured
+  wilting point taken on one probe can land close to another pot's field
+  capacity. That pot reads -1 rather than being clamped to 0% or 100% — the
+  100% end of such a clamp reads as "just watered" and would stop watering for
+  ever.
 
 ### Which wet endpoint
 

@@ -278,42 +278,6 @@ function App() {
     }
   }
 
-  // 20s of sampling, like the dry calibration. Blocks for the window.
-  const measureFieldCapacity = async (plantId) => {
-    try {
-      setStatus('Measuring field capacity, 20s...', { sticky: true })
-      const result = await fetchJson(`/plants/${plantId}/field-capacity`, {
-        method: 'POST',
-        body: JSON.stringify({ seconds: 20 }),
-      })
-      setStatus(
-        result.written
-          ? `Field capacity for this pot is ${result.value}. It now overrides ` +
-              'the figure from its mix.'
-          : `Not stored — ${result.reason}`,
-      )
-      await loadDashboard()
-    } catch (error) {
-      setStatus(`Could not measure: ${error.message}`)
-    }
-  }
-
-  const clearFieldCapacity = async (plantId) => {
-    try {
-      const result = await fetchJson(`/plants/${plantId}/field-capacity`, {
-        method: 'DELETE',
-      })
-      setStatus(
-        result.field_capacity_source === 'soil'
-          ? "Dropped this pot's own figure. It is back to using its mix's."
-          : "Dropped this pot's own figure. Its mix has none, so the pot now " +
-              'reads nothing until one is measured.',
-      )
-      await loadDashboard()
-    } catch (error) {
-      setStatus(`Could not clear: ${error.message}`)
-    }
-  }
 
   // Pot fields only. This used to be nine calls ending in a profile save, so
   // storing a rail coordinate also wrote a plant profile -- the two are edited
@@ -395,8 +359,6 @@ function App() {
             onLoadProfile={loadProfile}
             onClearProfile={clearProfile}
             soils={soils}
-            onMeasureFieldCapacity={measureFieldCapacity}
-            onClearFieldCapacity={clearFieldCapacity}
             onMove={moveGantry}
           />
           {/* Below the cards, because both are libraries the cards pick from:

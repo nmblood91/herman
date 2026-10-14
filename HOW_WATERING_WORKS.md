@@ -21,26 +21,75 @@ directly — it measures how easily an electrical signal passes through the soil
 around it, which changes depending on how wet that soil is. Wet soil and dry
 soil give very different signals, and that difference is what we use.
 
-The probe reports a plain number — a few hundred in open air, a few hundred
-more sitting in water. Those two ends are the scale: the planter converts every
-reading onto 0–100% between them, so when the app shows "43% moisture," that's
-where the raw number falls between bone dry and underwater.
+The probe reports a plain number, a sensor reading: a few hundred in open air,
+higher the wetter the soil around it. The planter reads every pot against two
+readings of its soil:
 
-**Each probe gets its own two ends, and you measure them.** Probes differ from
-each other by enough to matter — the four on this build read about 25 counts
-apart in identical conditions — so one shared scale would bake that difference
-into every percentage. Calibration is two passes, one with the sensors in open
-air and one with them in water, and it stores a dry and wet point per sensor.
-Run it from the Sensors tab, or see SENSOR_WIRING.md for the procedure and the
-warning about not submerging the boards.
+- **The top: field capacity.** What the probe reads once the soil has been
+  soaked and left to drain for 24 hours — as wet as it holds on its own.
+  Measured once per **soil profile**.
+- **The bottom: wilting point.** What the probe would read once the soil is so
+  dry the plant can no longer pull water out of it. Worked out, not measured.
 
-Until a sensor is calibrated it falls back to a rough built-in pair, which is
-good enough to show a number but not good enough to water on.
+Field capacity belongs to the soil rather than the probe, because a different
+mix holds a different amount of water. Herman ships with three soil profiles,
+one for each kind of plant — see [SOIL_PROFILES.md](SOIL_PROFILES.md) for the
+recipes. Each comes with a default field capacity reading, so a new planter
+can water straight away. To use your own, type the reading into the **Soil
+Profile Editor** or measure it there with one pot's probe. Every pot using that
+soil profile reads against it.
 
-One thing worth knowing: **soil never reaches 100%.** Plain water conducts better
-than even soaking wet dirt, so a freshly watered pot might read 80%. That's
-normal and it's the safe direction to be wrong in — the planter will never
-mistake damp soil for wet enough.
+Wilting point is worked out for each pot from its field capacity reading, its
+probe's **air reading** (Calibration → Moisture probes), which counts as 0%
+water, and the soil profile's **% VWC** figures. It sits the same fraction of
+the way from air to field capacity as the soil's wilting point % is of its
+field capacity %. Taking a real wilting point reading means drying a pot by
+weight, which is slow and fiddly, and the estimate is close enough for the
+bands below.
+
+The moisture shown on a card is then **plant-available water**:
+`(reading − wilting point) ÷ (field capacity − wilting point)`, as a
+percentage. 100% is just watered and drained; 0% is wilting point. So "40%"
+means 40% of the water the plant can use is still there, whatever the soil.
+
+The moisture bands are fixed slices of that same scale:
+
+| Band | Available water |
+| --- | --- |
+| very wet | 90–100% |
+| wet | 70–90% |
+| medium | 50–70% |
+| dry | 25–50% |
+| very dry | 0–25% |
+
+A plant set to water at "dry" is watered once it goes past dry into very dry;
+set to "medium", once it goes past medium into dry. The dry boundary at half the
+available water used is the standard irrigation trigger, not a number picked
+here.
+
+**Without a field capacity reading a pot reads nothing at all** — the card
+shows "no reading" and says what is missing — and is never watered
+automatically. That is deliberate. A made-up top of the scale would give a
+believable percentage against a number nobody measured, and nothing downstream
+could catch it.
+
+**Which way the estimate is off.** Soil reads a little above air even bone
+dry, and the probes do not respond in a perfectly straight line. Both put the
+real wilting point a little *above* the estimate. So a pot reads slightly
+wetter than it is, and is watered a little late rather than early. If a plant
+looks thirsty before it is watered, set its target one band wetter.
+
+**Measuring wilting point instead.** A soil profile with a **Wilting point
+(sensor reading)** uses that instead of the estimate. To take one without
+wilting a plant, use a pot of the mix with no plant in it. Weigh it at field
+capacity, work out how much water it holds at wilting point from the mix's
+percentages and the pot's volume, and let it dry until it has lost the rest.
+Then measure, with the same probe.
+
+So automatic watering needs, per pot: a soil profile with a field capacity
+reading and its two % VWC figures (all three built-in soil profiles have
+them). It is best with the probes' air readings taken; without them every probe
+uses `MOISTURE_RAW_DRY` from `.env`.
 
 ## Why it averages ten readings instead of trusting one
 
@@ -73,13 +122,12 @@ must be yes** or it moves on and tries again next minute.
    homed, something is in the way — the planter refuses to run the pump.
    Watering the wrong spot is worse than not watering.
 
-On that last one: the planter homes itself shortly after it comes up, so this
-clears on its own within a minute of a restart. Until it homes, the board
-reports a position relative to wherever the arm happened to be when the power
-went on, which is a meaningless number that looks like a real one. If the
-planter boots during quiet hours the home waits for the window to close, since
-the arm is one of the two loud parts. Both of those are switchable under
-Automation.
+On that last one: until the arm homes, the board reports a position relative
+to wherever the arm happened to be when the power went on, which is a
+meaningless number that looks like a real one. Home it from Controls after
+each start, or switch on **Home after startup** under Automation, which does it
+within a minute of the planter coming up and keeps retrying until it lands.
+See *Homing* below.
 
 Only then does the pump run.
 
@@ -187,7 +235,7 @@ planter records that your plant was watered. Everything else here fails loudly;
 that one failed silently.
 
 When a pour delivers nothing, the planter says so in the status bar, writes a
-warning to the log, and marks it on the history chart in the Sensors tab as a
+warning to the log, and marks it on the chart in the History tab as a
 **solid red line** instead of the usual dashed one.
 
 The status bar escalates if it keeps happening. One failed pour reads as "the
@@ -207,7 +255,7 @@ The pump and the carriage are the only loud parts of this machine, and it lives
 in a room people sit in. So anything the planter does on its own — watering,
 and the re-homes described under *Homing* — can be held back two ways:
 
-- **Quiet hours** — a nightly window, set in Settings. A window that ends before
+- **Quiet hours** — a nightly window, set under Automation. A window that ends before
   it starts runs through midnight, so 21:00 to 08:00 means overnight.
 - **Snooze** — one tap in Controls for 1, 2 or 4 hours, for when you are
   watching something and do not want the pump starting up behind you.
