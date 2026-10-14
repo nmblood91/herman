@@ -649,6 +649,14 @@ def load_plant_profile(
     return result
 
 
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/profile/clear")
+def clear_plant_profile(plant_id: str) -> dict[str, object]:
+    """Take the saved plant off this pot. Placement and soil are kept."""
+    result = automation.clear_plant_profile(plant_id)
+    log_event(f"Cleared the plant profile from {plant_id}")
+    return result
+
+
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/name")
 async def update_plant_name(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     name = str(payload.get("name", "")).strip()

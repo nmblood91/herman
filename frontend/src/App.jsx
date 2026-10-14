@@ -266,6 +266,18 @@ function App() {
     }
   }
 
+  const clearProfile = async (plantId) => {
+    try {
+      const result = await fetchJson(`/plants/${plantId}/profile/clear`, { method: 'POST' })
+      setStatus(
+        `Cleared the plant profile. ${result.name} keeps its location and soil.`,
+      )
+      await loadDashboard()
+    } catch (error) {
+      setStatus(`Clear failed: ${error.message}`)
+    }
+  }
+
   // 20s of sampling, like the dry calibration. Blocks for the window.
   const measureFieldCapacity = async (plantId) => {
     try {
@@ -381,6 +393,7 @@ function App() {
             movement={overview?.movement}
             profiles={profiles}
             onLoadProfile={loadProfile}
+            onClearProfile={clearProfile}
             soils={soils}
             onMeasureFieldCapacity={measureFieldCapacity}
             onClearFieldCapacity={clearFieldCapacity}

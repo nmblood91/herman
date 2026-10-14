@@ -89,6 +89,34 @@ assert again.get_plant(second).profile == marked.get_plant(first).name
 assert again.get_plant(ids(again)[2]).profile == ""
 print("ok: which pots have a profile survives a restart")
 
+# Clearing takes the plant off the pot and puts its care settings back to the
+# default, so it does not keep watering to a plant it no longer claims to be.
+# The pot keeps what describes the pot.
+from greenthumb.plants import default_plants
+
+cleared = build(temp_state())
+pot = cleared.get_plant(second)
+cleared.update_plant_name(first, "Fern")
+cleared.update_moisture_target(first, "wet")
+cleared.update_watering_volume(first, 250)
+cleared.save_plant_profile(first)
+cleared.apply_plant_profile(second, "Fern")
+cleared.set_plant_position(second, 300)
+position, soil = pot.position_mm, pot.soil
+
+cleared.clear_plant_profile(second)
+fresh = next(p for p in default_plants() if p.plant_id == second)
+assert pot.profile == ""
+assert pot.name == fresh.name, pot.name
+assert pot.moisture_target == fresh.moisture_target, pot.moisture_target
+assert pot.watering_volume_ml == fresh.watering_volume_ml, pot.watering_volume_ml
+assert (pot.light_start_time, pot.light_stop_time) == (fresh.light_start_time, fresh.light_stop_time)
+assert pot.notes == fresh.notes
+assert (pot.position_mm, pot.soil) == (position, soil), "clearing moved or re-potted the pot"
+assert "Fern" in [p["name"] for p in cleared.list_plant_profiles()], "clearing deleted the saved plant"
+assert cleared.get_plant(first).profile == "Fern", "clearing one pot cleared another"
+print("ok: clearing a profile resets the pot's plant settings, keeps its placement and the saved plant")
+
 
 # --- the rule that matters: placement never travels ---
 

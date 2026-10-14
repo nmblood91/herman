@@ -187,6 +187,7 @@ export function PlantsPanel({
   movement,
   profiles,
   onLoadProfile,
+  onClearProfile,
   soils,
   onMeasureFieldCapacity,
   onClearFieldCapacity,
@@ -391,36 +392,50 @@ export function PlantsPanel({
 
                   {/* Directly under Plant Info because that is the block it
                       replaces: loading a saved plant rewrites those three
-                      lines and touches nothing below. */}
+                      lines and touches nothing below. Only one of the two at
+                      a time: the picker while the pot has no saved plant, and
+                      a way to take it off once it has one. */}
                   <div className="plant-actions-row">
-                    <div className="load-profile-row">
-                      <select
-                        aria-label={`Saved plant to load onto ${plant.name}`}
-                        value={picked[plant.plant_id] ?? ''}
-                        onChange={(event) =>
-                          setPicked((current) => ({
-                            ...current,
-                            [plant.plant_id]: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">
-                          {profileNames.length ? 'Load a saved plant…' : 'Nothing saved yet'}
-                        </option>
-                        {profileNames.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                      </select>
+                    {plant.profile ? (
                       <button
                         type="button"
-                        disabled={!picked[plant.plant_id]}
-                        onClick={() => onLoadProfile(plant.plant_id, picked[plant.plant_id])}
+                        onClick={() => {
+                          setPicked((current) => ({ ...current, [plant.plant_id]: '' }))
+                          onClearProfile(plant.plant_id)
+                        }}
                       >
-                        Load
+                        Clear plant profile
                       </button>
-                    </div>
+                    ) : (
+                      <div className="load-profile-row">
+                        <select
+                          aria-label={`Saved plant to load onto ${plant.name}`}
+                          value={picked[plant.plant_id] ?? ''}
+                          onChange={(event) =>
+                            setPicked((current) => ({
+                              ...current,
+                              [plant.plant_id]: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">
+                            {profileNames.length ? 'Load a saved plant…' : 'Nothing saved yet'}
+                          </option>
+                          {profileNames.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={!picked[plant.plant_id]}
+                          onClick={() => onLoadProfile(plant.plant_id, picked[plant.plant_id])}
+                        >
+                          Load
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <h3 className="card-group-title">Watering</h3>

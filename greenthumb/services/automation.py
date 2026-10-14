@@ -2489,6 +2489,30 @@ class GreenThumbAutomation:
             "soil": plant.soil,
         }
 
+    def clear_plant_profile(self, plant_id: str) -> dict[str, object]:
+        """Take the saved plant off a pot: the undo of apply_plant_profile.
+
+        Everything a profile brings -- the name and the care settings -- goes
+        back to the pot's default, so the pot does not go on watering to a
+        plant it no longer claims to be. Everything a profile leaves alone
+        stays: placement, watering mode, soil and field capacity describe the
+        pot, not the plant.
+        """
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+
+        fresh = next(p for p in default_plants() if p.plant_id == plant_id)
+        plant.name = fresh.name
+        plant.profile = ""
+        plant.moisture_target = fresh.moisture_target
+        plant.watering_volume_ml = fresh.watering_volume_ml
+        plant.light_start_time = fresh.light_start_time
+        plant.light_stop_time = fresh.light_stop_time
+        plant.notes = fresh.notes
+        self._persist()
+        return {"status": "ok", "plant_id": plant_id, "name": plant.name}
+
     def delete_plant_profile(self, name: str) -> dict[str, object]:
         """Remove a saved plant. Pots already using it keep their settings."""
         wanted = str(name).strip()
