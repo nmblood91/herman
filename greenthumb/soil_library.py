@@ -275,11 +275,6 @@ def main(argv: list[str] | None = None) -> int:
     kept = sum(1 for result in outcome.values() if result == "kept")
     if kept:
         print(f"\n{kept} left as they were. Re-run with --overwrite to replace them.")
-    print(
-        "\nSet a soil profile on each pot under Plants and Soil. A soil profile "
-        "without a field capacity reading needs one measured in the Soil "
-        "Profile Editor before its pots are watered automatically."
-    )
     return 0
 
 
