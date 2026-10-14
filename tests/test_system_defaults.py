@@ -3,7 +3,7 @@
 Three things matter. It has to take effect now, not after a restart -- a
 button that changes nothing until the service is bounced reads as broken. It
 has to reach every pot, since a saved position quietly outliving a change of
-defaults is what prompted it. And it must not touch the saved-plant and soil
+defaults is what prompted it. And it must not touch the plant-profile and soil
 libraries or the history, which are built up over time and are not this
 planter's configuration.
 """
@@ -115,7 +115,7 @@ auto._persist()
 auto._sync_field_capacity()
 auto.save_plant_profile("plant_1")
 profiles_before = state.load_profiles(path)
-assert profiles_before, "the saved plant did not save"
+assert profiles_before, "the plant profile did not save"
 
 history.record_readings([SensorSample(0x36, 50.0, 500, 21.0)])
 history.record_watering("plant_1", 100, "manual", True)
@@ -155,10 +155,10 @@ print("ok: every setting is back on its default, without a restart")
 # --- the libraries and the history are kept ---
 
 assert state.load_soils(path) == soils_before, "the soil library changed"
-assert state.load_profiles(path) == profiles_before, "the saved plants changed"
+assert state.load_profiles(path) == profiles_before, "the plant profiles changed"
 assert history.series([0x36], 1) == readings_before, "readings were lost"
 assert history.waterings(1) == waterings_before, "waterings were lost"
-print("ok: the saved plants, the soils and the history are untouched")
+print("ok: the plant profiles, the soils and the history are untouched")
 
 # --- and it holds across a restart ---
 

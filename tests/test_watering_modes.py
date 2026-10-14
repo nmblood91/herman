@@ -564,7 +564,7 @@ assert kept.watering_mode == "sweep", kept.watering_mode
 assert (kept.sweep_min_mm, kept.sweep_max_mm) == (450.0, 650.0)
 print("ok: the mode and the span survive a restart")
 
-# A saved plant is care settings, not placement. A profile carrying the mode
+# A plant profile is care settings, not placement. A profile carrying the mode
 # without the bounds -- which are rail coordinates and cannot travel -- would
 # load as a sweep over a span of zero, fall back to point watering, and leave
 # the pot reading as configured for something it never does.
@@ -579,7 +579,7 @@ moved = restored.get_plant(spare.plant_id)
 assert moved.watering_mode == sweep.POINT, moved.watering_mode
 # Still its own default span, not the fern's.
 assert (moved.sweep_min_mm, moved.sweep_max_mm) == (272, 372), (moved.sweep_min_mm, moved.sweep_max_mm)
-print("ok: loading a saved plant does not drag another pot's span onto it")
+print("ok: loading a plant profile does not drag another pot's span onto it")
 
 # A hand-edited state file with a mode nothing recognises. It falls back to
 # point rather than being stored as written: an unknown mode would make every

@@ -42,7 +42,7 @@ CALIBRATION_KEY = "moisture_calibration"
 PROFILES_KEY = "plant_profiles"
 SOILS_KEY = "soil_profiles"
 
-# What a saved plant carries, and the list is a whitelist rather than
+# What a plant profile carries, and the list is a whitelist rather than
 # "everything on the plant" on purpose.
 #
 # position_mm is the omission that matters: a profile is care settings, not
@@ -328,7 +328,7 @@ def keep_only(keys: tuple[str, ...], path: str | Path | None = None) -> None:
     save_state({key: data[key] for key in keys if key in data}, path)
 
 
-# --- saved plants ---------------------------------------------------------
+# --- plant profiles ---------------------------------------------------------
 #
 # A small library of care settings keyed by plant name, so "Basil - Wet" can be
 # set up once and copied onto any pot. The name is the key, so saving overwrites
@@ -449,25 +449,25 @@ def _delete_named(key: str, name: str, path: str | Path | None = None) -> bool:
 
 
 def load_profiles(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
-    """Every saved plant, keyed by name."""
+    """Every plant profile, keyed by name."""
     return _load_named(PROFILES_KEY, PROFILE_FIELDS, path)
 
 
 def save_profile(
     name: str, settings: dict[str, Any], path: str | Path | None = None
 ) -> dict[str, Any]:
-    """Upsert one saved plant, replacing any entry of the same name."""
-    return _save_named(PROFILES_KEY, PROFILE_FIELDS, "saved plant", name, settings, path)
+    """Upsert one plant profile, replacing any entry of the same name."""
+    return _save_named(PROFILES_KEY, PROFILE_FIELDS, "plant profile", name, settings, path)
 
 
 def delete_profile(name: str, path: str | Path | None = None) -> bool:
-    """Remove a saved plant. False if there was nothing by that name."""
+    """Remove a plant profile. False if there was nothing by that name."""
     return _delete_named(PROFILES_KEY, name, path)
 
 
 # --- soils ----------------------------------------------------------------
 #
-# The same library shape as saved plants, and deliberately a separate store:
+# The same library shape as plant profiles, and deliberately a separate store:
 # soil is a property of what is in the pot, plants are a property of what grows
 # in it, and several plants share one mix.
 
@@ -485,7 +485,7 @@ def save_soil(
 ) -> dict[str, Any]:
     """Upsert one soil, keeping fields the caller did not mention.
 
-    Merging by default, unlike saved plants. A soil is written from two
+    Merging by default, unlike plant profiles. A soil is written from two
     directions -- the editor supplies the VWC figures and a note, a calibration
     supplies the measured field capacity -- and neither knows about the other's
     fields. Replacing wholesale means whichever saved last wipes the rest.

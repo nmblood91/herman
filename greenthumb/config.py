@@ -118,7 +118,7 @@ class Settings(BaseSettings):
     # Defaults here; the UI persists any change to data/state.json.
     # Home once when the service comes up. Until it homes, Klipper reports a
     # position relative to wherever the carriage happened to be powered on at,
-    # so every saved plant coordinate is wrong by an unknown amount and
+    # so every plant profile coordinate is wrong by an unknown amount and
     # watering is refused outright. Retried every tick until it lands, since
     # the usual reason it fails is Klipper still coming up alongside us.
     #

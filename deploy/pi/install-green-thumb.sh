@@ -155,7 +155,7 @@ pip install -e .
 # Seed the starter libraries.
 #
 # Not optional, and this is the fix for a real gap: a pot takes its care
-# settings by loading a saved plant, and it is only watered automatically once
+# settings by loading a plant profile, and it is only watered automatically once
 # its mix is known. With neither library present a fresh planter has nothing to
 # load and waters nothing -- and the only advice the UI could give was to come
 # back here and run these two commands by hand.

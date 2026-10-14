@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { API_BASE } from '../api'
 
-// Puts the planter back as it was freshly installed. The saved-plant and soil
+// Puts the planter back as it was freshly installed. The plant profile and soil
 // libraries are kept, and so is the history -- the list below says so, because
 // "defaults" on its own reads as though those would go too.
 export function SystemValuesPanel() {
@@ -16,7 +16,7 @@ export function SystemValuesPanel() {
         'Every pot goes back to its default: name, watering location, sweep, ' +
         'soil and field capacity. Every setting goes back too, including the ' +
         "pump flow rate and the probes' dry calibration.\n\n" +
-        'Kept: the saved plants and soils libraries, and the history.',
+        'Kept: the plant profile and soil libraries, and the history.',
     )
     if (!ok) return
 
@@ -62,7 +62,7 @@ export function SystemValuesPanel() {
             including the pump flow rate and the probes&apos; dry calibration.
           </p>
           <p className="field-hint">
-            Kept: the saved plants and soils libraries, and the history.
+            Kept: the plant profile and soil libraries, and the history.
           </p>
           {message && <p className="field-hint warning">{message}</p>}
         </div>

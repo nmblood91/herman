@@ -1963,7 +1963,7 @@ class GreenThumbAutomation:
 
         A copy rather than a live lookup. Reading through to the soil would
         mean re-measuring a mix silently rescaling every pot filled with it --
-        the same hazard that keeps soil out of a saved plant. The explicit,
+        the same hazard that keeps soil out of a plant profile. The explicit,
         logged back-fill in calibrate_soil_field_capacity is how a mix's new
         figure reaches existing pots.
         """
@@ -2003,7 +2003,7 @@ class GreenThumbAutomation:
 
         Every setting returns to .env or the code default, and every pot to its
         default plant: name, watering spot, sweep span and mode, soil, its own
-        field capacity, care settings. The saved-plant and soil libraries and
+        field capacity, care settings. The plant profile and soil libraries and
         the history database are kept.
 
         Applied in memory as well as on disk, so the planter runs on the
@@ -2313,14 +2313,14 @@ class GreenThumbAutomation:
         with self._exclusive(f"Move to {plant_id}"):
             return self.klipper.move_gantry_absolute(plant.position_mm)
 
-    # --- saved plants ----------------------------------------------------
+    # --- plant profiles ----------------------------------------------------
     #
     # A library of care settings keyed by plant name, so a plant can be set up
     # once and copied onto any pot. Saving overwrites the entry of that name
     # rather than accumulating near-duplicates.
 
     def list_plant_profiles(self) -> list[dict[str, object]]:
-        """Every saved plant, sorted for a picker rather than by recency."""
+        """Every plant profile, sorted for a picker rather than by recency."""
         profiles = state.load_profiles(self._state_path)
         entries = [{"name": name, **values} for name, values in profiles.items()]
         entries.sort(key=lambda entry: str(entry["name"]).casefold())
@@ -2348,7 +2348,7 @@ class GreenThumbAutomation:
             },
             self._state_path,
         )
-        # The pot is now what that saved plant describes.
+        # The pot is now what that plant profile describes.
         plant.profile = plant.name.strip()
         self._persist()
         return {"status": "ok", "name": plant.name.strip(), "profile": entry}
@@ -2356,10 +2356,10 @@ class GreenThumbAutomation:
     def write_plant_profile(
         self, name: str, settings: dict[str, object]
     ) -> dict[str, object]:
-        """Create or replace a saved plant from a body, with no pot involved.
+        """Create or replace a plant profile from a body, with no pot involved.
 
         The counterpart to save_plant_profile, which can only snapshot a pot.
-        That left no way to fix a saved plant without a spare pot to load it
+        That left no way to fix a plant profile without a spare pot to load it
         onto, edit and save back -- and that round trip changes what the
         planter is running in order to edit something it is not.
 
@@ -2409,16 +2409,16 @@ class GreenThumbAutomation:
         return {"status": "ok", "name": clean, "profile": stored}
 
     def get_plant_profile(self, name: str) -> dict[str, object]:
-        """One saved plant, for an editor to load into its form."""
+        """One plant profile, for an editor to load into its form."""
         wanted = str(name).strip()
         profiles = state.load_profiles(self._state_path)
         key = next((k for k in profiles if k.casefold() == wanted.casefold()), None)
         if key is None:
-            raise ValueError(f"No saved plant called {wanted!r}")
+            raise ValueError(f"No plant profile called {wanted!r}")
         return {"status": "ok", "name": key, "profile": profiles[key]}
 
     def apply_plant_profile(self, plant_id: str, name: str) -> dict[str, object]:
-        """Copy a saved plant onto a pot.
+        """Copy a plant profile onto a pot.
 
         The name comes across too, so the pot and the profile it came from
         agree. Two pots can then carry the same name, which is allowed on
@@ -2438,7 +2438,7 @@ class GreenThumbAutomation:
         profiles = state.load_profiles(self._state_path)
         key = next((k for k in profiles if k.casefold() == wanted.casefold()), None)
         if key is None:
-            raise ValueError(f"No saved plant called {wanted!r}")
+            raise ValueError(f"No plant profile called {wanted!r}")
 
         entry = profiles[key]
         plant.name = key
@@ -2490,7 +2490,7 @@ class GreenThumbAutomation:
         }
 
     def clear_plant_profile(self, plant_id: str) -> dict[str, object]:
-        """Take the saved plant off a pot: the undo of apply_plant_profile.
+        """Take the plant profile off a pot: the undo of apply_plant_profile.
 
         Everything a profile brings -- the name and the care settings -- goes
         back to the pot's default, so the pot does not go on watering to a
@@ -2514,10 +2514,10 @@ class GreenThumbAutomation:
         return {"status": "ok", "plant_id": plant_id, "name": plant.name}
 
     def delete_plant_profile(self, name: str) -> dict[str, object]:
-        """Remove a saved plant. Pots already using it keep their settings."""
+        """Remove a plant profile. Pots already using it keep their settings."""
         wanted = str(name).strip()
         if not state.delete_profile(wanted, self._state_path):
-            raise ValueError(f"No saved plant called {wanted!r}")
+            raise ValueError(f"No plant profile called {wanted!r}")
         return {"status": "ok", "deleted": wanted}
 
     def get_plant(self, plant_id: str) -> PlantSpec | None:

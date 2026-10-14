@@ -129,7 +129,7 @@ LIBRARY: tuple[LibraryPlant, ...] = (
 
 
 def install(overwrite: bool = False, path=None) -> dict[str, str]:
-    """Write the library into the saved-plant store.
+    """Write the library into the plant profile store.
 
     Existing entries are left alone unless `overwrite` is set, so this never
     quietly replaces a plant somebody has tuned to their own readings.
@@ -169,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "--install", action="store_true", help="write these into the saved-plant library"
+        "--install", action="store_true", help="write these into the plant profile library"
     )
     parser.add_argument(
         "--overwrite",
@@ -189,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"   light {plant.light_start_time}-{plant.light_stop_time} ({hours} h)"
             )
             print(f"  {plant.note}")
-        print("\nRe-run with --install to add these to the saved-plant library.")
+        print("\nRe-run with --install to add these to the plant profile library.")
         return 0
 
     outcome = install(overwrite=args.overwrite)

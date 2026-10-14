@@ -149,7 +149,7 @@ assert auto.get_plant(first).soil == ""
 print("ok: an empty name clears it, which is how you say the mix is unknown")
 
 
-# --- it belongs to the pot, not to the saved plant ---
+# --- it belongs to the pot, not to the plant profile ---
 
 auto.update_plant_soil(first, "Coco coir")
 auto.update_plant_soil(second, "Peat potting mix")
@@ -157,13 +157,13 @@ auto.update_plant_name(first, "Fern")
 auto.save_plant_profile(first)
 result = auto.apply_plant_profile(second, "Fern")
 
-# The mix is physically in the pot, and loading a saved plant repots nothing.
+# The mix is physically in the pot, and loading a plant profile repots nothing.
 # The two ways of being wrong here are not symmetrical: if the soil stays and
 # you did repot, you pick the mix again from a dropdown you are looking at. If
 # it travelled and you did not, the pot bands every reading against the wrong
 # wilting point and waters to it, and nothing looks broken.
 assert auto.get_plant(second).soil == "Peat potting mix", auto.get_plant(second).soil
-print("ok: loading a saved plant leaves the pot's soil alone")
+print("ok: loading a plant profile leaves the pot's soil alone")
 
 # Reported back, so the caller can say it was left rather than leave someone
 # wondering whether the profile changed the mix.

@@ -156,7 +156,7 @@
   gap: 12px;
 }
 
-/* New Plant / Saved Plant. Reuses .tab/.tab active rather than inventing a
+/* New Profile / Edit Profile, in the plant profile editor. Reuses .tab/.tab active rather than inventing a
    second "selected" look, since this is the same kind of control: pick one
    of two views, not an action. */
 .plant-editor-mode {
@@ -506,9 +506,9 @@ option {
   width: min(220px, 100%);
 }
 
-/* Splits the expanded card into what a saved plant carries and what stays
+/* Splits the expanded card into what a plant profile carries and what stays
    with the pot. Nothing on screen said which was which, so there was no way to
-   tell that loading a saved plant would not move the nozzle. */
+   tell that loading a plant profile would not move the nozzle. */
 .card-group-title {
   margin: 18px 0 10px;
   font-size: 0.8rem;
@@ -572,7 +572,7 @@ option {
 }
 
 /* The probe picker and its button, for measuring the picked mix's field
-   capacity. The soil editor is single-entity now, like the plant editor, so
+   capacity. The soil editor is single-entity now, like the plant profile editor, so
    there is no longer a list of every mix for this to sit under a row of. */
 .soil-capacity {
   display: flex;

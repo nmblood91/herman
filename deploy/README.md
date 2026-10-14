@@ -90,7 +90,7 @@ For a clean installation with the latest OS, start here:
    already there, so re-running the installer never replaces a mix or a plant
    you have tuned — pass `--overwrite` by hand to go back to the published
    figures. They are seeded rather than left to you because a pot takes its
-   care settings by loading a saved plant, and is only watered once its mix is
+   care settings by loading a plant profile, and is only watered once its mix is
    known: with neither library present a fresh planter has nothing to load and
    waters nothing.
 

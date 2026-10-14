@@ -65,7 +65,7 @@ outcome = plant_library.install(path=path)
 assert set(outcome.values()) == {"written"}, outcome
 stored = state.load_profiles(path)
 assert set(stored) == set(names), sorted(stored)
-print("ok: installing writes all five into the saved-plant library")
+print("ok: installing writes all five into the plant-profile library")
 
 # Placement must not have come along, the same rule as any other profile.
 for name, entry in stored.items():

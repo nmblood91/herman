@@ -12,7 +12,7 @@ import { cardTitle } from '../potLabel'
 // could disagree until something reloaded.
 const SAMPLE_SECONDS = 20
 
-// How long Delete has to be held. Matches the plant editor's.
+// How long Delete has to be held. Matches the plant profile editor's.
 const DELETE_HOLD_MS = 5000
 
 const BLANK = { name: '', capacity: '', wilting: '', notes: '' }
@@ -21,7 +21,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
   // 'new' types a free name below; 'existing' turns that field into a picker
   // over the list. Picked is only ever non-empty in 'existing' mode -- every
   // path back to 'new' clears it, so the two stay in lockstep. Same split as
-  // the plant editor, and for the same reason: there was no way to edit an
+  // the plant profile editor, and for the same reason: there was no way to edit an
   // existing mix's figures short of retyping its name exactly and hoping the
   // overwrite landed on the right one.
   //
@@ -388,7 +388,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               Save soil
             </button>
             {/* Hold rather than an inline Remove on every row: one place to
-                delete a mix, same as a saved plant, and a slip of the thumb
+                delete a mix, same as a plant profile, and a slip of the thumb
                 cannot finish five seconds by accident. */}
             {mode === 'existing' && picked && (
               <button

@@ -334,7 +334,7 @@ print("ok: the patrol switch survives a restart")
 # --- the startup home ---
 #
 # Until the arm is homed Klipper reports a position relative to wherever the
-# carriage happened to power up, so every saved plant coordinate is wrong by an
+# carriage happened to power up, so every plant profile coordinate is wrong by an
 # unknown amount and watering is refused outright.
 
 assert type(settings).model_fields["home_on_startup"].default is False

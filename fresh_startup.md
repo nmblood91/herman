@@ -199,8 +199,8 @@ Re-measure after a repot. Mixes lose capacity as they age and compact.
 In **Plants and Soil**:
 
 1. **Soil.** Choose a mix on each pot's card.
-2. **Plant.** Load a saved plant into each pot, or write your own in the plant
-   editor.
+2. **Plant.** Load a plant profile into each pot, or write your own in the Plant Profile
+   Editor.
 3. **Position.** Jog the carriage until the nozzle is over the pot, then press
    **Use current position** on that card. It fills the field without saving, so
    you can check the number first. It refuses an unhomed gantry.

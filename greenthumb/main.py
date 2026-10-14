@@ -296,7 +296,7 @@ def reset_moisture_calibration() -> dict[str, object]:
 
 @app.post(f"{settings.api_prefix}/system/restore-defaults")
 def restore_system_defaults() -> dict[str, object]:
-    """Back to a fresh install, keeping the saved-plant and soil libraries
+    """Back to a fresh install, keeping the plant profile and soil libraries
     and the history."""
     result = automation.restore_system_defaults()
     log_event("Planter restored to defaults (plant and soil libraries kept)")
@@ -461,7 +461,7 @@ async def list_plants() -> list[dict[str, object]]:
             "sweep_min_mm": plant.sweep_min_mm,
             "sweep_max_mm": plant.sweep_max_mm,
             "notes": plant.notes,
-            # Which saved plant the care settings came from; "" until one is
+            # Which plant profile the care settings came from; "" until one is
             # loaded, which the card shows instead of the placeholders.
             "profile": plant.profile,
             "field_capacity_raw": plant.field_capacity_raw,
@@ -480,7 +480,7 @@ async def list_plants() -> list[dict[str, object]]:
     ]
 
 
-# --- saved plants -----------------------------------------------------------
+# --- plant profiles -----------------------------------------------------------
 #
 # Keyed by plant name, so saving overwrites the entry of that name. Two pots
 # may carry the same name; a profile is care settings, not a slot.
@@ -602,7 +602,7 @@ def list_plant_profiles() -> dict[str, object]:
 
 @app.post(f"{settings.api_prefix}/plant-profiles")
 def write_plant_profile(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-    """Create or replace a saved plant directly, with no pot involved.
+    """Create or replace a plant profile directly, with no pot involved.
 
     Expects {"name", "moisture_target", "watering_volume_ml",
     "light_start_time", "light_stop_time", "notes"}. Name is the key, so
@@ -611,20 +611,20 @@ def write_plant_profile(payload: dict[str, object] = Body(default_factory=dict))
     result = automation.write_plant_profile(
         str(payload.get("name", "")), payload
     )
-    log_event(f"Saved plant {result['name']}")
+    log_event(f"Plant profile {result['name']}")
     return result
 
 
 @app.get(f"{settings.api_prefix}/plant-profiles/{{name}}")
 def read_plant_profile(name: str) -> dict[str, object]:
-    """One saved plant, for an editor to load into its form."""
+    """One plant profile, for an editor to load into its form."""
     return automation.get_plant_profile(name)
 
 
 @app.delete(f"{settings.api_prefix}/plant-profiles/{{name}}")
 def delete_plant_profile(name: str) -> dict[str, object]:
     result = automation.delete_plant_profile(name)
-    log_event(f"Deleted saved plant {name}")
+    log_event(f"Deleted plant profile {name}")
     return result
 
 
@@ -635,7 +635,7 @@ def delete_plant_profile(name: str) -> dict[str, object]:
 def save_plant_profile(plant_id: str) -> dict[str, object]:
     """Store this plant's current settings under its own name."""
     result = automation.save_plant_profile(plant_id)
-    log_event(f"Saved plant settings as {result.get('name')}")
+    log_event(f"Plant profile settings as {result.get('name')}")
     return result
 
 
@@ -643,15 +643,15 @@ def save_plant_profile(plant_id: str) -> dict[str, object]:
 def load_plant_profile(
     plant_id: str, payload: dict[str, str] = Body(default_factory=dict)
 ) -> dict[str, object]:
-    """Copy a saved plant onto this one. Leaves its rail position alone."""
+    """Copy a plant profile onto this one. Leaves its rail position alone."""
     result = automation.apply_plant_profile(plant_id, str(payload.get("name", "")))
-    log_event(f"Loaded saved plant {result.get('name')} onto {plant_id}")
+    log_event(f"Loaded plant profile {result.get('name')} onto {plant_id}")
     return result
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/profile/clear")
 def clear_plant_profile(plant_id: str) -> dict[str, object]:
-    """Take the saved plant off this pot. Placement and soil are kept."""
+    """Take the plant profile off this pot. Placement and soil are kept."""
     result = automation.clear_plant_profile(plant_id)
     log_event(f"Cleared the plant profile from {plant_id}")
     return result

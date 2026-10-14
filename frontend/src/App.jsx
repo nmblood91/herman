@@ -41,7 +41,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('plants')
   const [overview, setOverview] = useState(null)
   const [plants, setPlants] = useState([])
-  // The saved-plant library. Fetched alongside the dashboard because saving a
+  // The plant profile library. Fetched alongside the dashboard because saving a
   // plant changes it, so it has to refresh on the same beat.
   const [profiles, setProfiles] = useState([])
   const [soils, setSoils] = useState([])
@@ -244,16 +244,16 @@ function App() {
 
   const loadProfile = async (plantId, name) => {
     try {
-      setStatus(`Loading ${name}...`, { sticky: true })
+      setStatus(`Loading plant profile ${name}...`, { sticky: true })
       const result = await fetchJson(`/plants/${plantId}/profile/load`, {
         method: 'POST',
         body: JSON.stringify({ name }),
       })
       // Says what was left alone as well as what changed, because that is
-      // the surprising half: a saved plant carries care settings, and
+      // the surprising half: a plant profile carries care settings, and
       // everything describing the pot itself stays put.
       setStatus(
-        `Loaded ${result.name}: waters at ${result.moisture_target}, ` +
+        `Loaded plant profile ${result.name}: waters at ${result.moisture_target}, ` +
           `${result.watering_volume_ml} mL, lights ` +
           `${formatClock(result.light_start_time)}–` +
           `${formatClock(result.light_stop_time)}. The pot keeps its location ` +
@@ -316,7 +316,7 @@ function App() {
   }
 
   // Pot fields only. This used to be nine calls ending in a profile save, so
-  // storing a rail coordinate also wrote a saved plant -- the two are edited
+  // storing a rail coordinate also wrote a plant profile -- the two are edited
   // in separate places now, and this is the pot half.
   const savePot = async (plant) => {
     try {

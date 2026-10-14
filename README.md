@@ -74,7 +74,7 @@ Everything is under `/api/v1`, grouped roughly as:
 |---|---|
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
 | `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
-| `/plant-profiles`, `/plants/{id}/profile` | the saved-plant library: list, read one, write one from a body, snapshot a pot, load onto a pot, delete |
+| `/plant-profiles`, `/plants/{id}/profile` | the plant profile library: list, read one, write one from a body, snapshot a pot, load onto a pot, delete |
 | `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
 | `/moisture-bands` | the band scale, for pickers and legends |
 | `/water/{plant_id}` | move to a plant and dose it |
@@ -86,7 +86,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
 | `/lights/...` | mode, brightness, colour, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
-| `/system/restore-defaults` | back to a fresh install; the saved-plant and soil libraries and the history are kept |
+| `/system/restore-defaults` | back to a fresh install; the plant profile and soil libraries and the history are kept |
 | `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame. No UI — reach these directly |
 | `/diagnostics/endstop` | reads the home switch and interprets it |
 | `/system/time`, `/system/timezone` | the planter's clock |
@@ -127,19 +127,19 @@ Plants is the screen to open daily, Settings holds only what you set once, and
 Diagnostics is where everything you reach for when something looks wrong now
 lives together.
 
-## Saved plants
+## Plant profiles
 
 Saving a plant stores its care settings under its **name**, which is the key:
 saving again under the same name replaces that entry rather than making a
 second one. "Basil - Wet" and "Basil - Dry" are simply two names, so they are
-two saved plants. Capitalisation is not a difference — saving "basil" over
+two plant profiles. Capitalisation is not a difference — saving "basil" over
 "Basil" renames the entry rather than duplicating it.
 
-Loading copies a saved plant onto a pot, including its name. Two pots may end
+Loading copies a plant profile onto a pot, including its name. Two pots may end
 up with the same name, which is allowed: `plant_id` is the identity and the
 name is a label, and copying one plant onto a second pot is the point.
 
-**A saved plant is edited in its own right**, in the plant editor on the Plants
+**A plant profile is edited in its own right**, in the Plant Profile Editor on the Plants
 and Soil tab, or over the API:
 
 ```bash
@@ -149,14 +149,14 @@ curl http://herman.local/api/v1/plant-profiles/Basil
 ```
 
 That is a change in direction worth knowing about. Previously the only way to
-write a saved plant was `POST /plants/{id}/profile`, which snapshots a pot — so
-fixing a saved plant meant loading it onto a spare pot, editing, and saving
+write a plant profile was `POST /plants/{id}/profile`, which snapshots a pot — so
+fixing a plant profile meant loading it onto a spare pot, editing, and saving
 back, which changes what the planter is actually running in order to edit
 something it is not. Both paths still exist and write the same entry; there is
 a test asserting they agree field for field, since two editors that validate
 differently would fill the library with entries that load badly.
 
-A plant card no longer edits care settings at all. It picks a saved plant and
+A plant card no longer edits care settings at all. It picks a plant profile and
 loads it, picks a soil, and sets the pot's own geometry. Those pot fields
 **save themselves** a moment after the last edit, so the card stores geometry
 and nothing else — saving used to also write a profile as a side effect, so you
@@ -168,14 +168,14 @@ left end of the rail; and a sweep whose span is not yet wide enough to be one,
 because the API refuses it and the card is usually still being filled in. Both
 say so on the card.
 
-Each saved plant and each soil also carries **notes**: free text, and the only
+Each plant profile and each soil also carries **notes**: free text, and the only
 field the planter never acts on. The numbers say what it does; the note says
 why, which is the part nobody remembers a season later. The starter libraries
 have always carried this text in `plant_library.py` and `soil_library.py` — it
 was discarded on install until now, so the reasoning stayed in the source and
 never reached anyone reading the library in the app.
 
-**Nothing describing the pot is part of a saved plant** -- not the watering
+**Nothing describing the pot is part of a plant profile** -- not the watering
 location, not the watering mode or its sweep bounds, and not the soil. A saved
 plant is care settings, and loading one onto a pot must not assert physical
 facts about a pot nobody touched.
@@ -234,7 +234,7 @@ that has fallen off a re-measured rail, or Klipper not reporting its motion
 limits. The plant still drinks either way: the sweep decides how the water is
 spread, not whether it arrives.
 
-The mode and the two bounds are **not** part of a saved plant profile, for the
+The mode and the two bounds are **not** part of a plant profile profile, for the
 same reason `position_mm` is not. They are rail coordinates, so they cannot
 travel between pots, and a profile carrying the mode without them would load as
 a sweep over a span of zero.
@@ -242,7 +242,7 @@ a sweep over a span of zero.
 ### Soils
 
 Each pot records which mix it is filled with, chosen from a soil library that
-works the same way as the saved plants — name as the key, overwrite on save:
+works the same way as the plant profiles — name as the key, overwrite on save:
 
 ```bash
 python -m greenthumb.soil_library              # read them and the figures

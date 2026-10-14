@@ -3,7 +3,8 @@ import { formatClock } from '../time'
 import { cardTitle } from '../potLabel'
 
 // Pot fields only. A card no longer edits what a plant wants -- that is the
-// plant editor's job, and a pot takes those settings by loading a saved plant.
+// Plant Profile Editor's job, and a pot takes those settings by loading a
+// plant profile.
 // Keeping both here meant "Save Plant" wrote a profile as a side effect of
 // saving a rail coordinate, so you could not touch one without the other.
 //
@@ -199,7 +200,7 @@ export function PlantsPanel({
   const motionReady = movement?.ok !== false && movement?.homed === true
 
   const [drafts, setDrafts] = useState({})
-  // Which saved plant each card has picked, keyed by plant so one card's
+  // Which plant profile each card has picked, keyed by plant so one card's
   // choice cannot load onto another.
   const [picked, setPicked] = useState({})
   const [expandedPlantIds, setExpandedPlantIds] = useState([])
@@ -367,10 +368,10 @@ export function PlantsPanel({
               {isExpanded && (
                 <>
                   {/* Read-only: what this pot is currently set up to want.
-                      It is edited in the plant editor below, which keeps one
-                      place for a plant and one for a pot. */}
-                  <h3 className="card-group-title">Plant Info</h3>
-                  {/* Until a saved plant is loaded, the care settings are the
+                      It is edited in the Plant Profile Editor below, which
+                      keeps one place for a plant and one for a pot. */}
+                  <h3 className="card-group-title">Plant Profile</h3>
+                  {/* Until a plant profile is loaded, the care settings are the
                       code's placeholders. Showing them as a summary made them
                       look chosen. */}
                   {plant.profile ? (
@@ -384,16 +385,16 @@ export function PlantsPanel({
                   ) : (
                     <p className="field-hint warning">
                       No plant profile loaded. Load one from the drop down or
-                      create a new plant in the Plant Editor below the plant
-                      cards.
+                      create a new one in the Plant Profile Editor below the
+                      plant cards.
                     </p>
                   )}
                   {plant.notes && <p className="field-hint">Notes: {plant.notes}</p>}
 
-                  {/* Directly under Plant Info because that is the block it
-                      replaces: loading a saved plant rewrites those three
+                  {/* Directly under Plant Profile because that is the block it
+                      replaces: loading a plant profile rewrites those three
                       lines and touches nothing below. Only one of the two at
-                      a time: the picker while the pot has no saved plant, and
+                      a time: the picker while the pot has no plant profile, and
                       a way to take it off once it has one. */}
                   <div className="plant-actions-row">
                     {plant.profile ? (
@@ -409,7 +410,7 @@ export function PlantsPanel({
                     ) : (
                       <div className="load-profile-row">
                         <select
-                          aria-label={`Saved plant to load onto ${plant.name}`}
+                          aria-label={`Plant profile to load onto ${plant.name}`}
                           value={picked[plant.plant_id] ?? ''}
                           onChange={(event) =>
                             setPicked((current) => ({
@@ -419,7 +420,7 @@ export function PlantsPanel({
                           }
                         >
                           <option value="">
-                            {profileNames.length ? 'Load a saved plant…' : 'Nothing saved yet'}
+                            {profileNames.length ? 'Load a plant profile…' : 'No plant profiles yet'}
                           </option>
                           {profileNames.map((name) => (
                             <option key={name} value={name}>

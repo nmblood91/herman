@@ -1,6 +1,6 @@
-"""Editing a saved plant directly, and the notes that go with it.
+"""Editing a plant profile directly, and the notes that go with it.
 
-Until now the only way to write a saved plant was to snapshot a pot. So fixing
+Until now the only way to write a plant profile was to snapshot a pot. So fixing
 one meant loading it onto a spare pot, editing, and saving back -- changing
 what the planter is actually running in order to edit something it is not.
 
@@ -196,7 +196,7 @@ print("ok: saving the same name replaces it, capitalisation included")
 found = auto.get_plant_profile("BASIL")
 assert found["name"] == "basil", found
 assert found["profile"]["watering_volume_ml"] == 55
-print("ok: a saved plant reads back by name, case-insensitively")
+print("ok: a plant profile reads back by name, case-insensitively")
 
 try:
     auto.get_plant_profile("Nothing")

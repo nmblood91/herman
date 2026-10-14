@@ -29,7 +29,7 @@ class PlantSpec:
     #
     # A property of the pot rather than of the plant, and grouped here with the
     # rest of them for that reason: the mix is physically in the pot, so
-    # loading a saved plant leaves it alone.
+    # loading a plant profile leaves it alone.
     soil: str = ""
     # Where field capacity sits on this probe's scale, as a raw count. Copied
     # from the soil when a mix is assigned, or measured in this pot to override
@@ -66,7 +66,7 @@ class PlantSpec:
     # settings. A property of the plant, not the pot: the reason you water
     # something at a given band travels with it.
     notes: str = ""
-    # Which saved plant this pot's care settings came from, or "" for none.
+    # Which plant profile this pot's care settings came from, or "" for none.
     # Set by loading one onto the pot or saving the pot as one. Until then the
     # care settings are the code's placeholders, and the card says so rather
     # than presenting them as though somebody chose them.

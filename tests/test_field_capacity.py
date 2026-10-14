@@ -393,11 +393,11 @@ assert build(fresh).plants[0].field_capacity_source == ""
 print("ok: an unrecognised source falls back to unset")
 
 
-# --- 13. it never enters a saved plant ---
+# --- 13. it never enters a plant profile ---
 
 assert "field_capacity_raw" not in state.PROFILE_FIELDS
 assert not any(f.startswith("field_capacity") for f in state.PROFILE_FIELDS)
-print("ok: no field capacity field is part of a saved plant")
+print("ok: no field capacity field is part of a plant profile")
 
 shared = temp_state()
 auto = build(shared)
@@ -413,9 +413,9 @@ saved = state.load_profiles(shared)["Fern"]
 assert not any(k.startswith("field_capacity") for k in saved), saved
 auto.apply_plant_profile(second.plant_id, "Fern")
 assert second.field_capacity_raw is None, (
-    "loading a saved plant carried a figure measured in another pot's soil"
+    "loading a plant profile carried a figure measured in another pot's soil"
 )
-print("ok: a saved plant carries no field capacity, and loading one applies none")
+print("ok: a plant profile carries no field capacity, and loading one applies none")
 
 # A hand-written entry containing the key must not apply it either.
 blob = state.load_state(shared)

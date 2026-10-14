@@ -1,4 +1,4 @@
-"""Saved plants: a library of care settings keyed by name.
+"""Plant profiles: a library of care settings keyed by name.
 
 Two rules carry the design. The name is the key, so saving overwrites rather
 than accumulating "Basil (1)", "Basil (2)". And a profile is care settings
@@ -55,7 +55,7 @@ def ids(auto):
 auto = build()
 first, second = ids(auto)[0], ids(auto)[1]
 
-# A fresh pot has no saved plant behind it, and the card says so instead of
+# A fresh pot has no plant profile behind it, and the card says so instead of
 # presenting the code's placeholder care settings as a choice.
 assert all(plant.profile == "" for plant in auto.plants)
 print("ok: a fresh pot has no plant profile loaded")
@@ -113,9 +113,9 @@ assert pot.watering_volume_ml == fresh.watering_volume_ml, pot.watering_volume_m
 assert (pot.light_start_time, pot.light_stop_time) == (fresh.light_start_time, fresh.light_stop_time)
 assert pot.notes == fresh.notes
 assert (pot.position_mm, pot.soil) == (position, soil), "clearing moved or re-potted the pot"
-assert "Fern" in [p["name"] for p in cleared.list_plant_profiles()], "clearing deleted the saved plant"
+assert "Fern" in [p["name"] for p in cleared.list_plant_profiles()], "clearing deleted the plant profile"
 assert cleared.get_plant(first).profile == "Fern", "clearing one pot cleared another"
-print("ok: clearing a profile resets the pot's plant settings, keeps its placement and the saved plant")
+print("ok: clearing a profile resets the pot's plant settings, keeps its placement and the plant profile")
 
 
 # --- the rule that matters: placement never travels ---
@@ -177,7 +177,7 @@ auto.update_moisture_target(first, "very dry")
 auto.save_plant_profile(first)
 names = sorted(p["name"] for p in auto.list_plant_profiles())
 assert names == ["Basil - Dry", "basil"], names
-print("ok: Basil - Dry and basil are two saved plants, as intended")
+print("ok: Basil - Dry and basil are two plant profiles, as intended")
 
 
 # --- it survives a restart ---
@@ -220,7 +220,7 @@ else:
 # A pot still using a deleted profile keeps what it was given -- the library is
 # a source to copy from, not a live link.
 assert restored.get_plant(ids(restored)[1]).moisture_target == "medium"
-print("ok: deleting a saved plant does not change pots already using it")
+print("ok: deleting a plant profile does not change pots already using it")
 
 try:
     state.save_profile("   ", {"moisture_target": "dry"}, restored._state_path)
@@ -255,4 +255,4 @@ names = sorted(state.load_profiles(restored._state_path))
 assert names == ["Basil - Dry", "Good"], names
 print("ok: malformed and empty entries are skipped, the rest still load")
 
-print("\nall saved plant checks passed")
+print("\nall plant profile checks passed")

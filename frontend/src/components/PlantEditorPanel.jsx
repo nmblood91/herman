@@ -16,7 +16,7 @@ const BLANK = {
 // the button, short enough that meaning it does not feel like a chore.
 const DELETE_HOLD_MS = 5000
 
-// The library of saved plants, edited in its own right.
+// The library of plant profiles, edited in its own right.
 //
 // 
 // Nothing here touches a pot. A plant becomes real on a pot when you load it
@@ -59,9 +59,9 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
 
-  // A no-op on the already-active mode, like a tab: clicking New Plant again
+  // A no-op on the already-active mode, like a tab: clicking New Profile again
   // does not discard a half-typed draft.
-  const startNewPlant = () => {
+  const startNewProfile = () => {
     if (mode === 'new') return
     setMode('new')
     setPicked('')
@@ -70,10 +70,10 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
     setMessage('')
   }
 
-  const browseSavedPlants = () => {
+  const browseProfiles = () => {
     if (mode === 'existing') return
     setMode('existing')
-    // Picked is always '' on the way in here (startNewPlant clears it, and
+    // Picked is always '' on the way in here (startNewProfile clears it, and
     // it starts '' on mount), so the picker opens on its placeholder. Blank
     // the rest too, rather than showing a new-plant draft's leftover fields
     // under a dropdown that says nothing is chosen yet.
@@ -97,7 +97,7 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
         setMessage(data.detail || data.error || `Save failed (HTTP ${response.status})`)
         return
       }
-      setMessage(`Saved ${data.name}. Load it onto a pot from that pot's card.`)
+      setMessage(`Saved plant profile ${data.name}. Load it onto a pot from that pot's card.`)
       setMode('existing')
       setPicked(data.name)
       setSyncedPick(data.name)
@@ -120,7 +120,7 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
       }
       // Pots already carrying these settings keep them: loading copied the
       // values across rather than linking to the entry.
-      setMessage(`Deleted ${picked}. Pots already loaded with it keep their settings.`)
+      setMessage(`Deleted plant profile ${picked}. Pots already using it keep their settings.`)
       setPicked('')
       setSyncedPick('')
       setForm(BLANK)
@@ -147,7 +147,7 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
 
   return (
     <section className="panel-section">
-      <h2>Plant editor</h2>
+      <h2>Plant Profile Editor</h2>
 
       <div className="general-settings-form">
         <div className="field-row">
@@ -155,22 +155,22 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
             <button
               type="button"
               className={mode === 'new' ? 'tab active' : 'tab'}
-              onClick={startNewPlant}
+              onClick={startNewProfile}
             >
-              New Plant
+              New Profile
             </button>
             <button
               type="button"
               className={mode === 'existing' ? 'tab active' : 'tab'}
               disabled={!list.length}
-              onClick={browseSavedPlants}
+              onClick={browseProfiles}
             >
-              Saved Plant
+              Edit Profile
             </button>
           </div>
           {!list.length && (
             <p className="field-hint warning">
-              No saved plants. The installer adds a starter set, so this means
+              No plant profiles. The installer adds a starter set, so this means
               they were all deleted — fill the form below, or put the set back
               with <code>python -m greenthumb.plant_library --install</code> on
               the Pi. A pot takes its care settings by loading one of these, so
@@ -184,11 +184,11 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
             <label>
               Plant name
               <select
-                aria-label="Saved plant to edit"
+                aria-label="Plant profile to edit"
                 value={picked}
                 onChange={(event) => setPicked(event.target.value)}
               >
-                <option value="">Choose a plant…</option>
+                <option value="">Choose a plant profile…</option>
                 {list.map((profile) => (
                   <option key={profile.name} value={profile.name}>
                     {profile.name}
@@ -271,7 +271,7 @@ export function PlantEditorPanel({ profiles, bands, onRefresh }) {
               disabled={!form.name.trim()}
               onClick={save}
             >
-              Save plant
+              Save plant profile
             </button>
             {/* Hold rather than click-twice: a slip of the thumb cannot finish
                 five seconds by accident, so there is nothing left for a
