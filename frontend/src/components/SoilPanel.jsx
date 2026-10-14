@@ -64,9 +64,9 @@ export function SoilPanel({ soils, plants, onRefresh }) {
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
 
-  // A no-op on the already-active mode, like a tab: clicking New Soil again
+  // A no-op on the already-active mode, like a tab: clicking New Profile again
   // does not discard a half-typed draft.
-  const startNewSoil = () => {
+  const startNewProfile = () => {
     if (mode === 'new') return
     setMode('new')
     setPicked('')
@@ -75,7 +75,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
     setMessage('')
   }
 
-  const browseSavedSoils = () => {
+  const browseProfiles = () => {
     if (mode === 'existing') return
     setMode('existing')
     // Picked is always '' on the way in here, so the picker opens on its
@@ -153,7 +153,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
         return
       }
       setMessage(
-        `Saved ${data.name}: ${data.available_points} points of usable water, ` +
+        `Saved soil profile ${data.name}: ${data.available_points} points of usable water, ` +
           `wilting at ${Math.round((data.wilting_fraction ?? 0) * 100)}% of field capacity.`,
       )
       setMode('existing')
@@ -173,19 +173,19 @@ export function SoilPanel({ soils, plants, onRefresh }) {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setMessage(data.detail || data.error || `Could not remove ${picked}`)
+        setMessage(data.detail || data.error || `Could not delete ${picked}`)
         return
       }
       // Pots still naming it keep the name, which stops resolving. Saying so
       // is the point -- a silently cleared soil hides that a pot is no longer
       // described, and a pot with no soil is never watered automatically.
-      setMessage(`Removed ${picked}. Any pot still set to it needs a new soil.`)
+      setMessage(`Deleted soil profile ${picked}. Any pot still set to it needs a new soil profile.`)
       setPicked('')
       setSyncedPick('')
       setForm(BLANK)
       onRefresh?.()
     } catch (error) {
-      setMessage(`Could not remove ${picked}: ${error.message}`)
+      setMessage(`Could not delete ${picked}: ${error.message}`)
     }
   }
 
@@ -208,7 +208,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
 
   return (
     <section className="panel-section">
-      <h2>Soil</h2>
+      <h2>Soil Profile Editor</h2>
 
       <div className="general-settings-form">
         <div className="field-row">
@@ -216,25 +216,26 @@ export function SoilPanel({ soils, plants, onRefresh }) {
             <button
               type="button"
               className={mode === 'new' ? 'tab active' : 'tab'}
-              onClick={startNewSoil}
+              onClick={startNewProfile}
             >
-              New Soil
+              New Profile
             </button>
             <button
               type="button"
               className={mode === 'existing' ? 'tab active' : 'tab'}
               disabled={!list.length}
-              onClick={browseSavedSoils}
+              onClick={browseProfiles}
             >
-              Saved Soil
+              Edit Profile
             </button>
           </div>
           {!list.length && (
             <p className="field-hint warning">
-              No mixes. The installer adds a starting set, so this means they
-              were all removed — add your own below, or put the set back with{' '}
-              <code>python -m greenthumb.soil_library --install</code> on the
-              Pi. Until a pot has a soil it is never watered automatically.
+              No soil profiles. The installer adds a starting set, so this
+              means they were all deleted — add your own below, or put the set
+              back with <code>python -m greenthumb.soil_library --install</code>{' '}
+              on the Pi. Until a pot has a soil profile it is never watered
+              automatically.
             </p>
           )}
         </div>
@@ -244,11 +245,11 @@ export function SoilPanel({ soils, plants, onRefresh }) {
             <label>
               Name
               <select
-                aria-label="Saved mix to edit"
+                aria-label="Soil profile to edit"
                 value={picked}
                 onChange={(event) => setPicked(event.target.value)}
               >
-                <option value="">Choose a mix…</option>
+                <option value="">Choose a soil profile…</option>
                 {list.map((soil) => (
                   <option key={soil.name} value={soil.name}>
                     {soil.name}
@@ -385,7 +386,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               disabled={!formReady}
               onClick={save}
             >
-              Save soil
+              Save soil profile
             </button>
             {/* Hold rather than an inline Remove on every row: one place to
                 delete a mix, same as a plant profile, and a slip of the thumb
@@ -397,7 +398,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
                 {...holdHandlers}
               >
                 <HoldRing progress={holdProgress} />
-                {holdProgress > 0 ? `Removing ${picked}…` : `Hold to remove ${picked}`}
+                {holdProgress > 0 ? `Deleting ${picked}…` : `Hold to delete ${picked}`}
               </button>
             )}
           </div>

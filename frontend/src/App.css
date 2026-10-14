@@ -576,7 +576,7 @@ option {
 }
 
 /* The probe picker and its button, for measuring the picked mix's field
-   capacity. The soil editor is single-entity now, like the plant profile editor, so
+   capacity. The soil profile editor is single-entity now, like the plant profile editor, so
    there is no longer a list of every mix for this to sit under a row of. */
 .soil-capacity {
   display: flex;

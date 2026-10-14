@@ -173,6 +173,30 @@ const describeMoisture = (status) => {
 // parked over that plant and the button pressed on the wrong card.
 const CONFUSION_MARGIN_MM = 50
 
+// The Soil Profile summary on a card, the counterpart of the Plant Profile
+// line. A name the library no longer has is still shown, and said to be
+// missing: the pot keeps the name until it is given another.
+const describeSoil = (soil, name) => {
+  if (!soil) {
+    return (
+      <>
+        <strong>{name}</strong> — no longer in the soil profiles. Clear it and
+        choose another.
+      </>
+    )
+  }
+  const capacity = soil.field_capacity_vwc
+  const wilting = soil.wilting_point_vwc
+  return (
+    <>
+      <strong>{soil.name}</strong>
+      {capacity != null && wilting != null
+        ? ` — field capacity ${capacity}% VWC, wilting point ${wilting}% VWC.`
+        : ''}
+    </>
+  )
+}
+
 // The jog row under the position fields, the same steps as Controls.
 const JOG_STEPS = [
   ['Move Left 50', -50],
@@ -571,24 +595,56 @@ export function PlantsPanel({
                     )}
                   </div>
 
-                  <h3 className="card-group-title">Soil Info</h3>
+                  <h3 className="card-group-title">Soil Profile</h3>
                   <div className="field-grid">
-                    <label>
-                      Type
-                      <select
-                        value={draft.soil}
-                        onChange={(event) => updateDraft(plant, 'soil', event.target.value)}
-                      >
-                        <option value="">
-                          {soilList.length ? 'Not set' : 'No mixes installed'}
-                        </option>
-                        {soilList.map((soil) => (
-                          <option key={soil.name} value={soil.name}>
-                            {soil.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {/* The same shape as Plant Profile: the picker only while
+                        the pot has no soil profile, and a summary with a way
+                        to take it off once it has one. Driven by the draft, so
+                        it switches the moment a choice is made; the save
+                        follows a moment later like every other pot field. */}
+                    {draft.soil ? (
+                      <>
+                        <p className="field-hint">
+                          {describeSoil(soilList.find((soil) => soil.name === draft.soil), draft.soil)}
+                        </p>
+                        <div className="plant-actions-row">
+                          <button
+                            type="button"
+                            onClick={() => updateDraft(plant, 'soil', '')}
+                          >
+                            Clear soil profile
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="field-hint warning">
+                          No soil profile set. Choose one from the drop down or
+                          create a new one in the Soil Profile Editor below the
+                          plant cards.
+                        </p>
+                        <div className="plant-actions-row">
+                          <div className="load-profile-row">
+                            <select
+                              aria-label={`Soil profile for ${plant.name}`}
+                              value=""
+                              onChange={(event) =>
+                                updateDraft(plant, 'soil', event.target.value)
+                              }
+                            >
+                              <option value="">
+                                {soilList.length ? 'Choose a soil profile…' : 'No soil profiles yet'}
+                              </option>
+                              {soilList.map((soil) => (
+                                <option key={soil.name} value={soil.name}>
+                                  {soil.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )}
                     <label>Field Capacity</label>
                     <div>
                       {plant.field_capacity_raw != null ? (

@@ -1803,7 +1803,7 @@ class GreenThumbAutomation:
         soils = state.load_soils(self._state_path)
         key = next((k for k in soils if k.casefold() == str(soil_name).strip().casefold()), None)
         if key is None:
-            raise ValueError(f"No soil called {str(soil_name).strip()!r}")
+            raise ValueError(f"No soil profile called {str(soil_name).strip()!r}")
 
         outcome = self._capture_field_capacity(plant, seconds)
         outcome["soil"] = key
@@ -1864,7 +1864,7 @@ class GreenThumbAutomation:
         soils = state.load_soils(self._state_path)
         key = next((k for k in soils if k.casefold() == str(soil_name).strip().casefold()), None)
         if key is None:
-            raise ValueError(f"No soil called {str(soil_name).strip()!r}")
+            raise ValueError(f"No soil profile called {str(soil_name).strip()!r}")
 
         bounded = max(5, min(int(seconds), 120))
         with self._exclusive(f"Measuring wilting point on {plant.name}"):
@@ -2568,7 +2568,7 @@ class GreenThumbAutomation:
             key = next((k for k in soils if k.casefold() == wanted.casefold()), None)
             if key is None:
                 raise ValueError(
-                    f"No soil called {wanted!r}. Install the library with "
+                    f"No soil profile called {wanted!r}. Install the library with "
                     f"python -m greenthumb.soil_library --install"
                 )
             wanted = key
@@ -2703,7 +2703,7 @@ class GreenThumbAutomation:
         """Remove a soil. Plants still naming it keep the name, unresolved."""
         wanted = str(name).strip()
         if not state.delete_soil(wanted, self._state_path):
-            raise ValueError(f"No soil called {wanted!r}")
+            raise ValueError(f"No soil profile called {wanted!r}")
         return {"status": "ok", "deleted": wanted}
 
     def update_watering_volume(self, plant_id: str, volume_ml: int) -> dict[str, object]:

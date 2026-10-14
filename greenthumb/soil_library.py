@@ -174,7 +174,7 @@ def set_field_capacity(name: str, raw: int, path=None) -> str:
     key = next((k for k in soils if k.casefold() == name.strip().casefold()), None)
     if key is None:
         known = ", ".join(sorted(soils)) or "none installed"
-        raise ValueError(f"No soil called {name.strip()!r}. Installed: {known}")
+        raise ValueError(f"No soil profile called {name.strip()!r}. Installed: {known}")
 
     # A figure at or below the dry floor cannot produce a reading: span_for
     # returns None under MIN_CALIBRATION_SPAN, every pot on that mix reads -1,
