@@ -93,11 +93,16 @@ enable_force_move: True
 #
 # Declared as a filament sensor purely because that exposes the pin state through
 # objects/query; runout handling is off, the watering logic owns the decision.
-# Flip to ^!PC1 if a full tube reads as empty.
+# Expects the adapter board's SET switch DOWN (OUT low = liquid) and its output
+# switch at 3V. Inverted on purpose: with the pull-up, a green wire that falls
+# out reads high, which here means dry, so every dose is flagged as not
+# delivered. Wired the other way round, a loose wire reads wet and confirms
+# every dose, an empty tank included. If a full tube reads as empty, check SET
+# rather than flipping this.
 #
 # This owns Y-STOP (PC1). stepper_y below is a placeholder and gives the pin up.
 [filament_switch_sensor water_supply]
-switch_pin: ^PC1
+switch_pin: ^!PC1
 pause_on_runout: False
 
 # Y and Z are placeholders with no motor and no switch wired to them. The gantry

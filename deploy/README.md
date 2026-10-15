@@ -935,15 +935,63 @@ is not tight. `delivery_check_delay_seconds` in `greenthumb/config.py` sets how
 long to wait before the first look; raise it if the falling leg is unusually
 long.
 
-**Set the board's dial switch to 3.3V output before wiring.** The SKR's endstop
-inputs are 3.3V; at the 5V setting the sensor would overdrive the pin. With it at
-3.3V the signal wire connects directly, no divider or level shifter.
+**Set both DIP switches on the adapter board before wiring.** The CQRobot
+adapter board has two slide switches side by side next to the "SET" label, and
+both must be set:
+
+| Switch | Sets | Position for this build |
+|---|---|---|
+| Left (SET) | which level means "liquid" | **Down**: OUT goes low when the tube is wet, high when dry |
+| Right (5V / 3V) | how high "high" is | **Down, to 3V**: OUT's high level is 3.3V |
+
+So both switches go down.
+
+The right switch protects the board. The SKR's endstop inputs are 3.3V, and at
+the 5V setting the sensor would overdrive the pin. At 3V the signal wire connects
+directly, with no divider or level shifter.
+
+The left switch sets polarity, and down matches `switch_pin: ^!PC1` in
+`printer.cfg`, where a low pin reads as detected. This is inverted on purpose so
+that a fault is visible. The `^` turns on the pin's pull-up, so a green wire that
+falls out of Y-STOP reads high. With this polarity, high means dry, and every
+dose is flagged as not delivered: red markers on the chart and a warning in the
+status bar. With SET up and `^PC1` instead, the same loose wire would read wet
+and confirm every dose, an empty tank included, with nothing to show anything
+was wrong.
+
+The adapter's 3-pin output connector is labelled GND (1), VCC (2), OUT (3); the
+wires are black, red and green respectively.
 
 ```
-Sensor VCC (red)   ----> 5V (Pi header pin 2, or the busbar 5V rail)
-Sensor GND (black) ----> common ground, shared with the SKR
+Sensor VCC (red)   ----> 5V, Pi header pin 2 (or pin 4)
+Sensor GND (black) ----> Y-STOP GND pin
 Sensor OUT (green) ----> Y-STOP signal pin (PC1)
 ```
+
+**Power it from the Pi's 5V pin. There is no 5V busbar.** The busbar is
+12V only; the 5V the Pi runs on comes from the DC-DC converter and reaches
+nothing else except through the Pi's header. Pin 2 and pin 4 are both that 5V
+rail, tied together on the Pi. The sensor draws a few mA, which is nothing next
+to the converter's 3A.
+
+**Not 3.3V.** The sensor's supply needs 5V minimum (the CQRSENYW001 is rated
+5-24V; check the listing for anything "similar"). The 5V / 3V switch only sets
+the *output* level, through the board's own regulator, so 5V in and 3.3V out is
+the intended setup. Below its supply minimum the sensor tends to half-work —
+weak sensitivity, a flickering output — which looks like a placement problem
+and is miserable to chase.
+
+**Not the 12V busbar either**, even though 12V is inside the rating. The pump's
+brushed-motor noise is conducted onto the 12V rail, and this is the one input
+read while the pump runs (see "The one adjacency worth watching" below). The
+Pi's 5V, behind the DC-DC converter, is the quieter supply.
+
+Y-STOP is a 2-pin header, GND and signal, with no power pin, so it takes only
+the black and green wires. Find which pin is GND with a multimeter on
+continuity to a known SKR ground rather than trusting the plug: the sensor
+almost certainly ships with a 3-pin connector, so its wires go into a 2-pin
+JST-XH housing anyway. Swapped, nothing is damaged, but the query below reads
+the same on a full tube and an empty one.
 
 Z-STOP (PC2) is the spare if Y-STOP is taken. Both are free because the
 `stepper_y` and `stepper_z` sections in `printer.cfg` are placeholders — a
@@ -958,7 +1006,7 @@ check your tube's outer diameter falls inside that, and adjust the sensitivity
 pot if the board has one.
 
 **Confirm polarity before trusting it.** Bench the sensor first, powered at 5V
-with the dial at 3.3V, and read the output on a full tube and an empty one —
+with both switches down, and read the output on a full tube and an empty one —
 allow 500 ms between changing the tube and reading, that is its response time.
 Then check Klipper agrees:
 
@@ -966,8 +1014,13 @@ Then check Klipper agrees:
 python3 /opt/greenthumb/deploy/pi/send-gcode.py QUERY_FILAMENT_SENSOR SENSOR=water_supply
 ```
 
-A full tube must report detected. If it reads backwards, change `switch_pin` to
-`^!PC1` in `printer.cfg` and re-run the install script rather than rewiring.
+A full tube must report detected, and an empty one must not. If it reads
+backwards, the SET switch is up: move it down. Don't fix it by removing the
+`!` from `switch_pin`. That also flips the reading, but a loose wire then
+confirms every dose.
+
+To check the fail-safe, pull the green wire out of Y-STOP and query again. It
+must report **not** detected.
 
 Once confirmed, set `WATER_SENSOR_ENABLED=true` in `/opt/greenthumb/.env` and
 restart the API.
