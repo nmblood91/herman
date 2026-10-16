@@ -473,9 +473,8 @@ async def set_light_color(payload: dict[str, int] = Body(default_factory=dict)) 
 
 @app.post(f"{settings.api_prefix}/lights/color-order")
 async def set_light_color_order(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
-    # settings.led_color_order, not a literal: every other default in the
-    # project is GRB, and a request with the key missing used to silently
-    # set RGB and swap red and green on the strip.
+    # settings.led_color_order, not a literal: a request with the key missing
+    # used to silently set RGB and scramble the colours on the strip.
     order = str(payload.get("color_order", settings.led_color_order))
     result = automation.set_light_color_order(order)
     log_event(f"LED color order set to {result['color_order']}")

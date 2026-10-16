@@ -13,7 +13,7 @@ export function LedStripPanel({ overview }) {
   const chipOptions = lighting?.chip_options ?? []
 
   const [chip, setChip] = useState('WS2811')
-  const [colorOrder, setColorOrder] = useState('GRB')
+  const [colorOrder, setColorOrder] = useState('BRG')
   const [status, setStatus] = useState('')
   const [testing, setTesting] = useState('')
 

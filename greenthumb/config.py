@@ -39,8 +39,9 @@ class Settings(BaseSettings):
     # give on top of the Pi.
     led_chip: str = "WS2811"
     led_count: int = 60
-    # Overrides the chip's usual order, for strips wired differently.
-    led_color_order: str = "GRB"
+    # Overrides the chip's usual order, for strips wired differently. BRG is
+    # what the reference build's WS2811 strip turned out to need.
+    led_color_order: str = "BRG"
     led_spi_bus: int = 0
     led_spi_device: int = 0
     # Usable X travel, not the length of the rail. The extrusion is 1000 mm, but
