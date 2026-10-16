@@ -62,6 +62,11 @@ class HardwareBusyError(RuntimeError):
 # In care_fields for showing, and never stored.
 DERIVED_CARE_FIELDS = ("water_level", "light_stop_time")
 
+# Marks a file as a library backup, so importing some other JSON by mistake
+# is refused rather than half-read.
+LIBRARY_FORMAT = "greenthumb-library"
+LIBRARY_VERSION = 1
+
 
 def _water_level_of(profile: dict) -> dict[str, str]:
     """A stored plant profile's water level, worked out from its target."""
@@ -2908,6 +2913,107 @@ class GreenThumbAutomation:
                 f"({int(capacity)}), not {int(wilting)}"
             )
         return changes
+
+    def export_library(self) -> dict[str, object]:
+        """Every soil profile and plant profile, as one file to keep.
+
+        Exactly what is stored, measured readings and their provenance
+        included, so a restore puts back the field capacity somebody spent a
+        day measuring rather than only the published figures.
+        """
+        return {
+            "format": LIBRARY_FORMAT,
+            "version": LIBRARY_VERSION,
+            "exported_at": datetime.now().isoformat(timespec="seconds"),
+            "soil_profiles": state.load_soils(self._state_path),
+            "plant_profiles": state.load_profiles(self._state_path),
+        }
+
+    def import_library(self, data: object, replace: bool = False) -> dict[str, object]:
+        """Load a file from export_library back in.
+
+        Every entry goes through the same validation as the editors, so a
+        hand-edited backup cannot store something the UI would refuse. One bad
+        entry is reported and skipped rather than failing the rest. Soil
+        profiles go first, because a plant profile's preferred soil has to
+        exist before it can be stored.
+
+        Without `replace`, an entry whose name is already here is kept as it
+        is: importing an old backup must not quietly undo newer tuning.
+        """
+        # A planter's own data/state.json is accepted too: it stores both
+        # libraries under the same two keys, and it is what can be pulled off
+        # the card of a Pi that will not boot. Only those two keys are read.
+        is_backup = isinstance(data, dict) and data.get("format") == LIBRARY_FORMAT
+        is_state = (
+            isinstance(data, dict)
+            and "format" not in data
+            and (state.PROFILES_KEY in data or state.SOILS_KEY in data)
+        )
+        if not (is_backup or is_state):
+            raise ValueError("Not a GreenThumb library backup or state.json")
+        soils_in = data.get("soil_profiles") or {}
+        plants_in = data.get("plant_profiles") or {}
+        if not isinstance(soils_in, dict) or not isinstance(plants_in, dict):
+            raise ValueError("The backup's soil_profiles and plant_profiles must each map names to entries")
+
+        def exists(name: str, stored: dict[str, object]) -> bool:
+            return any(key.casefold() == name.strip().casefold() for key in stored)
+
+        soils_out: dict[str, str] = {}
+        existing_soils = state.load_soils(self._state_path)
+        for name, entry in soils_in.items():
+            if not isinstance(name, str) or not name.strip() or not isinstance(entry, dict):
+                soils_out[str(name)] = "skipped: not a soil profile"
+                continue
+            if exists(name, existing_soils) and not replace:
+                soils_out[name] = "kept"
+                continue
+            try:
+                # None for anything missing, so a replace leaves the soil
+                # exactly as the backup has it rather than merged with what
+                # was here.
+                self.save_soil(
+                    name,
+                    entry.get("field_capacity_vwc"),
+                    entry.get("wilting_point_vwc"),
+                    entry.get("notes", ""),
+                    entry.get("field_capacity_raw"),
+                    entry.get("wilting_point_raw"),
+                )
+            except ValueError as exc:
+                soils_out[name] = f"skipped: {exc}"
+                continue
+            # save_soil treats a reading as typed and clears where it came
+            # from; put the backup's provenance back beside it.
+            provenance = {
+                f"{end}_{detail}": entry[f"{end}_{detail}"]
+                for end in ("field_capacity", "wilting_point")
+                if entry.get(f"{end}_raw") is not None
+                for detail in ("samples", "measured_at", "address")
+                if entry.get(f"{end}_{detail}") is not None
+            }
+            if provenance:
+                state.save_soil(name, provenance, self._state_path)
+            soils_out[name] = "written"
+
+        plants_out: dict[str, str] = {}
+        existing_plants = state.load_profiles(self._state_path)
+        for name, entry in plants_in.items():
+            if not isinstance(name, str) or not name.strip() or not isinstance(entry, dict):
+                plants_out[str(name)] = "skipped: not a plant profile"
+                continue
+            if exists(name, existing_plants) and not replace:
+                plants_out[name] = "kept"
+                continue
+            try:
+                self.write_plant_profile(name, entry)
+            except ValueError as exc:
+                plants_out[name] = f"skipped: {exc}"
+                continue
+            plants_out[name] = "written"
+
+        return {"status": "ok", "soil_profiles": soils_out, "plant_profiles": plants_out}
 
     def delete_soil(self, name: str) -> dict[str, object]:
         """Remove a soil. Plants still naming it keep the name, unresolved."""

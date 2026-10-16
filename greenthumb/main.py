@@ -642,6 +642,29 @@ def write_plant_profile(payload: dict[str, object] = Body(default_factory=dict))
     return result
 
 
+@app.get(f"{settings.api_prefix}/library/export")
+def export_library() -> dict[str, object]:
+    """Every soil profile and plant profile, as one JSON backup."""
+    return automation.export_library()
+
+
+@app.post(f"{settings.api_prefix}/library/import")
+def import_library(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Load a backup from /library/export.
+
+    Expects {"backup": <the exported file>, "replace": false}. Without
+    replace, entries whose name already exists are kept as they are.
+    """
+    result = automation.import_library(payload.get("backup"), bool(payload.get("replace")))
+    written = sum(
+        outcome == "written"
+        for section in ("soil_profiles", "plant_profiles")
+        for outcome in result[section].values()
+    )
+    log_event(f"Imported a library backup: {written} entries written")
+    return result
+
+
 @app.get(f"{settings.api_prefix}/plant-profiles/{{name}}")
 def read_plant_profile(name: str) -> dict[str, object]:
     """One plant profile, for an editor to load into its form."""

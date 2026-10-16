@@ -6,6 +6,7 @@ import { AutomationPanel } from './components/AutomationPanel'
 import { PlantsPanel } from './components/PlantsPanel'
 import { PlantEditorPanel } from './components/PlantEditorPanel'
 import { SoilPanel } from './components/SoilPanel'
+import { LibraryBackupPanel } from './components/LibraryBackupPanel'
 import { HistoryPanel } from './components/HistoryPanel'
 import { HomeSwitchPanel } from './components/HomeSwitchPanel'
 import { ClockPanel } from './components/ClockPanel'
@@ -363,6 +364,7 @@ function App() {
               them belongs on the same tab rather than one away. */}
           <PlantEditorPanel profiles={profiles} soils={soils} onRefresh={loadDashboard} />
           <SoilPanel soils={soils} plants={plants} onRefresh={loadDashboard} />
+          <LibraryBackupPanel onRefresh={loadDashboard} />
         </>
       )}
 
