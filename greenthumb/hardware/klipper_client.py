@@ -162,6 +162,22 @@ class KlipperClient:
             return None
         return bool(sensor["filament_detected"])
 
+    def versions(self) -> dict[str, str | None]:
+        """Klipper's own version on the Pi, and the firmware's on the SKR.
+
+        None for whichever Klipper cannot report, which includes the firmware
+        before the board has connected.
+        """
+        host = None
+        info = self._send_command("info")
+        if info.get("ok"):
+            host = info.get("result", {}).get("software_version") or None
+        mcu = None
+        query = self._send_command("objects/query", {"objects": {"mcu": ["mcu_version"]}})
+        if query.get("ok"):
+            mcu = query.get("result", {}).get("status", {}).get("mcu", {}).get("mcu_version") or None
+        return {"host": host, "mcu": mcu}
+
     def endstop_state(self) -> dict[str, Any]:
         """Whether the home switch reads triggered right now.
 

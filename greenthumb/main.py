@@ -15,7 +15,7 @@ from greenthumb import moisture
 from greenthumb.config import settings
 from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_stream
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
-from greenthumb import system_clock, system_power, version
+from greenthumb import firmware_info, system_clock, system_power, system_update, version
 from greenthumb.plants import zone_for
 from greenthumb.services.automation import (
     UNCHANGED,
@@ -160,8 +160,20 @@ async def read_sensors() -> list[dict[str, object]]:
 
 @app.get(f"{settings.api_prefix}/version")
 def get_version() -> dict[str, object]:
-    """What is running, and whether the checkout has moved on without it."""
-    return version.status()
+    """What is running, and whether the code on disk has moved on without it.
+
+    Also Klipper's version on the Pi and the firmware's on the SKR. They have
+    to come from the same commit, and the board can only be reflashed by hand,
+    so a mismatch is reported rather than left to show up as a gantry that
+    refuses to move.
+    """
+    result = version.status()
+    klipper = automation.klipper.versions()
+    result["klipper"] = {
+        **klipper,
+        "firmware_mismatch": firmware_info.mismatch(klipper["host"], klipper["mcu"]),
+    }
+    return result
 
 
 @app.get(f"{settings.api_prefix}/system/time")
@@ -195,6 +207,30 @@ def system_power_action(payload: dict[str, object] = Body(default_factory=dict))
     action = str(payload.get("action", ""))
     result = automation.request_power(action)
     log_event(f"{action.capitalize()} requested from the UI")
+    return result
+
+
+@app.get(f"{settings.api_prefix}/system/update")
+def get_update_status() -> dict[str, object]:
+    """Installed version, any newer one available, and how the last update went."""
+    return system_update.status()
+
+
+@app.post(f"{settings.api_prefix}/system/update/check")
+def check_for_update() -> dict[str, object]:
+    """Look for a newer version now. Answers at once; poll GET for the result."""
+    return system_update.check()
+
+
+@app.post(f"{settings.api_prefix}/system/update")
+def install_update() -> dict[str, object]:
+    """Install the newer version. Refused with a 409 while the hardware is busy.
+
+    The update restarts this API, so the reply only says it has begun. The page
+    polls GET /system/update until the API is back on the new version.
+    """
+    result = automation.request_update()
+    log_event(f"Update to {result['updating_to']} started from the UI")
     return result
 
 

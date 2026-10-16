@@ -1,0 +1,9 @@
+[Unit]
+Description=Check for a newer GreenThumb package
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/greenthumb/greenthumb-update --check
+TimeoutStartSec=5min

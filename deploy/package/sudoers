@@ -1,0 +1,14 @@
+# Installed as /etc/sudoers.d/greenthumb (mode 0440) by the greenthumb package.
+# Everything the API, running as pi, may do as root -- each one exact, so this
+# grants nothing beyond the buttons in the web UI. CI checks it with visudo -c.
+
+# Settings tab: set the timezone, so the lighting schedule runs at local hours.
+# Only set-timezone: no changing the clock and no disabling NTP.
+pi ALL=(root) NOPASSWD: /usr/bin/timedatectl set-timezone *
+
+# Controls tab: shut down or reboot, so nobody has to pull the plug.
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff, /usr/bin/systemctl reboot
+
+# Software panel: check for and install an update. Starts the units only; what
+# they run is fixed in /usr/lib/greenthumb/greenthumb-update.
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl start --no-block greenthumb-update.service, /usr/bin/systemctl start --no-block greenthumb-update-check.service

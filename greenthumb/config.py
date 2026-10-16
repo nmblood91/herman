@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from greenthumb.paths import ENV_FILE
+
 
 class Settings(BaseSettings):
     # The product name, which is what any of this that reaches a screen should
@@ -146,11 +148,13 @@ class Settings(BaseSettings):
 
     # History
     history_retention_days: int = 90
-    # Empty means the default alongside the app, like logs/.
+    # Empty means the default beside state.json (see greenthumb/paths.py).
     history_db_path: str = ""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # .env in a checkout, /etc/greenthumb/greenthumb.env once packaged, so
+        # a command run by hand reads the same settings as the service.
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )

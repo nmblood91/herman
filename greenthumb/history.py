@@ -7,10 +7,11 @@ import time
 from pathlib import Path
 
 from greenthumb.models import SensorSample
+from greenthumb.paths import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "greenthumb.db"
+DEFAULT_DB_PATH = DATA_DIR / "greenthumb.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS readings (

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
-LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+from greenthumb.paths import LOG_DIR
+
 LOG_FILE = LOG_DIR / "greenthumb.log"
 
 # Requests polled on a timer, kept out of uvicorn's access log. The Controls tab

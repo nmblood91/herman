@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  remove)
+    # Built on the device rather than shipped, so dpkg does not know to remove
+    # them. The planter's data is kept.
+    rm -rf /opt/greenthumb/.venv /opt/greenthumb/klippy-env
+    rm -f /opt/greenthumb/klipper/klippy/chelper/c_helper.so
+    ;;
+  purge)
+    # Purge is the one time the data goes: state.json, the history, the logs.
+    rm -rf /opt/greenthumb /var/lib/greenthumb /var/log/greenthumb /var/log/klipper
+    ;;
+esac
+
+if [ -d /run/systemd/system ]; then
+  systemctl daemon-reload || true
+fi
+
+exit 0

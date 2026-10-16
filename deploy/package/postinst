@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  configure)
+    /opt/greenthumb/deploy/package/setup-system.sh
+    ;;
+esac
+
+exit 0

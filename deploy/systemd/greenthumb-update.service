@@ -1,0 +1,13 @@
+[Unit]
+Description=Install the latest GreenThumb package
+# Started from the Update button, through a sudoers rule that allows exactly
+# `systemctl start --no-block greenthumb-update.service`. A unit of its own
+# rather than a child of the API, because the upgrade restarts the API: a
+# child process would be killed halfway through its own install.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/greenthumb/greenthumb-update
+TimeoutStartSec=30min

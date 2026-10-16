@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+# Only on removal. An upgrade restarts everything from postinst instead, and
+# stopping here would leave the planter down if the new version failed to
+# unpack.
+case "$1" in
+  remove|deconfigure)
+    if [ -d /run/systemd/system ]; then
+      systemctl disable --now greenthumb-update-check.timer greenthumb-api.service klipper.service || true
+    fi
+    rm -f /etc/nginx/sites-enabled/greenthumb.conf
+    ;;
+esac
+
+exit 0

@@ -1,0 +1,21 @@
+[Unit]
+Description=Klipper host for the GreenThumb gantry and pump
+Documentation=https://www.klipper3d.org/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+# /run/klipper holds the socket the API talks to; /var/log/klipper the log.
+RuntimeDirectory=klipper
+LogsDirectory=klipper
+# Klipper's host code ships inside the package, at the commit in
+# deploy/klipper/KLIPPER_COMMIT, with its own virtualenv. The SKR's firmware is
+# built from the same commit, so the two cannot drift apart on an update.
+ExecStart=/opt/greenthumb/klippy-env/bin/python /opt/greenthumb/klipper/klippy/klippy.py /home/pi/printer_data/config/printer.cfg -l /var/log/klipper/klippy.log -a /run/klipper/uds
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

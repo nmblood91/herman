@@ -33,7 +33,7 @@ from greenthumb.hardware.soil_sensors import (
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
 from greenthumb.plants import default_plants, label_for, zone_for
-from greenthumb import care, dances, moisture, state, system_power
+from greenthumb import care, dances, moisture, state, system_power, system_update
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,11 @@ class HardwareBusyError(RuntimeError):
 
 # In care_fields for showing, and never stored.
 DERIVED_CARE_FIELDS = ("water_level", "light_stop_time")
+
+# How long to wait for a started update unit to show up, and how often to look
+# while it runs, before handing the hardware lock back.
+UPDATE_START_GRACE_SECONDS = 15.0
+UPDATE_POLL_SECONDS = 2.0
 
 # Marks a file as a library backup, so importing some other JSON by mistake
 # is refused rather than half-read.
@@ -1396,6 +1401,48 @@ class GreenThumbAutomation:
         except Exception:
             self._hardware_lock.release()
             raise
+
+    def request_update(self) -> dict[str, object]:
+        """Install the newer package, but never in the middle of a dose or a move.
+
+        Holds the hardware lock for the whole update, for the same reason as a
+        shutdown: the upgrade restarts this API and Klipper, and nothing may
+        start a dose that a restart would cut off. A successful upgrade
+        restarts the API, which ends the lock with the process. If the update
+        unit finishes without that happening -- it failed, or there was
+        nothing to install -- a watcher hands the lock back so the planter
+        carries on.
+        """
+        current = system_update.status()
+        if not current.get("supported"):
+            raise ValueError(str(current.get("detail")))
+        if current.get("updating"):
+            raise ValueError("An update is already running")
+        if not current.get("available"):
+            raise ValueError("Already up to date. Check for updates first.")
+        if not self._hardware_lock.acquire(blocking=False):
+            raise HardwareBusyError(
+                "Update rejected: hardware is busy. Wait for the watering or move to finish."
+            )
+        try:
+            system_update.start()
+        except Exception:
+            self._hardware_lock.release()
+            raise
+        threading.Thread(target=self._release_after_update, daemon=True).start()
+        return {"status": "ok", "updating_to": current["available"]}
+
+    def _release_after_update(self) -> None:
+        # --no-block returns before the unit is up, so first wait for it to
+        # appear; a unit that never shows up within the grace period has
+        # already finished, or never started.
+        deadline = monotonic() + UPDATE_START_GRACE_SECONDS
+        while monotonic() < deadline and not system_update.unit_active(system_update.UPDATE_UNIT):
+            sleep(UPDATE_POLL_SECONDS)
+        while system_update.unit_active(system_update.UPDATE_UNIT):
+            sleep(UPDATE_POLL_SECONDS)
+        logger.warning("Update finished without restarting the API; releasing the hardware")
+        self._hardware_lock.release()
 
     def water_sensor_diagnostic(self) -> dict[str, object]:
         """Read the outlet tube's liquid sensor once, for the calibration check.

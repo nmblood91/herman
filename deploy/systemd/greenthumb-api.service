@@ -1,11 +1,16 @@
 [Unit]
 Description=GreenThumb API Service
-After=network.target
+After=network.target klipper.service
 
 [Service]
 Type=simple
 User=pi
 WorkingDirectory=/opt/greenthumb
+# Created owned by pi on start: state.json and the history database, and the
+# app log. Outside /opt/greenthumb so an upgrade replaces the code and never
+# the data (see greenthumb/paths.py).
+StateDirectory=greenthumb
+LogsDirectory=greenthumb
 Environment=PATH=/opt/greenthumb/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Bound to localhost, not 0.0.0.0: nginx proxies to 127.0.0.1:8000, so the
 # API needs no listener of its own on the LAN. With no authentication yet,

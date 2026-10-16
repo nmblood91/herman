@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Look for, or install, a newer greenthumb package. Runs as root, only from
+# greenthumb-update.service (install) and greenthumb-update-check.service
+# (--check). The API never runs apt itself; it starts one of those units and
+# reads what this writes to update-status.json.
+#
+# Only the greenthumb source is refreshed and only the greenthumb package is
+# upgraded (plus anything new it depends on). Operating system updates are a
+# separate decision and are left to the usual `apt upgrade`.
+set -uo pipefail
+
+STATUS=/var/lib/greenthumb/update-status.json
+SOURCE=/etc/apt/sources.list.d/greenthumb.list
+LOG=$(mktemp)
+trap 'rm -f "$LOG"' EXIT
+export DEBIAN_FRONTEND=noninteractive
+
+MODE=install
+[ "${1:-}" = "--check" ] && MODE=check
+
+installed() { dpkg-query -W -f='${Version}' greenthumb 2>/dev/null || true; }
+candidate() { apt-cache policy greenthumb 2>/dev/null | awk '/Candidate:/ {print $2; exit}'; }
+
+# Written atomically and readable by the API, which runs as pi.
+write_status() {
+  local state=$1
+  local inst cand
+  inst=$(installed)
+  cand=$(candidate)
+  mkdir -p "$(dirname "$STATUS")"
+  STATE="$state" MODE="$MODE" INSTALLED="$inst" CANDIDATE="$cand" LOGFILE="$LOG" \
+  STATUS="$STATUS" python3 - <<'PY'
+import json, os, subprocess, tempfile
+from datetime import datetime
+
+installed, candidate = os.environ["INSTALLED"], os.environ["CANDIDATE"]
+available = False
+if installed and candidate and candidate != "(none)":
+    available = subprocess.run(
+        ["dpkg", "--compare-versions", candidate, "gt", installed]
+    ).returncode == 0
+
+status = {}
+try:
+    with open(os.environ["STATUS"], encoding="utf-8") as stream:
+        status = json.load(stream)
+except (OSError, ValueError):
+    pass
+
+now = datetime.now().astimezone().isoformat(timespec="seconds")
+state = os.environ["STATE"]
+status.update({
+    "installed": installed or None,
+    "candidate": candidate if candidate not in ("", "(none)") else None,
+    "available": available,
+})
+if os.environ["MODE"] == "check":
+    status["checked_at"] = now
+    status["check_state"] = state
+else:
+    status["state"] = state
+    status["finished_at" if state in ("done", "failed") else "started_at"] = now
+    if state == "running":
+        status["from"] = installed or None
+        status.pop("log_tail", None)
+if state == "failed":
+    with open(os.environ["LOGFILE"], encoding="utf-8", errors="replace") as stream:
+        status["log_tail"] = stream.read().splitlines()[-20:]
+
+directory = os.path.dirname(os.environ["STATUS"])
+fd, temp = tempfile.mkstemp(dir=directory, prefix=".update-status.")
+with os.fdopen(fd, "w", encoding="utf-8") as stream:
+    json.dump(status, stream, indent=2)
+os.chmod(temp, 0o644)
+os.replace(temp, os.environ["STATUS"])
+PY
+}
+
+refresh() {
+  apt-get update \
+    -o Dir::Etc::sourcelist="$SOURCE" \
+    -o Dir::Etc::sourceparts="-" \
+    -o APT::Get::List-Cleanup="0" >>"$LOG" 2>&1
+}
+
+if [ ! -f "$SOURCE" ]; then
+  echo "No GreenThumb package source at $SOURCE" >>"$LOG"
+  write_status failed
+  exit 1
+fi
+
+if [ "$MODE" = check ]; then
+  write_status checking
+  if refresh; then write_status checked; else write_status failed; exit 1; fi
+  exit 0
+fi
+
+write_status running
+if ! refresh; then
+  write_status failed
+  exit 1
+fi
+# Keeps any settings file the user edited (--force-confold) rather than
+# stopping to ask, since nobody is at a terminal to answer.
+if apt-get install -y --only-upgrade \
+    -o DPkg::Lock::Timeout=300 \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    greenthumb >>"$LOG" 2>&1; then
+  write_status done
+else
+  write_status failed
+  exit 1
+fi
