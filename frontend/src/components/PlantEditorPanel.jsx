@@ -232,7 +232,7 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
               Plant name
               <input
                 value={form.name}
-                placeholder="Basil"
+                placeholder="New Plant Name"
                 onChange={(event) => update('name', event.target.value)}
               />
             </label>
