@@ -57,6 +57,11 @@ export function Chart({ data, series, markers = [], height = 320, yRange, yLabel
                 if (marker.delivered === false) {
                   ctx.strokeStyle = 'rgba(230, 90, 80, 0.85)'
                   ctx.setLineDash([])
+                } else if (marker.soak === 'missed') {
+                  // Left the tube, or was never checked there, but the pot's
+                  // probe never saw it arrive: amber, a step short of red.
+                  ctx.strokeStyle = 'rgba(235, 170, 60, 0.9)'
+                  ctx.setLineDash([])
                 } else {
                   ctx.strokeStyle = 'rgba(125, 200, 255, 0.55)'
                   ctx.setLineDash([4, 3])

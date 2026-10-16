@@ -122,15 +122,17 @@ no history, and no history means no way to tell a real trend from a fluke.
 
 ## What has to be true before it waters
 
-Every minute, for each pot, the planter asks five questions in order. **All five
+Every minute, for each pot, the planter asks six questions in order. **All six
 must be yes** or it moves on and tries again next minute.
 
 1. **Am I allowed to make noise right now?** See quiet hours below.
-2. **Do I have ten readings yet?** If it just started up, no — wait.
-3. **Is the ten-minute average below the target for this plant?** Each pot has
+2. **Did the last watering, on any pot, show up on its moisture probe?** Until it
+   does, nothing else is watered. See *Checking it reached the soil* below.
+3. **Do I have ten readings yet?** If it just started up, no — wait.
+4. **Is the ten-minute average below the target for this plant?** Each pot has
    its own target, because a fern and a succulent don't want the same thing.
-4. **Has it been at least 30 minutes since I last watered this pot?** See below.
-5. **Did the arm actually reach the pot?** If the arm can't move — it isn't
+5. **Has it been at least an hour since I last watered this pot?** See below.
+6. **Did the arm actually reach the pot?** If the arm can't move — it isn't
    homed, something is in the way — the planter refuses to run the pump.
    Watering the wrong spot is worse than not watering.
 
@@ -261,6 +263,54 @@ Nothing gets blocked — the next pour tries again — so refilling the tank
 quietly fixes it with nothing to reset, and the first dose that lands clears
 the warning.
 
+The tube sensor is optional and off by default (`WATER_SENSOR_ENABLED`). On a
+narrow 4 mm line there is very little water in front of it, and it may not
+trigger at all. The check below needs no extra parts.
+
+## Checking it reached the soil
+
+Each pot already has a moisture probe in it, and a watering that lands in the
+pot makes that probe read wetter. So after every watering the planter watches
+that pot's probe for the rise.
+
+It has to be patient. The water spreads from where it lands to where the probe
+sits, and how long that takes depends on the mix and the distance. It can be a
+minute, or most of an hour. So:
+
+- **It passes as soon as the rise shows up**, which is usually within a few
+  minutes.
+- **It is only called a miss after a full hour** with no rise. That is the same
+  hour as the cooldown, so a pot is never watered again before its last
+  watering has been judged.
+- **The rise has to be real.** It is measured against the readings from the ten
+  minutes before the watering, and it has to reach 5% of the pot's scale
+  (`SOAK_RISE_PERCENT`; field capacity minus wilting point, in sensor counts). It
+  has to hold over three readings in a row, so one noisy reading can't pass a
+  watering that never arrived.
+- **Some waterings aren't judged.** That covers a pot with no usable scale, soil
+  already close to field capacity (where there's no room left to show a rise),
+  and a probe that stops reporting partway through. These are recorded as not
+  checked, never as misses.
+
+**While a watering is waiting to show up, no pot is watered automatically.**
+This is what stops an empty reservoir from running the pump dry over one pot
+after another before anything has noticed. Watering a pot yourself from the app
+still works, and gets checked the same way.
+
+**One miss** is a warning in the status bar naming the pot. The plant card says
+so too, and the History chart marks it as a **solid amber line**.
+
+**Two misses in a row pause automatic watering** until you press **Resume** on
+the Automation tab:
+
+- **Both on the same pot:** check the reservoir has water, then that the nozzle
+  lines up with the pot and the probe is in the soil.
+- **On different pots:** the reservoir is probably empty. Refill it, then
+  Resume.
+
+The pause survives a restart. A watering that does show up between two misses
+resets the count. Turn the whole check off with `SOAK_CHECK_ENABLED=false`.
+
 ## Quiet hours, and the snooze
 
 The pump and the carriage are the only loud parts of this machine, and it lives
@@ -328,7 +378,7 @@ Rules both follow:
 - **Routines you start yourself always run**, quiet hours or not. They have
   no effect on the hourly schedule.
 
-## The half-hour wait, and why it matters
+## The hour's wait, and why it matters
 
 This is the rule that keeps a plant from drowning, and it's worth understanding.
 
@@ -341,8 +391,11 @@ Without a waiting rule, here's what would happen: the planter waters, checks
 again a minute later, still sees a dry average, and waters again. And again.
 Roughly ten doses would go into a pot that needed one.
 
-So after watering a pot, that pot is off-limits for 30 minutes. Long enough for
-the water to spread and for the average to catch up to reality.
+So after watering a pot, that pot is off-limits for an hour
+(`WATERING_COOLDOWN_MINUTES`). That's long enough for the water to spread and the
+average to catch up, and it's also the time the pot's probe gets to show that
+the water arrived (see *Checking it reached the soil*). The wait carries over a
+restart, so rebooting the planter doesn't let every pot be watered again at once.
 
 ## One job at a time
 

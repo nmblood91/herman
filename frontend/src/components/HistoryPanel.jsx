@@ -119,6 +119,9 @@ export function HistoryPanel() {
   const failedCount = (history?.waterings || []).filter(
     (watering) => watering.delivered === false,
   ).length
+  const missedCount = (history?.waterings || []).filter(
+    (watering) => watering.delivered !== false && watering.soak === 'missed',
+  ).length
 
   return (
     <section className="panel-section">
@@ -203,6 +206,14 @@ export function HistoryPanel() {
               {failedCount === 1 ? '1 dose' : `${failedCount} doses`} ran but no
               water reached the outlet, drawn as solid red lines. Look for a
               moisture curve that did not rise afterwards.
+            </p>
+          )}
+          {missedCount > 0 && (
+            <p className="field-hint warning">
+              {missedCount === 1 ? '1 dose' : `${missedCount} doses`} never
+              showed up on the pot&apos;s moisture probe within the hour, drawn
+              as solid amber lines. Check the reservoir, that the nozzle lines up
+              with the pot, and that the probe is in the soil.
             </p>
           )}
         </>

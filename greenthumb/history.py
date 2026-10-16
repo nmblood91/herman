@@ -34,7 +34,13 @@ CREATE TABLE IF NOT EXISTS waterings (
     -- 1 delivered, 0 nothing reached the outlet, NULL not checked. Nullable
     -- because "we did not look" and "we looked and saw nothing" are different
     -- answers, and only the second one is a fault.
-    delivered   INTEGER
+    delivered   INTEGER,
+    -- Whether the pot's own moisture probe saw the water arrive: pending,
+    -- soaked, missed, unknown (the probe went quiet) or skipped (could not be
+    -- judged). NULL for rows from before the check existed.
+    soak        TEXT,
+    -- How far the raw reading rose above its pre-dose baseline, in counts.
+    soak_rise   REAL
 );
 CREATE INDEX IF NOT EXISTS idx_waterings_time ON waterings(recorded_at);
 """
@@ -105,6 +111,12 @@ class HistoryStore:
             # failed, and NULL is what the new column defaults to.
             self._db.execute("ALTER TABLE waterings ADD COLUMN delivered INTEGER")
             logger.info("Added waterings.delivered to the existing history database")
+        for column, kind in (("soak", "TEXT"), ("soak_rise", "REAL")):
+            if column not in columns:
+                # NULL on old rows: they were never checked, which is neither
+                # a pass nor a miss.
+                self._db.execute(f"ALTER TABLE waterings ADD COLUMN {column} {kind}")
+                logger.info("Added waterings.%s to the existing history database", column)
 
     def record_readings(self, samples: list[SensorSample], at: int | None = None) -> int:
         """Store one tick's readings. Returns how many were kept."""
@@ -137,21 +149,77 @@ class HistoryStore:
         trigger: str,
         delivered: bool | None = None,
         at: int | None = None,
-    ) -> None:
+        soak: str | None = None,
+    ) -> int:
+        """Store one dose. Returns its row id, for record_soak to update."""
         timestamp = int(time.time()) if at is None else at
         with self._lock:
-            self._db.execute(
-                "INSERT INTO waterings (recorded_at, plant_id, volume_ml, trigger, delivered)"
-                " VALUES (?, ?, ?, ?, ?)",
+            cursor = self._db.execute(
+                "INSERT INTO waterings (recorded_at, plant_id, volume_ml, trigger, delivered, soak)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     timestamp,
                     plant_id,
                     int(volume_ml),
                     trigger,
                     None if delivered is None else int(delivered),
+                    soak,
                 ),
             )
             self._db.commit()
+            return int(cursor.lastrowid)
+
+    def record_soak(self, watering_id: int, soak: str, rise: float | None = None) -> None:
+        """Record what the pot's probe made of one dose."""
+        with self._lock:
+            self._db.execute(
+                "UPDATE waterings SET soak = ?, soak_rise = ? WHERE id = ?",
+                (soak, None if rise is None else round(float(rise), 1), int(watering_id)),
+            )
+            self._db.commit()
+
+    def pending_soaks(self) -> list[dict[str, object]]:
+        """Doses still waiting for their probe to show the water, oldest first."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT id, recorded_at, plant_id, volume_ml FROM waterings"
+                " WHERE soak = 'pending' ORDER BY recorded_at"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def judged_soaks(self, since: int, limit: int = 10) -> list[dict[str, object]]:
+        """The latest doses the probe gave a verdict on (soaked or missed),
+        newest first. Unknown and skipped are left out: they say nothing about
+        whether water arrives."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT id, recorded_at, plant_id, soak FROM waterings"
+                " WHERE soak IN ('soaked', 'missed') AND recorded_at > ?"
+                " ORDER BY recorded_at DESC, id DESC LIMIT ?",
+                (int(since), int(limit)),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def raw_readings(self, address: int, since: int, until: int) -> list[tuple[int, float]]:
+        """(time, raw) for one probe over [since, until], oldest first."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT recorded_at, moisture_raw FROM readings"
+                " WHERE sensor_address = ? AND recorded_at >= ? AND recorded_at <= ?"
+                " ORDER BY recorded_at",
+                (int(address), int(since), int(until)),
+            ).fetchall()
+        return [(row["recorded_at"], row["moisture_raw"]) for row in rows]
+
+    def last_waterings(self) -> dict[str, dict[str, object]]:
+        """The most recent dose per plant: when, and what its probe made of it."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT w.plant_id, w.recorded_at, w.soak, w.soak_rise FROM waterings w"
+                " JOIN (SELECT plant_id, MAX(id) AS id FROM waterings GROUP BY plant_id) last"
+                " ON w.id = last.id"
+            ).fetchall()
+        return {row["plant_id"]: dict(row) for row in rows}
 
     def series(
         self, addresses: list[int], hours: float, now: int | None = None
@@ -215,7 +283,7 @@ class HistoryStore:
         since = end - int(hours * 3600)
         with self._lock:
             rows = self._db.execute(
-                "SELECT recorded_at, plant_id, volume_ml, trigger, delivered FROM waterings"
+                "SELECT recorded_at, plant_id, volume_ml, trigger, delivered, soak FROM waterings"
                 " WHERE recorded_at >= ? ORDER BY recorded_at",
                 (since,),
             ).fetchall()
@@ -226,6 +294,7 @@ class HistoryStore:
                 "volume_ml": row["volume_ml"],
                 "trigger": row["trigger"],
                 "delivered": None if row["delivered"] is None else bool(row["delivered"]),
+                "soak": row["soak"],
             }
             for row in rows
         ]

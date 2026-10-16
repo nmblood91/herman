@@ -246,6 +246,14 @@ def set_auto_watering(payload: dict[str, object] = Body(default_factory=dict)) -
     return result
 
 
+@app.post(f"{settings.api_prefix}/watering/resume")
+def resume_watering() -> dict[str, object]:
+    """Clear the pause after two waterings in a row didn't reach the soil."""
+    result = automation.resume_watering()
+    log_event("Automatic watering resumed after waterings didn't reach the soil")
+    return result
+
+
 @app.get(f"{settings.api_prefix}/dances")
 def list_dances() -> dict[str, object]:
     return {"dances": automation.dance_catalogue()}

@@ -103,7 +103,19 @@ class Settings(BaseSettings):
     # converts a requested volume into a run time -- get it wrong and every
     # watering is scaled by the same factor while still reporting success.
     auto_watering_enabled: bool = False
-    watering_cooldown_minutes: int = 30
+    # How long a pot waits before it can be watered again, and also how long
+    # its moisture probe is given to show the water arriving before the dose
+    # is called a miss. One figure for both: the next watering should not
+    # happen before the last one has been judged.
+    watering_cooldown_minutes: int = 60
+
+    # Confirm each dose from the pot's own probe: its raw reading has to rise
+    # by soak_rise_percent of the pot's span (field capacity minus wilting
+    # point, in raw counts) within the cooldown. While a dose is unconfirmed,
+    # automatic watering is held for every pot, so an empty tank cannot run
+    # the pump dry pot after pot; two misses in a row pause it until Resume.
+    soak_check_enabled: bool = True
+    soak_rise_percent: float = 5.0
 
     # Hourly auto-patrol: on the hour, every hour, home and then visit each
     # plant. The home is what earns it -- an open-loop stepper has no other way

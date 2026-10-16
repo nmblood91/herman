@@ -33,7 +33,7 @@ from greenthumb.hardware.soil_sensors import (
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
 from greenthumb.plants import default_plants, label_for, zone_for
-from greenthumb import care, dances, moisture, state, system_power
+from greenthumb import care, dances, moisture, soak, state, system_power
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +183,10 @@ class GreenThumbAutomation:
         # tank. Seeded from history at startup so a reboot does not forget that
         # the reservoir is empty.
         self._delivery_failures = 0
+        # Misses before this moment (epoch seconds) no longer count towards the
+        # soak-check pause: Resume sets it. Persisted, so a restart neither
+        # forgets a pause nor brings back one already resumed.
+        self._soak_reset_at = 0.0
         # The startup home is owed until any home succeeds -- its own, a
         # patrol's, or the button -- or until the first tick finds it switched
         # off. Switching it on later takes effect on the next start rather than
@@ -231,6 +235,7 @@ class GreenThumbAutomation:
         self.apply_default_led_ranges()
         self._warn_on_orphaned_plants()
         self._seed_delivery_failures()
+        self._seed_last_watered()
         # Plant edits, dose volumes, rail positions and LED preferences are all
         # user choices that used to live only in memory, so every restart reset
         # them to the literals above. Restore whatever was saved last.
@@ -428,6 +433,9 @@ class GreenThumbAutomation:
             if isinstance(watering.get("auto_enabled"), bool):
                 self.auto_watering_enabled = watering["auto_enabled"]
             self._restore_pump_flow(watering)
+            reset = watering.get("soak_reset_at")
+            if isinstance(reset, (int, float)) and not isinstance(reset, bool):
+                self._soak_reset_at = float(reset)
 
         quiet = stored.get("quiet")
         if isinstance(quiet, dict):
@@ -540,6 +548,7 @@ class GreenThumbAutomation:
                 # rest of the hand-tuned values after a reflash.
                 "flow_ml_per_second": self._pump_flow(),
                 "flow_measured_at": self._flow_measured_at,
+                "soak_reset_at": self._soak_reset_at,
             },
             "auto_patrol": {"enabled": self.auto_patrol_enabled},
             "startup_home": {"enabled": self.home_on_startup},
@@ -948,6 +957,13 @@ class GreenThumbAutomation:
         try:
             with self._exclusive("Control loop tick"):
                 self._poll_sensors()
+                # After the poll, so a verdict sees this tick's reading, and
+                # before deciding to water, so a dose just confirmed releases
+                # the hold on the same tick.
+                try:
+                    self._check_soaks()
+                except Exception:
+                    logger.exception("Could not check whether the last watering reached the soil")
                 if self.auto_watering_enabled:
                     held = self.watering_suppressed()
                     if held:
@@ -1140,6 +1156,123 @@ class GreenThumbAutomation:
                 # only an unbroken run means the tank is still empty now.
                 break
 
+    def _seed_last_watered(self) -> None:
+        """Each pot's last dose, from history, so a restart keeps the cooldown.
+
+        Kept only in memory before, which meant a restart let every pot be
+        watered again at once -- harmless at a few minutes, not at an hour.
+        """
+        try:
+            last = self.history.last_waterings()
+        except Exception:
+            logger.exception("Could not read watering history for the cooldown")
+            return
+        for plant_id, row in last.items():
+            self._last_watered[plant_id] = datetime.fromtimestamp(int(row["recorded_at"]))
+
+    # --- did the water reach the soil? -------------------------------------
+
+    def _soak_start_state(self, plant: PlantSpec, volume_ml: int) -> str | None:
+        """What a dose about to be recorded starts as: pending, or skipped when
+        it cannot be judged. None when the check is switched off."""
+        if not settings.soak_check_enabled:
+            return None
+        if volume_ml <= 0:
+            return soak.SKIPPED
+        address = plant.sensor_address
+        now = int(datetime.now().timestamp())
+        start = soak.baseline(
+            [raw for _, raw in self.history.raw_readings(address, now - soak.BASELINE_SECONDS, now)]
+        )
+        return soak.PENDING if soak.can_judge(start, self.sensor_hub.span_for(address)) else soak.SKIPPED
+
+    def _check_soaks(self, now: float | None = None) -> None:
+        """Give a verdict on every dose still waiting for its probe to show it."""
+        moment = int(datetime.now().timestamp() if now is None else now)
+        window = settings.watering_cooldown_minutes * 60
+        expected = window // max(1, settings.sensor_poll_seconds)
+        for row in self.history.pending_soaks():
+            plant = self.get_plant(str(row["plant_id"]))
+            dosed = int(row["recorded_at"])
+            if plant is None:
+                self.history.record_soak(int(row["id"]), soak.SKIPPED)
+                continue
+            address = plant.sensor_address
+            span = self.sensor_hub.span_for(address)
+            start = soak.baseline(
+                [raw for _, raw in self.history.raw_readings(address, dosed - soak.BASELINE_SECONDS, dosed)]
+            )
+            if not soak.can_judge(start, span):
+                # The soil profile or its reading changed since the dose.
+                self.history.record_soak(int(row["id"]), soak.SKIPPED)
+                continue
+            after = [
+                raw for _, raw in
+                self.history.raw_readings(address, dosed + 1, min(moment, dosed + window))
+            ]
+            verdict, rise = soak.judge(
+                start, after, span, settings.soak_rise_percent,
+                window_done=moment >= dosed + window, expected_readings=expected,
+            )
+            if verdict == soak.PENDING:
+                continue
+            self.history.record_soak(int(row["id"]), verdict, rise)
+            minutes = round((moment - dosed) / 60)
+            if verdict == soak.SOAKED:
+                logger.info("Watering of %s showed on its probe after %d min", plant.name, minutes)
+            elif verdict == soak.MISSED:
+                logger.warning(
+                    "Watering of %s never showed on its probe in %d min", plant.name, minutes
+                )
+            else:
+                logger.warning("Could not confirm the watering of %s: its probe went quiet", plant.name)
+
+    def _soak_misses(self) -> list[dict[str, object]]:
+        """The unbroken run of misses at the end of the history, newest first,
+        since the last Resume."""
+        if not settings.soak_check_enabled:
+            return []
+        try:
+            judged = self.history.judged_soaks(since=int(self._soak_reset_at))
+        except Exception:
+            logger.exception("Could not read the soak check history")
+            return []
+        misses = []
+        for row in judged:
+            if row["soak"] != soak.MISSED:
+                break
+            misses.append(row)
+        return misses
+
+    def _plant_name(self, plant_id: object) -> str:
+        plant = self.get_plant(str(plant_id))
+        return plant.name if plant else str(plant_id)
+
+    def soak_pause_reason(self) -> str | None:
+        """What to tell the owner when two misses in a row have paused watering."""
+        misses = self._soak_misses()
+        if len(misses) < 2:
+            return None
+        pots = {row["plant_id"] for row in misses[:2]}
+        if len(pots) == 1:
+            name = self._plant_name(misses[0]["plant_id"])
+            return (
+                f"{name}'s last 2 waterings didn't show up on its probe. Check the "
+                "reservoir has water, then that the nozzle lines up with the pot and "
+                "the probe is in the soil."
+            )
+        return (
+            "The last 2 waterings didn't reach the soil. The reservoir is probably "
+            "empty. Refill it, then press Resume."
+        )
+
+    def resume_watering(self) -> dict[str, object]:
+        """Clear a soak-check pause. Earlier misses stop counting."""
+        self._soak_reset_at = datetime.now().timestamp()
+        self._persist()
+        logger.info("Automatic watering resumed after a soak-check pause")
+        return self.watering_status()
+
     # --- what the owner is told ------------------------------------------
 
     def system_status(self) -> dict[str, object]:
@@ -1173,6 +1306,20 @@ class GreenThumbAutomation:
                 "attention",
                 "The last watering did not reach the plant. Check the water level, "
                 "then the line for a kink or a clog.",
+            )
+
+        # 2b. The same question answered from the soil: the pot's own probe
+        # never saw the water arrive.
+        paused = self.soak_pause_reason()
+        if paused:
+            return state("problem", f"Automatic watering is paused. {paused}")
+        misses = self._soak_misses()
+        if misses:
+            name = self._plant_name(misses[0]["plant_id"])
+            return state(
+                "attention",
+                f"{name}'s last watering didn't show up on its moisture probe. Check the "
+                "nozzle lines up with the pot and the probe is in the soil.",
             )
 
         # 3. A probe that answered, and answered that it is not there.
@@ -1514,6 +1661,11 @@ class GreenThumbAutomation:
         return {
             "status": "ok",
             "auto_watering_enabled": self.auto_watering_enabled,
+            "soak_check_enabled": settings.soak_check_enabled,
+            # Why automatic watering is paused after misses, or None. The
+            # Automation tab shows it with the Resume button.
+            "soak_paused": self.soak_pause_reason(),
+            "cooldown_minutes": settings.watering_cooldown_minutes,
         }
 
     # --- quiet hours and snooze ------------------------------------------
@@ -1527,6 +1679,22 @@ class GreenThumbAutomation:
         waters it on the first tick after the window closes.
         """
         moment = now or datetime.now()
+
+        if self.soak_pause_reason():
+            return "2 waterings in a row didn't reach the soil. Press Resume once it's sorted"
+
+        # One unconfirmed dose holds every pot, not just its own: if the tank
+        # is empty, watering the next pot and the next would run the pump dry
+        # on each of them before the first miss was even known.
+        if settings.soak_check_enabled:
+            try:
+                pending = self.history.pending_soaks()
+            except Exception:
+                logger.exception("Could not read pending soak checks")
+                pending = []
+            if pending:
+                name = self._plant_name(pending[-1]["plant_id"])
+                return f"waiting to confirm the last watering reached {name}"
 
         if self.snooze_until and moment < self.snooze_until:
             return f"snoozed until {self.snooze_until.strftime('%H:%M')}"
@@ -1775,7 +1943,16 @@ class GreenThumbAutomation:
             "delivered": delivered,
         }
         try:
-            self.history.record_watering(plant.plant_id, volume, trigger, delivered=delivered)
+            # Pending until the pot's probe shows the water (see _check_soaks),
+            # which also holds automatic watering for every pot meanwhile.
+            soak_state = self._soak_start_state(plant, volume)
+        except Exception:
+            logger.exception("Could not start the soak check for %s", plant.plant_id)
+            soak_state = None
+        try:
+            self.history.record_watering(
+                plant.plant_id, volume, trigger, delivered=delivered, soak=soak_state
+            )
         except Exception:
             logger.exception("Failed to record watering for %s", plant.plant_id)
         return {
@@ -1789,7 +1966,30 @@ class GreenThumbAutomation:
         last = self._last_watered.get(plant_id)
         return last.isoformat(timespec="seconds") if last else None
 
+    def _last_soaks(self) -> dict[str, dict[str, object]]:
+        """Each pot's last dose and its soak verdict, for the plant cards."""
+        try:
+            last = self.history.last_waterings()
+        except Exception:
+            logger.exception("Could not read the last waterings")
+            return {}
+        now = datetime.now().timestamp()
+        result = {}
+        for plant_id, row in last.items():
+            if row.get("soak") is None:
+                continue
+            dosed = int(row["recorded_at"])
+            result[plant_id] = {
+                "state": row["soak"],
+                "at": datetime.fromtimestamp(dosed).isoformat(timespec="seconds"),
+                # Minutes since the dose: how long it has waited, while pending.
+                "minutes": max(0, round((now - dosed) / 60)),
+                "rise": row.get("soak_rise"),
+            }
+        return result
+
     def get_overview(self) -> dict[str, object]:
+        soaks = self._last_soaks()
         plant_status = [
             PlantStatus(
                 plant_id=spec.plant_id,
@@ -1805,6 +2005,7 @@ class GreenThumbAutomation:
                 sample_count=len(self._history.get(spec.sensor_address) or ()),
                 window_size=settings.moisture_window_size,
                 scale_problem=self.scale_problem(spec),
+                last_soak=soaks.get(spec.plant_id),
             )
             for spec in self.plants
         ]
@@ -2159,6 +2360,9 @@ class GreenThumbAutomation:
         self.quiet_hours_start = time.fromisoformat(settings.quiet_hours_start)
         self.quiet_hours_stop = time.fromisoformat(settings.quiet_hours_stop)
         self.snooze_until = None
+        # The history is kept, so its old misses must not pause the fresh
+        # planter: a restore counts as a Resume.
+        self._soak_reset_at = datetime.now().timestamp()
 
         # Chip before order: choosing a chip resets the order to that chip's
         # usual one, and .env may override it.

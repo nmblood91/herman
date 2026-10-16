@@ -138,6 +138,22 @@ export function AutomationPanel({ overview, onRefresh }) {
       readBack: (data) => data.enabled,
     })
 
+  const [resumeMsg, setResumeMsg] = useState('')
+  const resume = async () => {
+    setResumeMsg('')
+    try {
+      const response = await fetch(`${API_BASE}/watering/resume`, { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setResumeMsg(data.error || `Could not resume (HTTP ${response.status})`)
+        return
+      }
+      onRefresh?.()
+    } catch (error) {
+      setResumeMsg(`Could not resume: ${error.message}`)
+    }
+  }
+
   const saveQuiet = async () => {
     setQuietMsg('')
     try {
@@ -189,6 +205,30 @@ export function AutomationPanel({ overview, onRefresh }) {
             </p>
             {autoMsg && <p className="field-hint warning">{autoMsg}</p>}
           </div>
+
+          {watering?.soak_paused && (
+            <div className="field-row">
+              <p className="field-hint warning">
+                Automatic watering is paused. {watering.soak_paused}
+              </p>
+              <div className="motion-grid">
+                <button type="button" className="primary" onClick={resume}>
+                  Resume watering
+                </button>
+              </div>
+              {resumeMsg && <p className="field-hint warning">{resumeMsg}</p>}
+            </div>
+          )}
+
+          {watering?.soak_check_enabled && (
+            <p className="field-hint">
+              After each watering, the pot&apos;s moisture probe has to show the
+              water arriving within {watering.cooldown_minutes} minutes. Until it
+              does, no pot is watered automatically, so an empty reservoir cannot
+              run the pump dry one pot after another. Two waterings in a row that
+              never show up pause automatic watering until you press Resume.
+            </p>
+          )}
         </div>
 
         {/* Both switches move the arm without anyone pressing a button, so

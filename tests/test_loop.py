@@ -10,6 +10,9 @@ from tests.helpers import give_every_plant_soil, temp_state, temp_store
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
 
 settings.auto_watering_enabled = True
+# These pots never get wetter, so every dose would stay unconfirmed and hold the
+# loop. That hold is tested in test_soak_check.py; this file tests the cooldown.
+settings.soak_check_enabled = False
 
 # The top of the scale, matching what give_every_plant_soil measures. This was
 # settings.moisture_raw_wet, which no longer exists: field capacity is measured

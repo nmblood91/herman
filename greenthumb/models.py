@@ -105,3 +105,7 @@ class PlantStatus:
     # Why the pot has no reading, when it has no scale to read on: no soil
     # profile, or one missing a sensor reading. None when it has one.
     scale_problem: str | None = None
+    # What the pot's probe made of its last watering: {"state", "at",
+    # "minutes", "rise"}, state being pending, soaked, missed, unknown or
+    # skipped. None when it has never been watered with the check on.
+    last_soak: dict | None = None

@@ -163,6 +163,32 @@ const describeMoisture = (status) => {
   }
 }
 
+// What the pot's moisture probe made of its last watering. The probe can take
+// most of an hour to show a dose, so "waiting" is normal, not a fault.
+const describeSoak = (soak) => {
+  if (!soak) return null
+  const minutes = (n) => (n === 1 ? '1 min' : `${n} min`)
+  switch (soak.state) {
+    case 'pending':
+      return { text: `Last watering: waiting for it to show on the probe, ${minutes(soak.minutes)} so far` }
+    case 'soaked':
+      return { text: 'Last watering: showed up on the probe' }
+    case 'missed':
+      return {
+        text:
+          'Last watering: never showed up on the probe. Check the reservoir, ' +
+          'that the nozzle lines up with the pot, and that the probe is in the soil.',
+        warn: true,
+      }
+    case 'unknown':
+      return { text: 'Last watering: could not be confirmed, the probe stopped reporting', warn: true }
+    case 'skipped':
+      return { text: 'Last watering: not checked (no scale, or the soil was already wet)' }
+    default:
+      return null
+  }
+}
+
 // How close two plants have to be before capturing one looks like a mix-up.
 // Pots on a metre of rail sit hundreds of millimetres apart, so anything this
 // near an already-configured plant almost certainly means the carriage was
@@ -363,9 +389,9 @@ export function PlantsPanel({
         {plants.map((plant) => {
           const draft = drafts[plant.plant_id] || draftFrom(plant)
           const isExpanded = expandedPlantIds.includes(plant.plant_id)
-          const reading = describeMoisture(
-            status?.find((item) => item.plant_id === plant.plant_id),
-          )
+          const plantStatus = status?.find((item) => item.plant_id === plant.plant_id)
+          const reading = describeMoisture(plantStatus)
+          const lastSoak = describeSoak(plantStatus?.last_soak)
 
           return (
             <div key={plant.plant_id} className="plant-card">
@@ -384,6 +410,12 @@ export function PlantsPanel({
                 </span>
                 <span className="plant-chevron">{isExpanded ? '−' : '+'}</span>
               </button>
+
+              {/* Shown collapsed too: a watering that never arrived is worth
+                  seeing without opening the card. */}
+              {lastSoak && (isExpanded || lastSoak.warn) && (
+                <p className={`field-hint${lastSoak.warn ? ' warning' : ''}`}>{lastSoak.text}</p>
+              )}
 
               {isExpanded && (
                 <>

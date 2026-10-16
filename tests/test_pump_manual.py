@@ -9,6 +9,10 @@ from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyErr
 
 settings.auto_watering_enabled = True
 settings.water_sensor_enabled = False
+# The pots here never get wetter, so a dose would stay unconfirmed and hold the
+# loop this file needs to see resume. The hold has its own tests in
+# test_soak_check.py.
+settings.soak_check_enabled = False
 
 
 class Klip:
