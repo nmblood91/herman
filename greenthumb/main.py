@@ -195,6 +195,16 @@ def get_endstop_diagnostic() -> dict[str, object]:
     return automation.endstop_diagnostic()
 
 
+@app.get(f"{settings.api_prefix}/diagnostics/water-sensor")
+def get_water_sensor_diagnostic() -> dict[str, object]:
+    """Read the outlet tube's liquid sensor once.
+
+    Takes no gantry lock, so it answers during a pump run, which is when the
+    tube is full and the wet reading can be checked.
+    """
+    return automation.water_sensor_diagnostic()
+
+
 @app.get(f"{settings.api_prefix}/watering/auto")
 def get_auto_watering() -> dict[str, object]:
     return automation.watering_status()

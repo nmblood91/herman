@@ -11,6 +11,7 @@ import { HomeSwitchPanel } from './components/HomeSwitchPanel'
 import { ClockPanel } from './components/ClockPanel'
 import { VersionPanel } from './components/VersionPanel'
 import { PumpPanel } from './components/PumpPanel'
+import { WaterSensorPanel } from './components/WaterSensorPanel'
 import { CalibrationPanel } from './components/CalibrationPanel'
 import { SystemValuesPanel } from './components/SystemValuesPanel'
 import { LedStripPanel } from './components/LedStripPanel'
@@ -392,6 +393,7 @@ function App() {
           <ClockPanel />
           <HomeSwitchPanel />
           <PumpPanel />
+          <WaterSensorPanel />
           <CalibrationPanel />
           <LedStripPanel overview={overview} />
           <SystemValuesPanel />

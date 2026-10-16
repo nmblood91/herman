@@ -1372,6 +1372,37 @@ class GreenThumbAutomation:
 
         return result
 
+    def water_sensor_diagnostic(self) -> dict[str, object]:
+        """Read the outlet tube's liquid sensor once, for the calibration check.
+
+        Takes no hardware lock, unlike the endstop read. It is a status query
+        that moves nothing, and the most useful time to read it is while the
+        pump is running, which holds the lock for the whole dose. The falling
+        leg drains as soon as the pump stops, so the pump running is the only
+        time the tube is reliably full.
+        """
+        enabled = bool(settings.water_sensor_enabled)
+        wet = self.klipper.water_supply_present()
+        if wet is None:
+            return {
+                "ok": False,
+                "enabled": enabled,
+                "wet": None,
+                "pump_running": self.pump.is_running,
+                "detail": (
+                    "Could not read the sensor. Either Klipper is not answering, or "
+                    "printer.cfg has no [filament_switch_sensor water_supply] section. "
+                    "Re-running the installer regenerates printer.cfg from the template."
+                ),
+            }
+        return {
+            "ok": True,
+            "enabled": enabled,
+            "wet": wet,
+            "pump_running": self.pump.is_running,
+            "detail": "Reads wet: liquid detected in the tube." if wet else "Reads dry: no liquid in the tube.",
+        }
+
     def pump_status(self) -> dict[str, object]:
         """The flow rate in use, and the run a calibration would divide by."""
         return {

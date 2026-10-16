@@ -1022,6 +1022,11 @@ confirms every dose.
 To check the fail-safe, pull the green wire out of Y-STOP and query again. It
 must report **not** detected.
 
+The **Water sensor** panel on the Calibration tab walks through all three
+checks (full, empty, unplugged) and says what a failing combination points to.
+It reads without taking the gantry lock, so the full-tube check works while the
+pump is running from the Pump panel.
+
 Once confirmed, set `WATER_SENSOR_ENABLED=true` in `/opt/greenthumb/.env` and
 restart the API.
 
