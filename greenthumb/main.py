@@ -15,7 +15,7 @@ from greenthumb import moisture
 from greenthumb.config import settings
 from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_stream
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
-from greenthumb import system_clock, version
+from greenthumb import system_clock, system_power, version
 from greenthumb.plants import zone_for
 from greenthumb.services.automation import (
     UNCHANGED,
@@ -181,6 +181,20 @@ def set_system_timezone(payload: dict[str, str] = Body(default_factory=dict)) ->
     name = str(payload.get("timezone", ""))
     result = system_clock.set_timezone(name)
     log_event(f"System timezone set to {result['timezone']}")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/system/power")
+def system_power_action(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Shut the Pi down or reboot it: {"action": "shutdown" | "reboot"}.
+
+    Refused with a 409 while the hardware is busy, so a shutdown cannot cut
+    a dose or a gantry move off halfway. An unknown action is a 400, and a
+    missing sudoers rule a 409 saying how to add it.
+    """
+    action = str(payload.get("action", ""))
+    result = automation.request_power(action)
+    log_event(f"{action.capitalize()} requested from the UI")
     return result
 
 

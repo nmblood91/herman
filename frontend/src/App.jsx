@@ -11,6 +11,7 @@ import { HomeSwitchPanel } from './components/HomeSwitchPanel'
 import { ClockPanel } from './components/ClockPanel'
 import { VersionPanel } from './components/VersionPanel'
 import { PumpPanel } from './components/PumpPanel'
+import { PowerPanel } from './components/PowerPanel'
 import { WaterSensorPanel } from './components/WaterSensorPanel'
 import { CalibrationPanel } from './components/CalibrationPanel'
 import { SystemValuesPanel } from './components/SystemValuesPanel'
@@ -379,6 +380,7 @@ function App() {
           onRefresh={loadDashboard}
         />
       )}
+      {activeTab === 'controls' && <PowerPanel />}
 
       {activeTab === 'automation' && (
         <AutomationPanel overview={overview} onRefresh={loadDashboard} />

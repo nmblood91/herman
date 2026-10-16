@@ -33,7 +33,7 @@ from greenthumb.hardware.soil_sensors import (
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
 from greenthumb.plants import default_plants, label_for, zone_for
-from greenthumb import care, dances, moisture, state
+from greenthumb import care, dances, moisture, state, system_power
 
 logger = logging.getLogger(__name__)
 
@@ -1371,6 +1371,26 @@ class GreenThumbAutomation:
             )
 
         return result
+
+    def request_power(self, action: str) -> dict[str, object]:
+        """Shut down or reboot, but never in the middle of a dose or a move.
+
+        Takes the hardware lock and keeps it: nothing may start a dose in the
+        seconds between the reply and the Pi going down, because the pump is
+        switched through Klipper and nothing turns it off once the host has
+        gone. It is handed back only if the command is refused or fails, so a
+        planter that stays up does not stay locked.
+        """
+        if not self._hardware_lock.acquire(blocking=False):
+            raise HardwareBusyError(
+                f"{action.capitalize() or 'Power action'} rejected: hardware is busy. "
+                "Wait for the watering or move to finish."
+            )
+        try:
+            return system_power.request(action, on_failure=self._hardware_lock.release)
+        except Exception:
+            self._hardware_lock.release()
+            raise
 
     def water_sensor_diagnostic(self) -> dict[str, object]:
         """Read the outlet tube's liquid sensor once, for the calibration check.

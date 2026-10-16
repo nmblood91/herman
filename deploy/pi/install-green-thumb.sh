@@ -261,6 +261,21 @@ else
   echo "    sudo timedatectl set-timezone <Area/City>"
 fi
 
+# Let the API shut the Pi down or reboot it, from the buttons at the bottom of
+# the Controls tab. Pulling the plug on a running Pi can corrupt the SD card;
+# a shutdown button is what makes the safe way the easy way. Scoped to exactly
+# these two commands, with no arguments.
+SUDOERS_POWER=/etc/sudoers.d/greenthumb-power
+echo "pi ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff, /usr/bin/systemctl reboot" | sudo tee "$SUDOERS_POWER" >/dev/null
+sudo chmod 0440 "$SUDOERS_POWER"
+if sudo visudo -c -f "$SUDOERS_POWER" >/dev/null 2>&1; then
+  echo "✓ API may shut down and reboot the Pi"
+else
+  sudo rm -f "$SUDOERS_POWER"
+  echo "⚠️  Could not install the power sudoers rule; the Shutdown and Reboot"
+  echo "    buttons will say so. Use sudo systemctl poweroff over SSH instead."
+fi
+
 sudo cp /opt/greenthumb/deploy/systemd/greenthumb-api.service /etc/systemd/system/greenthumb-api.service
 sudo systemctl daemon-reload
 # Same as Klipper above: `--now` would not restart an already-running service,
