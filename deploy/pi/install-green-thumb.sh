@@ -190,9 +190,21 @@ sudo -u pi git -C /opt/greenthumb checkout -- frontend/package-lock.json
 
 # Install Klipper host software (last, to avoid blocking on large clone)
 echo "Installing Klipper host software..."
-if [ ! -d /home/pi/klipper ]; then
-  sudo -u pi bash -c 'cd ~ && git clone --depth 1 https://github.com/Klipper3d/klipper.git'
+# Exactly the commit in deploy/klipper/KLIPPER_COMMIT, never the latest. The
+# firmware on the SKR (deploy/klipper/firmware.bin) was built from that commit,
+# and Klipper on the Pi has to match it: a newer one can refuse to talk to the
+# board until it is reflashed from an SD card. tests/test_firmware_pin.py
+# checks the firmware and the pin agree.
+KLIPPER_COMMIT=$(tr -d '[:space:]' </opt/greenthumb/deploy/klipper/KLIPPER_COMMIT)
+if [ ! -d /home/pi/klipper/.git ]; then
+  sudo -u pi git init -q /home/pi/klipper
 fi
+if [ "$(sudo -u pi git -C /home/pi/klipper rev-parse HEAD 2>/dev/null)" != "$KLIPPER_COMMIT" ]; then
+  echo "Checking out Klipper ${KLIPPER_COMMIT:0:7}, the commit the SKR firmware was built from..."
+  sudo -u pi git -C /home/pi/klipper fetch -q --depth 1 https://github.com/Klipper3d/klipper.git "$KLIPPER_COMMIT"
+  sudo -u pi git -C /home/pi/klipper checkout -q --force FETCH_HEAD
+fi
+echo "✓ Klipper at ${KLIPPER_COMMIT:0:7}"
 # Always install/update Klipper dependencies
 sudo -u pi bash -c 'pip install --break-system-packages cffi greenlet jinja2 markupsafe pyserial'
 

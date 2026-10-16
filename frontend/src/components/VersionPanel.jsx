@@ -35,6 +35,20 @@ export function VersionPanel() {
             Version {build?.version ?? '—'} · API {build?.running_commit ?? '—'} ·
             page {__BUILD_COMMIT__}
           </p>
+          {build?.klipper?.host && (
+            <p className="field-hint">
+              Klipper {build.klipper.host} · SKR firmware {build.klipper.mcu ?? 'not connected'}
+            </p>
+          )}
+          {build?.klipper?.firmware_mismatch && (
+            <p className="field-hint warning">
+              The SKR&apos;s firmware ({build.klipper.mcu}) was built from a
+              different Klipper than the one on the Pi ({build.klipper.host}).
+              The gantry and pump may stop responding. Flash
+              deploy/klipper/firmware.bin to the board from an SD card, or
+              re-run the installer to put the Pi back on the pinned Klipper.
+            </p>
+          )}
           {build?.stale && (
             <p className="field-hint warning">
               The planter has newer code on disk ({build.checkout_commit}) than

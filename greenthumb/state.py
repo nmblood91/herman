@@ -26,9 +26,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from greenthumb.paths import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_STATE_PATH = Path(__file__).resolve().parent.parent / "data" / "state.json"
+DEFAULT_STATE_PATH = DATA_DIR / "state.json"
 
 # Bumped only when a reader needs to tell old layouts apart. Unknown versions are
 # loaded on a best-effort basis rather than discarded.
