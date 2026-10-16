@@ -101,20 +101,6 @@
   white-space: nowrap;
 }
 
-/* The failed-delivery banner. Not sticky: two sticky bars at the same offset
-   would sit on top of each other, and this one is a standing condition rather
-   than a running commentary, so it scrolls with the page. It also wraps, since
-   it carries a sentence telling you what to go and check. */
-.status-bar.alert {
-  position: static;
-  background: rgba(60, 30, 20, 0.9);
-  border-color: #7a4a2a;
-  color: #ffd9c0;
-  white-space: normal;
-  overflow: visible;
-  margin-top: -8px;
-}
-
 .panel-section {
   background: rgba(19, 33, 25, 0.9);
   border: 1px solid #2a4737;

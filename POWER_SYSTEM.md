@@ -36,8 +36,8 @@ Herman uses a 12V primary bus with a DC-DC converter for 5V logic. All component
 ```
 
 **The busbar is 12V only. There is no 5V busbar.** The converter's 5V output
-feeds the Pi and nothing else; anything small that needs 5V, like the liquid
-sensor on the outlet tube, takes it from the Pi's header (pin 2 or 4).
+feeds the Pi and nothing else; anything small that needs 5V takes it from the
+Pi's header (pin 2 or 4).
 
 **The pump hangs off the SKR, not off the busbar**, so Klipper can switch it.
 HB's mosfet switches the pump's *return* path to ground; the connector's
@@ -105,7 +105,6 @@ the Pi. A 5V strip needs its own 5V supply and its own fuse sized to it.
 | Raspberry Pi | 5V | 0.6A | 3W |
 | Pi Camera *(optional add-on)* | 5V | 0.1A | 0.5W |
 | Soil Moisture Sensors (4x) | 3.3V | 0.05A | 0.15W |
-| Liquid Sensor on the outlet tube | 5V (Pi pin 2) | <0.01A | <0.05W |
 | Addressable LEDs (60 LEDs, 12V) | 12V | ~1.2-1.5A (peak full white) | ~14-18W |
 | Peristaltic Pump (12V, 100 mL/min) | 12V | 0.2-0.3A | ~3.6W |
 | **Total Peak** | — | **~2.4A @ 12V** | **~29W** |

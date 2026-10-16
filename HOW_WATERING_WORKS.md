@@ -9,7 +9,8 @@ Every minute, the planter checks how wet the soil is in each pot. It doesn't act
 on any single check — it looks at the average of the last ten. If that average
 says a plant is drier than you asked it to be, the watering arm slides over to
 that pot and runs the pump for a measured number of seconds. Then it leaves that
-plant alone for half an hour before it will consider watering it again.
+plant alone for an hour before it will consider watering it again, and watches
+that pot's probe to make sure the water actually arrived.
 
 That's the whole idea. The rest of this document explains why each of those
 pieces is there.
@@ -226,46 +227,6 @@ during a dose would not run alongside it, it would sit behind the wait and
 happen after the pump had already stopped. Sending it all as one block also
 means a dropped network connection mid-dose cannot strand the pump on with the
 arm parked over one spot, which is the flood worth designing against.
-
-## Checking that the water actually arrived
-
-There is a sensor clipped to the tube that feeds the nozzle. It does not decide
-whether to water — it checks, a few seconds into each pour, that water is really
-moving through the tube.
-
-It works this way round for a simple reason: that tube empties itself into the
-pot after every pour, so between waterings it is *supposed* to be dry. A planter
-that refused to water whenever the tube was dry would never water at all.
-
-So instead it pours first and watches. Running the pump dry for a few seconds
-does it no harm, and watching the tube fill answers a better question than
-"is there water in the tank" — it answers "did water reach the plant", which
-also catches a blocked tube, a kinked hose, or a pump that has failed while
-still turning.
-
-This is what stops a specific kind of lie. Without it, an empty reservoir looks
-exactly like a successful watering: the pump runs, nothing comes out, and the
-planter records that your plant was watered. Everything else here fails loudly;
-that one failed silently.
-
-When a pour delivers nothing, the planter says so in the status bar, writes a
-warning to the log, and marks it on the chart in the History tab as a
-**solid red line** instead of the usual dashed one.
-
-The status bar escalates if it keeps happening. One failed pour reads as "the
-last watering did not reach the plant" — that could be a kink or a clog on one
-line. **Two or more in a row says the reservoir is probably empty**, because a
-run of them across different plants points at the one thing they share. The
-count survives a restart, so a planter rebooted with an empty tank comes back
-still saying so rather than looking fine until the next dose fails.
-
-Nothing gets blocked — the next pour tries again — so refilling the tank
-quietly fixes it with nothing to reset, and the first dose that lands clears
-the warning.
-
-The tube sensor is optional and off by default (`WATER_SENSOR_ENABLED`). On a
-narrow 4 mm line there is very little water in front of it, and it may not
-trigger at all. The check below needs no extra parts.
 
 ## Checking it reached the soil
 
@@ -499,12 +460,13 @@ rather than toward flooding:
   also quietly retries it every minute, so a loose connector that reseats itself
   recovers on its own.
 - **The arm can't move.** The pump doesn't run. No water goes anywhere.
-- **The reservoir runs dry.** The pour still runs — briefly and harmlessly — and
-  the sensor on the nozzle tube notices that nothing came through. You get a
-  warning and a red mark on the chart rather than a false record of a healthy
-  watering. Refilling fixes it with nothing to reset; the next pour re-checks.
-  A sensor that stops answering is recorded as *unknown* rather than as a
-  failure, because "we couldn't tell" is not the same as "no water arrived".
+- **The reservoir runs dry.** The pour still runs, briefly and harmlessly, but
+  the pot's moisture probe never shows the water arriving. Within the hour you
+  get a warning and an amber mark on the chart, not a false record of a healthy
+  watering. Nothing else is watered while that one is unconfirmed, and a second
+  miss pauses automatic watering until you refill and press Resume. A probe
+  that stops answering is recorded as *unknown* rather than as a miss, because
+  "we couldn't tell" is not the same as "no water arrived".
 - **The connection to the motion board drops mid-pour.** The pump is commanded
   off regardless, and the board is configured to shut the pump off by itself if
   it loses contact with the software. Two independent stops, because a pump stuck
@@ -515,8 +477,8 @@ rather than toward flooding:
 
 The failure this design does *not* protect against is a wrong flow rate, because
 nothing about it looks like an error — the planter reports success every time
-while quietly delivering the wrong amount. The outlet sensor confirms that
-water arrived, not how much of it. That's why measuring it matters more than it
+while quietly delivering the wrong amount. The soak check confirms that water
+arrived, not how much of it. That's why measuring it matters more than it
 sounds like it should, and why the planter refuses a measurement that could not
 be a real one rather than storing it: a run too short to weigh accurately, or a
 volume that works out to a rate no pump of this kind could manage.

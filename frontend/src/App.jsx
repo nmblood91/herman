@@ -13,7 +13,6 @@ import { ClockPanel } from './components/ClockPanel'
 import { VersionPanel } from './components/VersionPanel'
 import { PumpPanel } from './components/PumpPanel'
 import { PowerPanel } from './components/PowerPanel'
-import { WaterSensorPanel } from './components/WaterSensorPanel'
 import { CalibrationPanel } from './components/CalibrationPanel'
 import { SystemValuesPanel } from './components/SystemValuesPanel'
 import { LedStripPanel } from './components/LedStripPanel'
@@ -159,11 +158,6 @@ function App() {
       : `${numericValue} mm`
   }, [livePosition, overview])
 
-  const delivery = overview?.delivery
-  const deliveryPlant =
-    plants.find((item) => item.plant_id === delivery?.last?.plant_id)?.name ??
-    delivery?.last?.plant_id
-
   const homeGantry = async () => {
     try {
       setStatus('Homing gantry...', { sticky: true })
@@ -223,16 +217,10 @@ function App() {
       // finished, which is over a minute, so say so rather than looking hung.
       setStatus(`Watering ${label}, this takes a minute...`, { sticky: true })
       const result = await fetchJson(`/water/${plantId}`, { method: 'POST' })
-      // delivered is null when no outlet sensor is fitted, so only false is a
-      // failure — the pump ran and nothing came out the other end.
-      const outcome =
-        result?.delivered === false
-          ? ' but no water reached the outlet — check the reservoir and the line'
-          : ''
       setStatus(
         result?.status === 'error'
           ? `Water ${label}: failed - ${result.error}`
-          : `Watered ${label} with ${result.volume_ml} mL${outcome}.`,
+          : `Watered ${label} with ${result.volume_ml} mL. Its moisture probe should show it within the hour.`,
       )
       await loadDashboard()
     } catch (error) {
@@ -334,18 +322,6 @@ function App() {
         {action || systemStatus.message}
       </div>
 
-      {/* Outside the tabs on purpose. A dose that delivered nothing is the one
-          thing that should not be hidden behind whichever tab you are not on.
-          Only the last dose is worth reporting: the outlet line is dry between
-          waterings by design, so live state says nothing. */}
-      {delivery?.enabled && delivery.last && delivery.last.delivered !== true && (
-        <div className="status-bar alert">
-          {delivery.last.delivered === false
-            ? `No water reached the outlet on the last dose (${deliveryPlant}, ${delivery.last.at}). Check the reservoir, then the line for a clog or an airlock.`
-            : `Could not verify the last dose (${deliveryPlant}) — the outlet sensor did not respond.`}
-        </div>
-      )}
-
       {activeTab === 'plants' && (
         <>
           <PlantsPanel
@@ -397,7 +373,6 @@ function App() {
           <ClockPanel />
           <HomeSwitchPanel />
           <PumpPanel />
-          <WaterSensorPanel />
           <CalibrationPanel />
           <LedStripPanel overview={overview} />
           <SystemValuesPanel />

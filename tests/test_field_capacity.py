@@ -12,7 +12,7 @@ different figures and there was nowhere to put them.
 Ordered below by how quietly a wrong value mis-waters. The first few matter
 most: a missing field capacity must never produce a plausible percentage,
 because nothing downstream can tell a wrong number from a right one -- the
-outlet sensor confirms water arrived, not that it was needed.
+soak check confirms water arrived, not that it was needed.
 """
 
 import sys
@@ -39,7 +39,6 @@ CAPACITY = 800
 
 class Klip:
     def status(self): return {"ok": True, "position": 0.0, "homed": True, "max_x": 890.0}
-    def water_supply_present(self): return True
     def __getattr__(self, n): return lambda *a, **k: {"ok": True}
 
 

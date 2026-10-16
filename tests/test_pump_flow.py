@@ -31,7 +31,6 @@ from greenthumb.services.automation import (
 from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state, temp_store
 
 settings.auto_watering_enabled = False
-settings.water_sensor_enabled = False
 settings.auto_patrol_enabled = False
 
 
@@ -49,8 +48,6 @@ class Klip:
     def status(self):
         return {"ok": True, "position": 0.0, "homed": True, "max_x": 890.0}
 
-    def water_supply_present(self):
-        return True
 
 
 class Hub(CalibrationSurface):

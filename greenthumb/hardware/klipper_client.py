@@ -140,28 +140,6 @@ class KlipperClient:
             "homed": "x" in (toolhead.get("homed_axes") or ""),
         }
 
-    def water_supply_present(self) -> bool | None:
-        """True if the outlet tube reads wet, None if the sensor cannot be read.
-
-        The Klipper object is still named water_supply, which printer.cfg and
-        this query have to agree on; the sensor itself moved to the outlet.
-        """
-        response = self._send_command(
-            "objects/query",
-            {"objects": {"filament_switch_sensor water_supply": ["filament_detected"]}},
-        )
-        if not response.get("ok"):
-            return None
-
-        sensor = response.get("result", {}).get("status", {}).get(
-            "filament_switch_sensor water_supply"
-        )
-        # Absent rather than false when printer.cfg has no such section, which
-        # must stay distinguishable from the sensor reporting a dry line.
-        if not sensor or "filament_detected" not in sensor:
-            return None
-        return bool(sensor["filament_detected"])
-
     def versions(self) -> dict[str, str | None]:
         """Klipper's own version on the Pi, and the firmware's on the SKR.
 

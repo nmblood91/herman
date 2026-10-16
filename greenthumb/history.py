@@ -31,10 +31,6 @@ CREATE TABLE IF NOT EXISTS waterings (
     plant_id     TEXT NOT NULL,
     volume_ml   INTEGER NOT NULL,
     trigger     TEXT NOT NULL,
-    -- 1 delivered, 0 nothing reached the outlet, NULL not checked. Nullable
-    -- because "we did not look" and "we looked and saw nothing" are different
-    -- answers, and only the second one is a fault.
-    delivered   INTEGER,
     -- Whether the pot's own moisture probe saw the water arrive: pending,
     -- soaked, missed, unknown (the probe went quiet) or skipped (could not be
     -- judged). NULL for rows from before the check existed.
@@ -106,11 +102,6 @@ class HistoryStore:
             )
             logger.info("Renamed waterings.zone_id to plant_id in the existing history database")
             columns = {row["name"] for row in self._db.execute("PRAGMA table_info(waterings)")}
-        if "delivered" not in columns:
-            # Rows written before delivery verification existed are unknown, not
-            # failed, and NULL is what the new column defaults to.
-            self._db.execute("ALTER TABLE waterings ADD COLUMN delivered INTEGER")
-            logger.info("Added waterings.delivered to the existing history database")
         for column, kind in (("soak", "TEXT"), ("soak_rise", "REAL")):
             if column not in columns:
                 # NULL on old rows: they were never checked, which is neither
@@ -147,7 +138,7 @@ class HistoryStore:
         plant_id: str,
         volume_ml: int,
         trigger: str,
-        delivered: bool | None = None,
+        *,
         at: int | None = None,
         soak: str | None = None,
     ) -> int:
@@ -155,16 +146,9 @@ class HistoryStore:
         timestamp = int(time.time()) if at is None else at
         with self._lock:
             cursor = self._db.execute(
-                "INSERT INTO waterings (recorded_at, plant_id, volume_ml, trigger, delivered, soak)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    timestamp,
-                    plant_id,
-                    int(volume_ml),
-                    trigger,
-                    None if delivered is None else int(delivered),
-                    soak,
-                ),
+                "INSERT INTO waterings (recorded_at, plant_id, volume_ml, trigger, soak)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (timestamp, plant_id, int(volume_ml), trigger, soak),
             )
             self._db.commit()
             return int(cursor.lastrowid)
@@ -283,7 +267,7 @@ class HistoryStore:
         since = end - int(hours * 3600)
         with self._lock:
             rows = self._db.execute(
-                "SELECT recorded_at, plant_id, volume_ml, trigger, delivered, soak FROM waterings"
+                "SELECT recorded_at, plant_id, volume_ml, trigger, soak FROM waterings"
                 " WHERE recorded_at >= ? ORDER BY recorded_at",
                 (since,),
             ).fetchall()
@@ -293,7 +277,6 @@ class HistoryStore:
                 "plant_id": row["plant_id"],
                 "volume_ml": row["volume_ml"],
                 "trigger": row["trigger"],
-                "delivered": None if row["delivered"] is None else bool(row["delivered"]),
                 "soak": row["soak"],
             }
             for row in rows

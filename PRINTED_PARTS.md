@@ -200,10 +200,7 @@ Only the parts with a constraint worth recording.
   in anything printed.
 
 - **Cable chain for water tube** — carries the outlet tube to the moving
-  carriage. The liquid sensor clamps to that tube's *falling* leg, after the
-  high point and before the nozzle, so whatever the chain does to the tube's
-  routing has to leave that stretch accessible and still falling. See
-  [HOW_WATERING_WORKS.md](HOW_WATERING_WORKS.md). Fifty links at 3 g, which
+  carriage. Fifty links at 3 g, which
   makes it the third-heaviest item in the build at 150 g — more than either
   gantry cover and more than both sub hub fronts together. The anchor is a
   separate part and takes the two `#4`.

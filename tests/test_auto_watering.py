@@ -20,7 +20,6 @@ from greenthumb.models import SensorSample
 from greenthumb.services.automation import GreenThumbAutomation
 from tests.helpers import give_every_plant_soil, temp_state, temp_store
 
-settings.water_sensor_enabled = False
 # The starting value only. Every case below sets the switch explicitly, so a
 # test must never be passing because of what the environment happened to say.
 settings.auto_watering_enabled = False
@@ -64,8 +63,6 @@ class FakeKlipper:
     def status(self):
         return {"ok": True, "position": 0.0, "homed": True}
 
-    def water_supply_present(self):
-        return True
 
 
 class FakeLeds:

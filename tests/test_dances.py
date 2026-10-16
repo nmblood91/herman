@@ -47,8 +47,6 @@ class Klip:
     def move_gantry_absolute(self, p):
         return {"ok": True}
 
-    def water_supply_present(self):
-        return True
 
 
 class Hub(CalibrationSurface):

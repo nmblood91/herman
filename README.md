@@ -20,7 +20,7 @@ This repository is intentionally structured as a product-ready foundation for a 
 
 | Document | Covers |
 |---|---|
-| [deploy/README.md](deploy/README.md) | Flashing the SKR, Pi setup, and the wiring for every subsystem — endstop, pump, water level sensor, soil sensors, LED strip, camera — plus how to route the harness |
+| [deploy/README.md](deploy/README.md) | Flashing the SKR, Pi setup, and the wiring for every subsystem — endstop, pump, soil sensors, LED strip, camera — plus how to route the harness |
 | [POWER_SYSTEM.md](POWER_SYSTEM.md) | 12V busbar, fuse sizing and why each rating was chosen, power budget |
 | [SENSOR_WIRING.md](SENSOR_WIRING.md) | Soil sensor I2C addressing and the per-plant address mapping |
 | [BOM.md](BOM.md) | Parts list |
@@ -535,7 +535,7 @@ and `spidev`, so they run on a development machine with no hardware attached.
 | Gantry | Real — Klipper over its Unix socket |
 | Pump | Real — Klipper `output_pin` on the SKR's HB MOSFET |
 | LEDs | Real — WS2811 (default), WS2815 or GS8208 over SPI, 12V only, strip type selectable in Settings |
-| Water level sensor | Real — non-contact sensor on the outlet tube, via Klipper; verifies a dose rather than gating it |
+| Watering check | Real — each dose is confirmed from the pot's own moisture probe; see HOW_WATERING_WORKS.md |
 | Camera | API only — Camera Module 3 Wide via rpicam-vid, MJPEG over HTTP. An optional add-on, with no UI and no timelapse |
 
 Automatic watering is disabled by default. Turn it on with **Water plants

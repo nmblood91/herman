@@ -116,11 +116,8 @@ export function HistoryPanel() {
   const yRange = moisture ? [0, 100] : undefined
 
   const hasData = history?.timestamps?.length > 0
-  const failedCount = (history?.waterings || []).filter(
-    (watering) => watering.delivered === false,
-  ).length
   const missedCount = (history?.waterings || []).filter(
-    (watering) => watering.delivered !== false && watering.soak === 'missed',
+    (watering) => watering.soak === 'missed',
   ).length
 
   return (
@@ -201,13 +198,6 @@ export function HistoryPanel() {
               : ' (none in this range)'}
             . Gaps in a line mean that sensor could not be read.
           </p>
-          {failedCount > 0 && (
-            <p className="field-hint warning">
-              {failedCount === 1 ? '1 dose' : `${failedCount} doses`} ran but no
-              water reached the outlet, drawn as solid red lines. Look for a
-              moisture curve that did not rise afterwards.
-            </p>
-          )}
           {missedCount > 0 && (
             <p className="field-hint warning">
               {missedCount === 1 ? '1 dose' : `${missedCount} doses`} never

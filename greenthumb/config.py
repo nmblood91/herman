@@ -145,19 +145,6 @@ class Settings(BaseSettings):
     quiet_hours_start: str = "21:00"
     quiet_hours_stop: str = "08:00"
 
-    # Requires the liquid sensor clamped to the outlet tube, on the falling leg
-    # between the high point and the nozzle, with its polarity confirmed.
-    #
-    # The sensor verifies a dose after the fact rather than gating it. It cannot
-    # gate: the outlet reads dry between doses by design, so a pre-check would
-    # refuse every watering. Running a peristaltic pump dry for a few seconds is
-    # harmless, and watching the line fill proves water reached the plant --
-    # which catches a clog or a split tube that an inlet-side check cannot see.
-    water_sensor_enabled: bool = False
-    # How long to wait after the pump starts before the first look. The falling
-    # leg has to fill first: a few mL at the pump's flow rate, a few seconds.
-    delivery_check_delay_seconds: float = 5.0
-
     # History
     history_retention_days: int = 90
     # Empty means the default beside state.json (see greenthumb/paths.py).

@@ -230,9 +230,6 @@ measured. Then enable it in the **Settings** tab. The switch persists in
 
 Optional extras, each covered in [deploy/README.md](deploy/README.md):
 
-- **Delivery check:** wire the clamp-on level sensor, confirm its polarity, set
-  `WATER_SENSOR_ENABLED=true` in `/opt/greenthumb/.env`, then
-  `sudo systemctl restart greenthumb-api`.
 - **LED strip:** pick the chip type in the app before the colour order.
 - **Camera:** the service account needs the `video` group:
   `sudo usermod -aG video pi`.

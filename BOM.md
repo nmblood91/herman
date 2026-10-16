@@ -18,15 +18,15 @@ cannot be subtotalled yet.
 | Motion and control | $43.00 | 1 — wiring harness |
 | Compute and monitoring | $40.00 | complete for the base build |
 | Sensing | $69.00 | complete |
-| Watering system | $35.00 | 2 — intake weight, level sensor |
+| Watering system | $35.00 | 1 — intake weight |
 | Lighting | $10.00 | 2 — hook-up wire, connectors |
 | Power and electronics | $27.00 | 9 — fuses, fuse holders, level shifter, wire, heat shrink |
-| **Running total** | **~$431–437** | **15 lines outstanding** |
+| **Running total** | **~$431–437** | **13 lines outstanding** |
 
 Close to final. The frame, motion, compute and sensing are all fully costed.
 What is left is small electrical hardware — three fuses and their holders, the
-level shifter, wire, connectors and heat shrink — plus the intake weight and
-the liquid level sensor. Call it another $25, which puts a finished prototype
+level shifter, wire, connectors and heat shrink — plus the intake weight. Call
+it another $25, which puts a finished prototype
 around **$457**.
 
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
@@ -209,8 +209,7 @@ are solder pads on the sensors rather than a purchased part.
 | 12 V peristaltic pump | 1 | $30.00 | $30.00 | not tapped — mounts on M3 inserts |
 | Reservoir | 1 | BYO | — | top-loaded; a Nalgene works |
 | Intake weight | 1 | TBD | TBD | only if dipping a tube from the top |
-| Tubing and barb fittings | 1 set | $5.00 | $5.00 | sized to the level sensor's 0–13 mm range. **No anti-drip fitting on the falling leg** |
-| Non-contact liquid level sensor | 1 | TBD | TBD | CQRobot CQRSENYW001 or similar |
+| Tubing and barb fittings | 1 set | $5.00 | $5.00 | |
 
 **There is no bought nozzle.** The tube dribbles straight out, held by the
 lower gantry face — which PRINTED_PARTS.md already calls the nozzle holder and
@@ -223,10 +222,8 @@ a high spot in a suction line. The intake weight is what stops that tube
 floating up and sucking air as the tank drains, so it is not optional on a
 dipped setup.
 
-**No anti-drip fitting on the outlet's falling leg.** The delivery check
-depends on that section draining back between doses, which is exactly what an
-anti-drip fitting prevents. A stopped peristaltic pump already occludes the
-tube, so there is no check valve to add.
+A stopped peristaltic pump already occludes the tube, so there is no check
+valve to add.
 
 The nozzle must sit above the reservoir water line. Vertical order is nozzle,
 then pump, then reservoir — see [deploy/README.md](deploy/README.md) for why,

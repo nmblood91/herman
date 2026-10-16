@@ -51,15 +51,11 @@ export function Chart({ data, series, markers = [], height = 320, yRange, yLabel
               for (const marker of markersRef.current) {
                 const x = u.valToPos(marker.t, 'x', true)
                 if (x < u.bbox.left || x > u.bbox.left + u.bbox.width) continue
-                // A dose that delivered nothing is drawn solid red: it should
-                // stand out against the moisture curve that failed to respond
-                // to it, because that pairing is the whole diagnosis.
-                if (marker.delivered === false) {
-                  ctx.strokeStyle = 'rgba(230, 90, 80, 0.85)'
-                  ctx.setLineDash([])
-                } else if (marker.soak === 'missed') {
-                  // Left the tube, or was never checked there, but the pot's
-                  // probe never saw it arrive: amber, a step short of red.
+                // A dose the pot's probe never saw arrive is drawn solid
+                // amber: it should stand out against the moisture curve that
+                // failed to respond to it, because that pairing is the
+                // diagnosis.
+                if (marker.soak === 'missed') {
                   ctx.strokeStyle = 'rgba(235, 170, 60, 0.9)'
                   ctx.setLineDash([])
                 } else {

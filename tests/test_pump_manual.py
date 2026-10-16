@@ -8,7 +8,6 @@ from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state,
 from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyError
 
 settings.auto_watering_enabled = True
-settings.water_sensor_enabled = False
 # The pots here never get wetter, so a dose would stay unconfirmed and hold the
 # loop this file needs to see resume. The hold has its own tests in
 # test_soak_check.py.
@@ -21,7 +20,6 @@ class Klip:
         self.gcode.append(g); return {"ok": True}
     def move_gantry_absolute(self, p): self.moves.append(p); return {"ok": True}
     def status(self): return {"ok": True}
-    def water_supply_present(self): return True
 
 class Hub(CalibrationSurface):
     addresses = [0x36, 0x37, 0x38, 0x39]

@@ -120,7 +120,7 @@ profiles_before = state.load_profiles(path)
 assert profiles_before, "the plant profile did not save"
 
 history.record_readings([SensorSample(0x36, 50.0, 500, 21.0)])
-history.record_watering("plant_1", 100, "manual", True)
+history.record_watering("plant_1", 100, "manual")
 readings_before = history.series([0x36], 1)
 waterings_before = history.waterings(1)
 assert waterings_before, "the watering did not record"

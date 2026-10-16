@@ -53,8 +53,6 @@ class Klip:
     def home_gantry(self):
         return {"ok": True}
 
-    def water_supply_present(self):
-        return True
 
 
 class Hub(CalibrationSurface):

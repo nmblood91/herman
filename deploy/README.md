@@ -727,8 +727,7 @@ Hub black (GND) ---> Pin 6   (or any GND: 9, 14, 20, 25, 30, 34, 39)
 
 Bus 1 is what `i2cdetect -y 1` queries and what the install script's
 `dtparam=i2c_arm_baudrate` applies to. Nothing else in the build touches these
-pins — the LED data line is GPIO10 (pin 19) and the water level sensor takes 5V
-from pin 2.
+pins — the LED data line is GPIO10 (pin 19).
 
 **Power the sensors from 3.3V, not 5V.** The STEMMA boards and the Pi's I2C pins
 are both 3.3V parts, and the pull-ups discussed below reference whatever the
@@ -831,7 +830,7 @@ lower gantry face. There is no fitting to buy — the tube just dribbles.
 ```
    HIGH POINT  ──────── top of the outlet run
      │      ╲
-     │       ╲  falling leg  ──[ level sensor clamps here ]
+     │       ╲  falling leg
      │        ╲
      │       NOZZLE  ──────── over the pot
      │
@@ -862,7 +861,7 @@ gravity feed permanently instead of only while idle.
 The pump does not need to sit below the water; peristaltic pumps self-prime.
 The cost is that the pump inlet becomes the *highest* point of the suction line
 and so the first place to go dry if prime slips. That is a non-event in itself —
-prime recovers in seconds — but it decides where the level sensor goes.
+prime recovers in seconds.
 
 Keep the suction line short and steadily rising, with no high spots to trap air.
 Suction joints are far less forgiving than pressure joints: a pinhole that would
@@ -876,166 +875,13 @@ looking for — *bulkhead fitting*, *hydroponic reservoir with drain*, or any ta
 sold with a spigot. A plain tank plus an aftermarket bulkhead fitting works too.
 
 **A tube simply dipped in from the top is fine.** It needs no fittings and
-pumps identically. Two things to watch, both about prime rather than sensing:
+pumps identically. Two things to watch, both about prime:
 
 - **The rim crossing is a high spot**, which is exactly what a suction line is
   not supposed to have. Keep it as low as you can — through a hole in the lid
   rather than over the edge — and keep the whole run short.
 - **Weight the intake end** so it stays at the bottom. A tube that floats up as
   the tank drains starts sucking air well before the tank is empty.
-
-Note that with a dipped tube there is nowhere useful to sense *reservoir level*:
-every reachable section of tube sits above the water line. That is why the
-sensor lives on the outlet instead, described next.
-
-## Wiring the Water Level Sensor
-
-A non-contact liquid sensor (CQRobot CQRSENYW001 or similar) clamped around the
-**outlet** tube confirms that a dose actually delivered water, instead of the
-system running the pump and logging a dose that delivered nothing.
-
-**Clamp it on the falling leg — after the high point, before the nozzle.**
-
-### Why it verifies rather than blocks
-
-This sensor does not gate watering. It cannot: the falling leg drains into the
-pot after every dose, so it reads dry whenever the pump is idle, and a pre-check
-would refuse every watering forever.
-
-Instead the software starts the pump, watches the sensor a few seconds in, and
-records whether water arrived. Running a peristaltic pump dry for a few seconds
-is harmless, so there is nothing to protect against by checking first. What you
-get in exchange is a better question answered: not "is water available at the
-inlet" but "did water reach the plant" — which also catches a clog, a kink, a
-split pump tube, or a pump turning with nothing engaged.
-
-A dose that delivers nothing is logged as a warning, flagged on the history chart in the Sensors tab
-as a solid red marker, and reported in the status bar. Nothing is blocked; the
-next dose runs and re-checks, so a refilled tank clears the condition by itself.
-
-### Where exactly to clamp it
-
-The placement is fussier than it looks, because half the outlet run holds water
-permanently:
-
-- **Rising leg (pump → high point): stays full.** The stopped pump seals the
-  bottom and water cannot climb over the peak to escape. A sensor here reads wet
-  forever and tells you nothing.
-- **Falling leg (high point → nozzle): drains.** It siphons into the pot when
-  the pump stops and refills on the next dose. This is the only section with a
-  signal in it.
-
-**Do not fit an anti-drip fitting on the falling leg.** It exists to stop
-exactly the drain-back this depends on. The cost of leaving it out is a few mL
-dribbling into the pot it was already headed for.
-
-Sizing: about 7 mL of 4 mm ID tube fills in roughly four seconds at the pump's
-flow rate, against a 500 ms sensor response and a 60-second dose, so the timing
-is not tight. `delivery_check_delay_seconds` in `greenthumb/config.py` sets how
-long to wait before the first look; raise it if the falling leg is unusually
-long.
-
-**Set both DIP switches on the adapter board before wiring.** The CQRobot
-adapter board has two slide switches side by side next to the "SET" label, and
-both must be set:
-
-| Switch | Sets | Position for this build |
-|---|---|---|
-| Left (SET) | which level means "liquid" | **Down**: OUT goes low when the tube is wet, high when dry |
-| Right (5V / 3V) | how high "high" is | **Down, to 3V**: OUT's high level is 3.3V |
-
-So both switches go down.
-
-The right switch protects the board. The SKR's endstop inputs are 3.3V, and at
-the 5V setting the sensor would overdrive the pin. At 3V the signal wire connects
-directly, with no divider or level shifter.
-
-The left switch sets polarity, and down matches `switch_pin: ^!PC1` in
-`printer.cfg`, where a low pin reads as detected. This is inverted on purpose so
-that a fault is visible. The `^` turns on the pin's pull-up, so a green wire that
-falls out of Y-STOP reads high. With this polarity, high means dry, and every
-dose is flagged as not delivered: red markers on the chart and a warning in the
-status bar. With SET up and `^PC1` instead, the same loose wire would read wet
-and confirm every dose, an empty tank included, with nothing to show anything
-was wrong.
-
-The adapter's 3-pin output connector is labelled GND (1), VCC (2), OUT (3); the
-wires are black, red and green respectively.
-
-```
-Sensor VCC (red)   ----> 5V, Pi header pin 2 (or pin 4)
-Sensor GND (black) ----> Y-STOP GND pin
-Sensor OUT (green) ----> Y-STOP signal pin (PC1)
-```
-
-**Power it from the Pi's 5V pin. There is no 5V busbar.** The busbar is
-12V only; the 5V the Pi runs on comes from the DC-DC converter and reaches
-nothing else except through the Pi's header. Pin 2 and pin 4 are both that 5V
-rail, tied together on the Pi. The sensor draws a few mA, which is nothing next
-to the converter's 3A.
-
-**Not 3.3V.** The sensor's supply needs 5V minimum (the CQRSENYW001 is rated
-5-24V; check the listing for anything "similar"). The 5V / 3V switch only sets
-the *output* level, through the board's own regulator, so 5V in and 3.3V out is
-the intended setup. Below its supply minimum the sensor tends to half-work —
-weak sensitivity, a flickering output — which looks like a placement problem
-and is miserable to chase.
-
-**Not the 12V busbar either**, even though 12V is inside the rating. The pump's
-brushed-motor noise is conducted onto the 12V rail, and this is the one input
-read while the pump runs (see "The one adjacency worth watching" below). The
-Pi's 5V, behind the DC-DC converter, is the quieter supply.
-
-Y-STOP is a 2-pin header, GND and signal, with no power pin, so it takes only
-the black and green wires. Find which pin is GND with a multimeter on
-continuity to a known SKR ground rather than trusting the plug: the sensor
-almost certainly ships with a 3-pin connector, so its wires go into a 2-pin
-JST-XH housing anyway. Swapped, nothing is damaged, but the query below reads
-the same on a full tube and an empty one.
-
-Z-STOP (PC2) is the spare if Y-STOP is taken. Both are free because the
-`stepper_y` and `stepper_z` sections in `printer.cfg` are placeholders — a
-single-axis gantry still needs all three for `kinematics: cartesian` — and their
-endstop pins are pointed at the unused E0-STOP and PROBE headers to keep them out
-of the way. Leave them there: pointing `stepper_y` back at PC1 collides with this
-sensor, and Klipper rejects the whole config with "pin PC1 used multiple times in
-config" rather than picking one.
-
-The sensor senses through 0-13 mm, so
-check your tube's outer diameter falls inside that, and adjust the sensitivity
-pot if the board has one.
-
-**Confirm polarity before trusting it.** Bench the sensor first, powered at 5V
-with both switches down, and read the output on a full tube and an empty one —
-allow 500 ms between changing the tube and reading, that is its response time.
-Then check Klipper agrees:
-
-```bash
-python3 /opt/greenthumb/deploy/pi/send-gcode.py QUERY_FILAMENT_SENSOR SENSOR=water_supply
-```
-
-A full tube must report detected, and an empty one must not. If it reads
-backwards, the SET switch is up: move it down. Don't fix it by removing the
-`!` from `switch_pin`. That also flips the reading, but a loose wire then
-confirms every dose.
-
-To check the fail-safe, pull the green wire out of Y-STOP and query again. It
-must report **not** detected.
-
-The **Water sensor** panel on the Calibration tab walks through all three
-checks (full, empty, unplugged) and says what a failing combination points to.
-It reads without taking the gantry lock, so the full-tube check works while the
-pump is running from the Pump panel.
-
-Once confirmed, set `WATER_SENSOR_ENABLED=true` in `/opt/greenthumb/.env` and
-restart the API.
-
-Enabling it changes nothing about when watering happens — it only adds the
-check afterwards. Three outcomes are recorded per dose: **delivered** (the line
-read wet during the run), **not delivered** (it read dry throughout, logged as a
-warning and drawn in red on the chart), and **unknown** (the sensor never
-answered). Unknown is deliberately distinct from a failure: "we did not look" and
-"we looked and saw nothing" are different problems.
 
 ## Wiring the LED Strip
 
@@ -1225,20 +1071,6 @@ broken wire becomes indistinguishable from a healthy untriggered switch.
 So if the reading is backwards, re-trace the switch for the pair that is closed
 with the lever released and move the signal wire there, rather than flipping the
 config.
-
-### The one adjacency worth watching
-
-The water level sensor is the only signal input that gets **read while the pump is
-running**, and its wire naturally follows the same tube as the pump leads, so the
-two are hard to separate. That is acceptable: the sensor board drives its output
-actively and at low impedance, unlike a passive switch.
-
-If delivery checks ever start reading dry on a dose that visibly watered, suspect
-the pump rather than the routing. Brushed-motor commutation noise is broadband and
-continuous, and the flyback diode does nothing about it — the diode only clamps
-the turn-off spike. Fit a **100 nF ceramic across the pump terminals**, alongside
-the 1N5822. Note that this noise is conducted onto the 12V rail regardless of how
-the wires are dressed, which is why re-routing is not the fix here.
 
 ### Signal runs
 

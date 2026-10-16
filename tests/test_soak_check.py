@@ -25,7 +25,6 @@ from greenthumb.services.automation import GreenThumbAutomation
 from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state
 
 settings.auto_watering_enabled = True
-settings.water_sensor_enabled = False
 settings.soak_check_enabled = True
 settings.soak_rise_percent = 5.0
 settings.watering_cooldown_minutes = 60
@@ -86,7 +85,6 @@ class Hub(CalibrationSurface):
 class Klipper:
     def move_gantry_absolute(self, pos): return {"ok": True}
     def status(self): return {"ok": True, "position": 0.0, "homed": True}
-    def water_supply_present(self): return True
 
 
 class Pump:
@@ -242,7 +240,7 @@ old = Path(tempfile.mkdtemp()) / "old.db"
 con = sqlite3.connect(old)
 con.execute(
     "CREATE TABLE waterings (id INTEGER PRIMARY KEY, recorded_at INTEGER NOT NULL, plant_id TEXT NOT NULL,"
-    " volume_ml INTEGER NOT NULL, trigger TEXT NOT NULL, delivered INTEGER)"
+    " volume_ml INTEGER NOT NULL, trigger TEXT NOT NULL)"
 )
 con.execute("INSERT INTO waterings (recorded_at, plant_id, volume_ml, trigger) VALUES (1, 'plant_1', 50, 'auto')")
 con.commit()

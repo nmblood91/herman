@@ -107,25 +107,34 @@ print("ok: a lost motion board outranks everything below it")
 
 # --- running out of water ---
 
-auto = settled(build())
-auto._delivery_failures = 1
-state = auto.system_status()
-assert state["level"] == "attention" and "did not reach" in state["message"], state
-print("ok: one missed dose suggests checking the water and the line")
+def judged(auto, plant_id, verdict):
+    """A dose the pot's probe has already given its verdict on."""
+    watering = auto.history.record_watering(plant_id, 100, "auto", soak="pending")
+    auto.history.record_soak(watering, verdict, 0.0)
 
-auto._delivery_failures = 3
+
+auto = settled(build())
+judged(auto, "plant_1", "missed")
+state = auto.system_status()
+assert state["level"] == "attention" and "moisture probe" in state["message"], state
+print("ok: one missed dose suggests checking the nozzle and the probe")
+
+judged(auto, "plant_2", "missed")
 state = auto.system_status()
 assert state["level"] == "problem" and "reservoir" in state["message"].lower(), state
-print("ok: a run of missed doses calls out the reservoir")
+print("ok: misses on two pots in a row call out the reservoir")
 
-# A dose that lands clears it: refilling the tank should not need a restart.
-auto._delivery_failures = 0
-assert auto.system_status()["level"] == "ok"
-print("ok: a successful dose clears the empty-reservoir state")
+# A dose that lands clears it once watering is resumed: refilling the tank
+# should not need a restart.
+auto.resume_watering()
+judged(auto, "plant_3", "soaked")
+assert auto.system_status()["level"] == "ok", auto.system_status()
+print("ok: Resume and a dose that reaches the soil clear the empty-reservoir state")
 
 # An empty reservoir outranks a merely unhomed arm.
 auto = settled(build(klip=Klip(homed=False)))
-auto._delivery_failures = 2
+judged(auto, "plant_1", "missed")
+judged(auto, "plant_2", "missed")
 assert "reservoir" in auto.system_status()["message"].lower()
 print("ok: an empty reservoir outranks an unhomed arm")
 

@@ -157,7 +157,6 @@ settings.auto_patrol_enabled = False
 
 class _Klip:
     def status(self): return {"ok": True, "position": 0.0, "homed": True, "max_x": 890.0}
-    def water_supply_present(self): return True
     def __getattr__(self, n): return lambda *a, **k: {"ok": True}
 
 

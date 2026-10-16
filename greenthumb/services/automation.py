@@ -37,10 +37,6 @@ from greenthumb import care, dances, moisture, soak, state, system_power
 
 logger = logging.getLogger(__name__)
 
-# How often to re-read the outlet sensor while a dose is running.
-DELIVERY_POLL_SECONDS = 1.0
-# Slack for the watcher thread to notice the dose ended and return its verdict.
-DELIVERY_JOIN_SECONDS = 5.0
 # How close to position_max counts as parked on the home switch. Wider than
 # homing_retract_dist so a carriage resting just off the switch after a failed
 # home is still read as being at it.
@@ -177,12 +173,6 @@ class GreenThumbAutomation:
         self._bands: dict[str, str] = {}
         self._last_watered: dict[str, datetime] = {}
         self.history = history or HistoryStore(settings.history_db_path or DEFAULT_DB_PATH)
-        self._last_delivery: dict[str, object] | None = None
-        # Consecutive doses that reached nothing. One can be a clog on a single
-        # line; a run of them across plants is the shared thing, which is the
-        # tank. Seeded from history at startup so a reboot does not forget that
-        # the reservoir is empty.
-        self._delivery_failures = 0
         # Misses before this moment (epoch seconds) no longer count towards the
         # soak-check pause: Resume sets it. Persisted, so a restart neither
         # forgets a pause nor brings back one already resumed.
@@ -234,7 +224,6 @@ class GreenThumbAutomation:
         self.plants = default_plants()
         self.apply_default_led_ranges()
         self._warn_on_orphaned_plants()
-        self._seed_delivery_failures()
         self._seed_last_watered()
         # Plant edits, dose volumes, rail positions and LED preferences are all
         # user choices that used to live only in memory, so every restart reset
@@ -1141,21 +1130,6 @@ class GreenThumbAutomation:
             return -1.0
         return self.sensor_hub.raw_to_percent(mean, plant.sensor_address)
 
-    def _seed_delivery_failures(self) -> None:
-        """Count the run of failed deliveries at the end of the history."""
-        try:
-            recent = self.history.waterings(hours=24 * 7)
-        except Exception:
-            logger.exception("Could not read watering history for delivery state")
-            return
-        for watering in reversed(recent):
-            if watering.get("delivered") is False:
-                self._delivery_failures += 1
-            else:
-                # Stops at the first dose that worked or could not be checked:
-                # only an unbroken run means the tank is still empty now.
-                break
-
     def _seed_last_watered(self) -> None:
         """Each pot's last dose, from history, so a restart keeps the cooldown.
 
@@ -1294,22 +1268,8 @@ class GreenThumbAutomation:
         if movement.get("ok") is False:
             return state("problem", "Lost contact with the motion board. Nothing can be watered.")
 
-        # 2. Doses are running and nothing is coming out.
-        if self._delivery_failures >= 2:
-            return state(
-                "problem",
-                f"{self._delivery_failures} waterings in a row reached nothing. "
-                "The reservoir is probably empty.",
-            )
-        if self._delivery_failures == 1:
-            return state(
-                "attention",
-                "The last watering did not reach the plant. Check the water level, "
-                "then the line for a kink or a clog.",
-            )
-
-        # 2b. The same question answered from the soil: the pot's own probe
-        # never saw the water arrive.
+        # 2. Waterings are running and the pot's own probe never saw the water
+        # arrive: an empty tank, a misaimed nozzle or a probe out of the soil.
         paused = self.soak_pause_reason()
         if paused:
             return state("problem", f"Automatic watering is paused. {paused}")
@@ -1544,37 +1504,6 @@ class GreenThumbAutomation:
             self._hardware_lock.release()
             raise
 
-    def water_sensor_diagnostic(self) -> dict[str, object]:
-        """Read the outlet tube's liquid sensor once, for the calibration check.
-
-        Takes no hardware lock, unlike the endstop read. It is a status query
-        that moves nothing, and the most useful time to read it is while the
-        pump is running, which holds the lock for the whole dose. The falling
-        leg drains as soon as the pump stops, so the pump running is the only
-        time the tube is reliably full.
-        """
-        enabled = bool(settings.water_sensor_enabled)
-        wet = self.klipper.water_supply_present()
-        if wet is None:
-            return {
-                "ok": False,
-                "enabled": enabled,
-                "wet": None,
-                "pump_running": self.pump.is_running,
-                "detail": (
-                    "Could not read the sensor. Either Klipper is not answering, or "
-                    "printer.cfg has no [filament_switch_sensor water_supply] section. "
-                    "Re-running the installer regenerates printer.cfg from the template."
-                ),
-            }
-        return {
-            "ok": True,
-            "enabled": enabled,
-            "wet": wet,
-            "pump_running": self.pump.is_running,
-            "detail": "Reads wet: liquid detected in the tube." if wet else "Reads dry: no liquid in the tube.",
-        }
-
     def pump_status(self) -> dict[str, object]:
         """The flow rate in use, and the run a calibration would divide by."""
         return {
@@ -1774,11 +1703,7 @@ class GreenThumbAutomation:
         return datetime.now() - last >= timedelta(minutes=settings.watering_cooldown_minutes)
 
     def run_pump(self) -> dict[str, object]:
-        """Start the pump and leave it running, for bench testing.
-
-        Not gated on the water sensor: running a dry line on purpose is part of
-        what this is for.
-        """
+        """Start the pump and leave it running, for bench testing."""
         # Held across requests rather than through _exclusive, so the control
         # loop cannot start a watering cycle while the pump is manually on.
         if not self._hardware_lock.acquire(blocking=False):
@@ -1832,39 +1757,6 @@ class GreenThumbAutomation:
             self._pump_lock_held = False
             self._hardware_lock.release()
 
-    def _watch_delivery(
-        self,
-        duration_seconds: float,
-        verdict: dict[str, bool | None],
-        finished: threading.Event,
-    ) -> None:
-        """Watch the outlet sensor during a dose and record whether water arrived.
-
-        Runs on its own thread because deliver_ml does not return until Klipper
-        finishes the dwell. That is safe: the sensor is read over objects/query,
-        which Klipper answers even while the gcode queue is busy.
-        """
-        # The falling leg has to fill before there is anything to see.
-        finished.wait(timeout=min(settings.delivery_check_delay_seconds, duration_seconds))
-
-        saw_dry = False
-        while True:
-            present = self.klipper.water_supply_present()
-            if present is True:
-                verdict["delivered"] = True
-                return
-            if present is False:
-                # A definite dry read proves the sensor answers, which is what
-                # separates "no water arrived" from "we could not tell".
-                saw_dry = True
-            # Ends with the dose rather than on a timer, so a dose cut short by
-            # a Klipper error does not hold the watering call open. Always one
-            # read first: the loop is entered before this is checked.
-            if finished.wait(timeout=DELIVERY_POLL_SECONDS):
-                break
-
-        verdict["delivered"] = False if saw_dry else None
-
     def _move_and_water(
         self, plant: PlantSpec, volume_ml: int | None = None, trigger: str = "auto"
     ) -> dict[str, object]:
@@ -1892,56 +1784,9 @@ class GreenThumbAutomation:
             )
             return {"status": "error", "plant_id": plant.plant_id, "error": move.get("error")}
 
-        verdict: dict[str, bool | None] = {"delivered": None}
-        watcher: threading.Thread | None = None
-        finished = threading.Event()
-        if settings.water_sensor_enabled and volume > 0:
-            # The pump's own figure, not a literal. A stale 1.67 here would
-            # time the delivery window against the uncalibrated rate while the
-            # operator believed their measured one was in use -- the silent
-            # wrong-flow-rate failure HOW_WATERING_WORKS.md calls out as the
-            # unguarded one.
-            duration = self._dose_seconds(volume)
-            watcher = threading.Thread(
-                target=self._watch_delivery,
-                args=(duration, verdict, finished),
-                daemon=True,
-            )
-            watcher.start()
-
-        try:
-            self.pump.deliver_ml(volume, motion=motion)
-        finally:
-            finished.set()
-
-        if watcher is not None:
-            watcher.join(timeout=DELIVERY_JOIN_SECONDS)
-        delivered = verdict["delivered"]
-
-        if delivered is False:
-            # The failure this whole sensor exists to catch: the pump ran, the
-            # dose was logged, and nothing came out the other end.
-            logger.warning(
-                "Watered %s with %d mL but no water reached the outlet sensor",
-                plant.plant_id,
-                volume,
-            )
-        elif settings.water_sensor_enabled and delivered is None:
-            logger.warning("Could not verify delivery for %s, sensor unreadable", plant.plant_id)
-
-        if delivered is False:
-            self._delivery_failures += 1
-        elif delivered is True:
-            self._delivery_failures = 0
-        # delivered is None means the sensor did not answer, which is neither
-        # evidence of water nor of its absence, so the count is left alone.
+        self.pump.deliver_ml(volume, motion=motion)
 
         self._last_watered[plant.plant_id] = datetime.now()
-        self._last_delivery = {
-            "plant_id": plant.plant_id,
-            "at": self._last_watered[plant.plant_id].isoformat(timespec="seconds"),
-            "delivered": delivered,
-        }
         try:
             # Pending until the pot's probe shows the water (see _check_soaks),
             # which also holds automatic watering for every pot meanwhile.
@@ -1950,17 +1795,10 @@ class GreenThumbAutomation:
             logger.exception("Could not start the soak check for %s", plant.plant_id)
             soak_state = None
         try:
-            self.history.record_watering(
-                plant.plant_id, volume, trigger, delivered=delivered, soak=soak_state
-            )
+            self.history.record_watering(plant.plant_id, volume, trigger, soak=soak_state)
         except Exception:
             logger.exception("Failed to record watering for %s", plant.plant_id)
-        return {
-            "status": "ok",
-            "plant_id": plant.plant_id,
-            "volume_ml": volume,
-            "delivered": delivered,
-        }
+        return {"status": "ok", "plant_id": plant.plant_id, "volume_ml": volume}
 
     def _last_watered_iso(self, plant_id: str) -> str | None:
         last = self._last_watered.get(plant_id)
@@ -2014,13 +1852,6 @@ class GreenThumbAutomation:
             "app": settings.app_name,
             "movement": self.klipper.status(),
             "lighting": self.leds.status(),
-            # Reports the last dose, not the line's current state: the outlet
-            # reads dry between doses by design, so "dry right now" is normal
-            # and would be alarming to show.
-            "delivery": {
-                "enabled": settings.water_sensor_enabled,
-                "last": self._last_delivery,
-            },
             "plants": [status.__dict__ for status in plant_status],
             # So the UI can say why nothing is watering rather than leaving it
             # looking broken.

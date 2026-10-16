@@ -44,8 +44,6 @@ class Klip:
     def send_gcode(self, gcode, timeout=5.0):
         return {"ok": True}
 
-    def water_supply_present(self):
-        return True
 
 
 class Hub(CalibrationSurface):

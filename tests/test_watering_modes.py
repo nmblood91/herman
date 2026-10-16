@@ -28,7 +28,6 @@ from greenthumb.services.automation import GreenThumbAutomation
 from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state, temp_store
 
 settings.auto_watering_enabled = True
-settings.water_sensor_enabled = False
 settings.auto_patrol_enabled = False
 
 ACCEL = 1000.0
@@ -222,8 +221,6 @@ class Klip:
             reported["max_accel"] = ACCEL
         return reported
 
-    def water_supply_present(self):
-        return True
 
 
 class Hub(CalibrationSurface):
