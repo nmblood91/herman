@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Rename this Pi, so it answers at <name>.local. Run as root through the one
+# sudoers rule that allows it; the web UI's Network name panel is what calls it.
+#
+# Installed to /usr/local/sbin, owned by root, rather than run from
+# /opt/greenthumb: pi owns that tree, and a script pi can edit that sudo runs as
+# root would hand pi root.
+set -euo pipefail
+
+NAME="${1:-}"
+# One DNS label: lowercase letters, digits and hyphens, 1-63 characters, not
+# starting or ending with a hyphen. Checked here as well as in the API, because
+# this is the side that runs as root.
+if ! [[ "$NAME" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+  echo "Not a valid name: use lowercase letters, digits and hyphens" >&2
+  exit 2
+fi
+
+hostnamectl set-hostname "$NAME"
+
+# The 127.0.1.1 line is how the Pi resolves its own name. Left on the old one,
+# every sudo afterwards complains "unable to resolve host".
+if grep -q '^127\.0\.1\.1' /etc/hosts; then
+  sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$NAME/" /etc/hosts
+else
+  printf '127.0.1.1\t%s\n' "$NAME" >>/etc/hosts
+fi
+
+# Avahi announces <name>.local, and only picks up the new name on a restart.
+systemctl restart avahi-daemon 2>/dev/null || true

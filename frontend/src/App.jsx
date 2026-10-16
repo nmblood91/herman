@@ -10,6 +10,7 @@ import { LibraryBackupPanel } from './components/LibraryBackupPanel'
 import { HistoryPanel } from './components/HistoryPanel'
 import { HomeSwitchPanel } from './components/HomeSwitchPanel'
 import { ClockPanel } from './components/ClockPanel'
+import { HostnamePanel } from './components/HostnamePanel'
 import { VersionPanel } from './components/VersionPanel'
 import { PumpPanel } from './components/PumpPanel'
 import { PowerPanel } from './components/PowerPanel'
@@ -371,6 +372,7 @@ function App() {
       {activeTab === 'calibration' && (
         <>
           <ClockPanel />
+          <HostnamePanel />
           <HomeSwitchPanel />
           <PumpPanel />
           <CalibrationPanel />

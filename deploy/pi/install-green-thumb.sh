@@ -288,6 +288,22 @@ else
   echo "    buttons will say so. Use sudo systemctl poweroff over SSH instead."
 fi
 
+# Let the API rename the Pi (the Network name panel on the Calibration tab).
+# The helper is copied out of the checkout to a root-owned path: pi owns
+# /opt/greenthumb, and sudo running a script pi can edit would hand pi root.
+# The helper checks the name itself before touching anything.
+sudo install -o root -g root -m 0755 /opt/greenthumb/deploy/pi/greenthumb-set-hostname /usr/local/sbin/greenthumb-set-hostname
+SUDOERS_HOSTNAME=/etc/sudoers.d/greenthumb-hostname
+echo "pi ALL=(root) NOPASSWD: /usr/local/sbin/greenthumb-set-hostname *" | sudo tee "$SUDOERS_HOSTNAME" >/dev/null
+sudo chmod 0440 "$SUDOERS_HOSTNAME"
+if sudo visudo -c -f "$SUDOERS_HOSTNAME" >/dev/null 2>&1; then
+  echo "✓ API may rename the Pi"
+else
+  sudo rm -f "$SUDOERS_HOSTNAME"
+  echo "⚠️  Could not install the rename sudoers rule; rename with"
+  echo "    sudo hostnamectl set-hostname <name>"
+fi
+
 sudo cp /opt/greenthumb/deploy/systemd/greenthumb-api.service /etc/systemd/system/greenthumb-api.service
 sudo systemctl daemon-reload
 # Same as Klipper above: `--now` would not restart an already-running service,

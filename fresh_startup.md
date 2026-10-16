@@ -34,7 +34,10 @@ Skip this if the board has already been flashed.
 In Raspberry Pi Imager:
 
 - **OS:** Raspberry Pi OS (64-bit)
-- **Hostname:** `herman`
+- **Hostname:** `herman`. With two planters on one network, give each its own
+  name, or rename one later under **Network name** on the Calibration tab.
+  Otherwise whichever boots first gets `herman.local` and the other becomes
+  `herman-2.local`.
 - **Username:** `pi`. This is not optional. The service, the Klipper paths and
   the installer all assume `/home/pi`.
 - **SSH:** enabled

@@ -15,7 +15,7 @@ from greenthumb import moisture
 from greenthumb.config import settings
 from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_stream
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
-from greenthumb import firmware_info, system_clock, system_power, version
+from greenthumb import firmware_info, system_clock, system_hostname, system_power, version
 from greenthumb.plants import zone_for
 from greenthumb.services.automation import (
     UNCHANGED,
@@ -193,6 +193,25 @@ def set_system_timezone(payload: dict[str, str] = Body(default_factory=dict)) ->
     name = str(payload.get("timezone", ""))
     result = system_clock.set_timezone(name)
     log_event(f"System timezone set to {result['timezone']}")
+    return result
+
+
+@app.get(f"{settings.api_prefix}/system/hostname")
+def get_hostname() -> dict[str, object]:
+    return system_hostname.status()
+
+
+@app.post(f"{settings.api_prefix}/system/hostname")
+def set_hostname(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Rename the Pi: {"hostname": "herman-kitchen"} -> herman-kitchen.local.
+
+    A bad name is a 400 and a refused rename a 409, through the app-level
+    handlers, the same as the timezone.
+    """
+    before = system_hostname.current()
+    result = system_hostname.rename(payload.get("hostname"))
+    if result["hostname"] != before:
+        log_event(f"Planter renamed from {before} to {result['hostname']}")
     return result
 
 
