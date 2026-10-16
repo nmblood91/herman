@@ -14,10 +14,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 PROBE = (
-    # An editable install (`pip install -e .`) resolves greenthumb ahead of
-    # PYTHONPATH, which would import this checkout instead of the copy under
-    # test. Its finder is dropped first.
-    "import sys; sys.meta_path[:] = [f for f in sys.meta_path if 'editable' not in repr(f)]; "
     "import json; from greenthumb import paths, state, history, logging_setup; "
     "print(json.dumps({'packaged': paths.PACKAGED, 'state': str(state.DEFAULT_STATE_PATH), "
     "'db': str(history.DEFAULT_DB_PATH), 'log': str(logging_setup.LOG_FILE), "
@@ -30,8 +26,12 @@ def probe(root=ROOT, **env):
     environment.update(env)
     environment["PYTHONPATH"] = str(root)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    # Run from inside the tree under test: `python -c` puts the current
+    # directory first on the import path, ahead of PYTHONPATH, so running from
+    # this checkout would import it instead of the copy being probed.
     out = subprocess.run(
-        [sys.executable, "-c", PROBE], capture_output=True, text=True, env=environment, check=True,
+        [sys.executable, "-c", PROBE], capture_output=True, text=True, env=environment,
+        cwd=root, check=True,
     ).stdout
     return json.loads(out)
 
