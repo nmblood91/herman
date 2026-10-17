@@ -21,6 +21,7 @@ from greenthumb.hardware.lighting import (
     DEFAULT_BRIGHTNESS,
     DEFAULT_COLOR,
     DEFAULT_MODE,
+    DEFAULT_RAINBOW_SPEED,
     LedController,
 )
 from greenthumb.hardware.soil_sensors import unavailable_sample
@@ -98,6 +99,8 @@ auto.set_quiet_hours(True, "22:30", "06:15")
 auto.snooze_until = datetime.now() + timedelta(hours=2)
 auto.set_light_chip("WS2815")
 auto.set_light_brightness(20)
+auto.set_light_rainbow_speed(10)
+assert build(path).leds.rainbow_speed == 10, "the rainbow speed did not survive a restart"
 auto.set_light_color((255, 0, 0))
 auto.sensor_hub.calibration = {0x36: {"dry": 410}}
 state.save_calibration_point(0x36, "dry", 410, path=path)
@@ -149,6 +152,7 @@ assert auto.snooze_until is None, "a snooze survived the restore"
 assert auto.leds.strip.chip == settings.led_chip, auto.leds.strip.chip
 assert auto.leds.strip.color_order == settings.led_color_order, auto.leds.strip.color_order
 assert auto.leds.brightness == DEFAULT_BRIGHTNESS
+assert auto.leds.rainbow_speed == DEFAULT_RAINBOW_SPEED
 assert auto.leds.color == DEFAULT_COLOR
 assert auto.leds.mode == DEFAULT_MODE
 assert auto.sensor_hub.calibration == {}

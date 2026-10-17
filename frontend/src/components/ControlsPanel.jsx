@@ -36,6 +36,19 @@ const BACKEND_MODE_BY_UI = {
   off: 'off',
 }
 
+// Mirrors rainbow_cycle_seconds in greenthumb/hardware/lighting.py, so the
+// label follows the slider while it is dragged rather than after the save.
+const DEFAULT_RAINBOW_SPEED = 82
+const describeCycle = (speed) => {
+  const seconds = 120 * (2 / 120) ** ((Math.min(Math.max(speed, 1), 100) - 1) / 99)
+  if (seconds >= 60) {
+    const minutes = Math.floor(seconds / 60)
+    const rest = Math.round(seconds % 60)
+    return rest ? `${minutes} min ${rest} s a cycle` : `${minutes} min a cycle`
+  }
+  return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)} s a cycle`
+}
+
 const toHexColor = (value) => {
   if (Array.isArray(value)) {
     const [r, g, b] = value
@@ -83,6 +96,7 @@ export function ControlsPanel({
 
   const [ledMode, setLedMode] = useState('schedule')
   const [brightness, setBrightness] = useState(75)
+  const [rainbowSpeed, setRainbowSpeed] = useState(DEFAULT_RAINBOW_SPEED)
   const [color, setColor] = useState('#00ff80')
   const [lightingError, setLightingError] = useState('')
   const [quietStatus, setQuietStatus] = useState('')
@@ -97,6 +111,7 @@ export function ControlsPanel({
     setSyncedOverview(overview)
     setLedMode(UI_MODE_BY_BACKEND[lighting?.mode] ?? ledMode)
     setBrightness(lighting?.brightness ?? brightness)
+    setRainbowSpeed(lighting?.rainbow_speed ?? rainbowSpeed)
     setColor(toHexColor(lighting?.color || color))
   }
 
@@ -142,6 +157,11 @@ export function ControlsPanel({
   const changeBrightness = (value) => {
     setBrightness(value)
     postDebounced('brightness', '/lights/brightness', { brightness: Number(value) })
+  }
+
+  const changeRainbowSpeed = (value) => {
+    setRainbowSpeed(value)
+    postDebounced('rainbowSpeed', '/lights/rainbow-speed', { rainbow_speed: Number(value) })
   }
 
   const changeColor = (value) => {
@@ -352,6 +372,24 @@ export function ControlsPanel({
                     onChange={(event) => changeBrightness(Number(event.target.value))}
                   />
                   <span>{brightness}%</span>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {ledMode === 'rainbow' && (
+            <div className="field-row">
+              <label>
+                Rainbow speed
+                <div className="slider-row">
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={rainbowSpeed}
+                    onChange={(event) => changeRainbowSpeed(Number(event.target.value))}
+                  />
+                  <span>{describeCycle(rainbowSpeed)}</span>
                 </div>
               </label>
             </div>

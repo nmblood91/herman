@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from greenthumb import moisture
 from greenthumb.config import settings
 from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_stream
+from greenthumb.hardware.lighting import DEFAULT_RAINBOW_SPEED
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
 from greenthumb import firmware_info, system_clock, system_hostname, system_power, version
 from greenthumb.plants import zone_for
@@ -499,8 +500,16 @@ async def set_light_brightness(payload: dict[str, int] = Body(default_factory=di
     return result
 
 
+@app.post(f"{settings.api_prefix}/lights/rainbow-speed")
+async def set_light_rainbow_speed(payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
+    result = automation.set_light_rainbow_speed(payload.get("rainbow_speed", DEFAULT_RAINBOW_SPEED))
+    log_event(f"Rainbow speed set to {result['rainbow_speed']} ({result['rainbow_cycle_seconds']} s a cycle)")
+    return result
+
+
 # Declared last: a path parameter here matches anything, so it would otherwise
-# swallow /lights/mode, /lights/color, /lights/color-order and /lights/brightness.
+# swallow /lights/mode, /lights/color, /lights/color-order, /lights/brightness
+# and /lights/rainbow-speed.
 @app.get(f"{settings.api_prefix}/plants")
 async def list_plants() -> list[dict[str, object]]:
     plants = automation.plants

@@ -4,7 +4,14 @@ from datetime import time as dtime
 sys.modules["smbus2"] = types.ModuleType("smbus2")
 
 from greenthumb.hardware.led_strip import AddressableStrip, CHIPS, DEFAULT_CHIP, encoding_table, RESET
-from greenthumb.hardware.lighting import LedController
+from greenthumb.hardware.lighting import (
+    DEFAULT_RAINBOW_SPEED,
+    FASTEST_CYCLE_SECONDS,
+    FRAME_INTERVAL,
+    SLOWEST_CYCLE_SECONDS,
+    LedController,
+    rainbow_cycle_seconds,
+)
 from greenthumb.services.automation import within_window
 
 # --- bit encoding, per chip: this is what the strip actually sees on the wire ---
@@ -113,6 +120,37 @@ led._rainbow_offset = 40
 led._render()
 assert strip.frames[-1] != first, "rainbow did not advance"
 print(f"ok: rainbow spans {len(set(first))} distinct colours and animates")
+
+# The speed slider runs from a two-minute cycle to a two-second one, and the
+# default keeps the speed the rainbow had before the slider existed.
+assert rainbow_cycle_seconds(1) == SLOWEST_CYCLE_SECONDS
+assert abs(rainbow_cycle_seconds(100) - FASTEST_CYCLE_SECONDS) < 1e-9
+cycles = [rainbow_cycle_seconds(speed) for speed in range(1, 101)]
+assert cycles == sorted(cycles, reverse=True), "a faster setting gave a slower rainbow"
+assert 3.5 < rainbow_cycle_seconds(DEFAULT_RAINBOW_SPEED) < 5, rainbow_cycle_seconds(DEFAULT_RAINBOW_SPEED)
+assert led.set_rainbow_speed(0)["rainbow_speed"] == 1
+assert led.set_rainbow_speed(250)["rainbow_speed"] == 100
+for bad in (True, "fast", None):
+    try:
+        led.set_rainbow_speed(bad)
+    except (ValueError, TypeError):
+        pass
+    else:
+        raise AssertionError(f"accepted rainbow speed {bad!r}")
+assert led.rainbow_speed == 100
+print("ok: rainbow speed maps 1-100 onto a 2 min to 2 s cycle and refuses junk")
+
+# Even the slowest setting must still move: the offset is fractional, so the
+# per-frame step of about 0.07 accumulates instead of rounding to nothing.
+led.set_rainbow_speed(1)
+led._rainbow_offset = 0.0
+frames = round(rainbow_cycle_seconds(1) / FRAME_INTERVAL)
+led._advance_rainbow()
+assert 0 < led._rainbow_offset < 1, led._rainbow_offset
+for _ in range(frames - 1):
+    led._advance_rainbow()
+assert abs(led._rainbow_offset % 256) < 1e-6 or abs(led._rainbow_offset - 256) < 1e-6, led._rainbow_offset
+print("ok: the slowest rainbow still advances, and takes its full two minutes a cycle")
 
 # schedule mode lights only the plants that are on
 led, strip = controller(count=60)

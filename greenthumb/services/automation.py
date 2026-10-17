@@ -19,6 +19,7 @@ from greenthumb.hardware.lighting import (
     DEFAULT_BRIGHTNESS,
     DEFAULT_COLOR,
     DEFAULT_MODE,
+    DEFAULT_RAINBOW_SPEED,
     LedController,
 )
 from greenthumb.hardware.pump import PumpController
@@ -486,6 +487,7 @@ class GreenThumbAutomation:
             ("chip", "set_chip"),
             ("color_order", "set_color_order"),
             ("brightness", "set_brightness"),
+            ("rainbow_speed", "set_rainbow_speed"),
             ("mode", "set_mode"),
         ):
             value = leds.get(key)
@@ -553,6 +555,7 @@ class GreenThumbAutomation:
                     ("mode", getattr(self.leds, "mode", None)),
                     ("color", list(getattr(self.leds, "color", []) or []) or None),
                     ("brightness", getattr(self.leds, "brightness", None)),
+                    ("rainbow_speed", self._rainbow_speed()),
                     ("chip", getattr(getattr(self.leds, "strip", None), "chip", None)),
                     (
                         "color_order",
@@ -562,6 +565,18 @@ class GreenThumbAutomation:
                 if value is not None
             },
         }
+
+    def _rainbow_speed(self) -> int | None:
+        """The strip's rainbow speed, or None when the controller has none.
+
+        Type-checked rather than read with a getattr default: a test double
+        with __getattr__ hands back a function, which would poison the state
+        snapshot and silently stop every settings save.
+        """
+        speed = getattr(self.leds, "rainbow_speed", None)
+        if isinstance(speed, bool) or not isinstance(speed, int):
+            return None
+        return speed
 
     def _persist(self) -> None:
         """Write the current settings. Never raises: a failed save must not
@@ -2201,6 +2216,7 @@ class GreenThumbAutomation:
         if settings.led_color_order:
             self.leds.set_color_order(settings.led_color_order)
         self.leds.set_brightness(DEFAULT_BRIGHTNESS)
+        self.leds.set_rainbow_speed(DEFAULT_RAINBOW_SPEED)
         self.leds.color = DEFAULT_COLOR
         self.leds.set_mode(DEFAULT_MODE)
 
@@ -2237,6 +2253,11 @@ class GreenThumbAutomation:
             "status": "ok",
             "brightness": result["brightness"],
         }
+
+    def set_light_rainbow_speed(self, speed: int) -> dict[str, object]:
+        result = self.leds.set_rainbow_speed(speed)
+        self._persist()
+        return result
 
     # --- routines ---------------------------------------------------------
 

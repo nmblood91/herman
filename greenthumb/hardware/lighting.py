@@ -28,6 +28,24 @@ def colour_wheel(position: int) -> tuple[int, int, int]:
     return (0, position * 3, 255 - position * 3)
 
 
+# Rainbow speed is 1-100, mapped onto the time one full trip round the colour
+# wheel takes: two minutes at 1, two seconds at 100. Exponential, so each step
+# of the slider feels like the same change whether it is slow or fast.
+SLOWEST_CYCLE_SECONDS = 120.0
+FASTEST_CYCLE_SECONDS = 2.0
+
+
+def clamp_rainbow_speed(speed: object) -> int:
+    if isinstance(speed, bool):
+        raise ValueError(f"Unsupported rainbow speed: {speed}")
+    return max(1, min(int(speed), 100))
+
+
+def rainbow_cycle_seconds(speed: int) -> float:
+    fraction = (clamp_rainbow_speed(speed) - 1) / 99
+    return SLOWEST_CYCLE_SECONDS * (FASTEST_CYCLE_SECONDS / SLOWEST_CYCLE_SECONDS) ** fraction
+
+
 def _dim(pixel: tuple[int, int, int], brightness: int) -> tuple[int, int, int]:
     scale = max(0, min(int(brightness), 100)) / 100
     red, green, blue = pixel
@@ -39,6 +57,8 @@ def _dim(pixel: tuple[int, int, int], brightness: int) -> tuple[int, int, int]:
 DEFAULT_MODE = "schedule"
 DEFAULT_COLOR = (0, 255, 128)
 DEFAULT_BRIGHTNESS = 75
+# About 4 s a cycle, the speed the rainbow ran at before it had a setting.
+DEFAULT_RAINBOW_SPEED = 82
 
 
 class LedController:
@@ -57,6 +77,7 @@ class LedController:
         self.mode: Mode = DEFAULT_MODE
         self.color = DEFAULT_COLOR
         self.brightness = DEFAULT_BRIGHTNESS
+        self.rainbow_speed = DEFAULT_RAINBOW_SPEED
         self.strip = strip if strip is not None else AddressableStrip(
             bus=spi_bus, device=spi_device, chip=chip, color_order=color_order
         )
@@ -64,7 +85,9 @@ class LedController:
         # (first LED, last LED, lit, brightness %). Brightness is per plant and
         # may be None, which means the strip-wide brightness.
         self._segments: list[tuple] = []
-        self._rainbow_offset = 0
+        # A float, so a slow rainbow can advance by less than one wheel step a
+        # frame.
+        self._rainbow_offset = 0.0
         self._last_frame: list[tuple[int, int, int]] | None = None
         self._wake = threading.Event()
         self._stop = threading.Event()
@@ -92,13 +115,18 @@ class LedController:
                 logger.exception("LED render failed")
 
             if self.mode == "rainbow":
-                self._rainbow_offset = (self._rainbow_offset + 2) % 256
+                self._advance_rainbow()
                 time.sleep(FRAME_INTERVAL)
             else:
                 # Static modes only need redrawing when something changes, so
                 # wait to be woken instead of burning a core on identical frames.
                 self._wake.wait(IDLE_INTERVAL)
                 self._wake.clear()
+
+    def _advance_rainbow(self) -> None:
+        """One frame's turn of the colour wheel at the current speed."""
+        step = 256 * FRAME_INTERVAL / rainbow_cycle_seconds(self.rainbow_speed)
+        self._rainbow_offset = (self._rainbow_offset + step) % 256
 
     def _render(self) -> None:
         frame = self._build_frame()
@@ -116,7 +144,7 @@ class LedController:
             pixels = [self.color] * self.led_count
         else:
             pixels = [
-                colour_wheel(index * 256 // self.led_count + self._rainbow_offset)
+                colour_wheel(index * 256 // self.led_count + int(self._rainbow_offset))
                 for index in range(self.led_count)
             ]
         return [_dim(pixel, self.brightness) for pixel in pixels]
@@ -162,6 +190,14 @@ class LedController:
         self._wake.set()
         return {"status": "ok", "brightness": self.brightness}
 
+    def set_rainbow_speed(self, speed: int) -> dict[str, object]:
+        self.rainbow_speed = clamp_rainbow_speed(speed)
+        return {
+            "status": "ok",
+            "rainbow_speed": self.rainbow_speed,
+            "rainbow_cycle_seconds": round(rainbow_cycle_seconds(self.rainbow_speed), 1),
+        }
+
     def set_color_order(self, order: str) -> dict[str, object]:
         normalised = str(order).strip().upper()
         if normalised not in VALID_COLOR_ORDERS:
@@ -191,6 +227,7 @@ class LedController:
             "mode": self.mode,
             "color": self.color,
             "brightness": self.brightness,
+            "rainbow_speed": self.rainbow_speed,
             "led_count": self.led_count,
             "chip": self.strip.chip,
             "chip_options": [

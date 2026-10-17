@@ -85,7 +85,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/dances`, `/dances/run/{name}` | the routines, run by hand |
 | `/patrol/auto`, `/gantry/home-on-startup` | the hourly auto-patrol and the startup home, each on or off |
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
-| `/lights/...` | mode, brightness, colour, strip type, colour order |
+| `/lights/...` | mode, brightness, colour, rainbow speed, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
 | `/system/restore-defaults` | back to a fresh install; the plant profile and soil libraries and the history are kept |
 | `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame. No UI — reach these directly |
