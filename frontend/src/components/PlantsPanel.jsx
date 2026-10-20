@@ -683,11 +683,9 @@ export function PlantsPanel({
                         </button>
                       ))}
                     </div>
-                    {!motionReady && (
+                    {movement?.ok === false && (
                       <p className="field-hint">
-                        {movement?.ok === false
-                          ? 'The motion board is not responding, so the gantry cannot be moved.'
-                          : 'Home the gantry first (under Controls). Until then it refuses every move.'}
+                        The motion board is not responding, so the gantry cannot be moved.
                       </p>
                     )}
 
