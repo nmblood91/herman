@@ -9,7 +9,7 @@ const BLANK = {
   name: '',
   category: '',
   preferred_soil: '',
-  target_vwc: 25,
+  target_available: 40,
   watering_volume_ml: 100,
   light_start_time: '07:00',
   light_hours: 12,
@@ -17,28 +17,29 @@ const BLANK = {
   notes: '',
 }
 
-// The water level a target % VWC falls in. A label only, worked out from the
-// target and never stored: the percentage waters. Mirrors
-// greenthumb.care.WATER_LEVEL_FLOORS.
+// The water level a target falls in, as a share of the soil's available water.
+// A label only, worked out from the target and never stored: the percentage
+// waters. Mirrors greenthumb.care.WATER_LEVEL_FLOORS and its 10-90% range.
 const WATER_LEVEL_FLOORS = [
-  [46, 'Ultra Wet'],
-  [41, 'Very Wet'],
-  [35, 'Wet'],
-  [31, 'Wet-Medium'],
-  [25, 'Medium'],
-  [21, 'Medium-Dry'],
-  [16, 'Dry'],
-  [11, 'Very Dry'],
+  [88, 'Ultra Wet'],
+  [76, 'Very Wet'],
+  [63, 'Wet'],
+  [51, 'Medium-Wet'],
+  [38, 'Medium-Dry'],
+  [26, 'Dry'],
+  [13, 'Very Dry'],
   [0, 'Ultra Dry'],
 ]
-const waterLevelFor = (vwc) =>
-  WATER_LEVEL_FLOORS.find(([floor]) => Number(vwc) >= floor)?.[1] ?? ''
+const MIN_TARGET = 10
+const MAX_TARGET = 90
+const waterLevelFor = (percent) =>
+  WATER_LEVEL_FLOORS.find(([floor]) => Number(percent) >= floor)?.[1] ?? ''
 
 const formFrom = (entry) => ({
   name: entry.name,
   category: entry.category ?? '',
   preferred_soil: entry.preferred_soil ?? '',
-  target_vwc: entry.target_vwc ?? BLANK.target_vwc,
+  target_available: entry.target_available ?? BLANK.target_available,
   watering_volume_ml: entry.watering_volume_ml ?? BLANK.watering_volume_ml,
   light_start_time: entry.light_start_time ?? BLANK.light_start_time,
   light_hours: entry.light_hours ?? BLANK.light_hours,
@@ -113,7 +114,7 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
-          target_vwc: Number(form.target_vwc),
+          target_available: Number(form.target_available),
           watering_volume_ml: Number(form.watering_volume_ml),
           light_hours: Number(form.light_hours),
           light_brightness: Number(form.light_brightness),
@@ -269,14 +270,14 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
           </div>
 
           <label>
-            Water at: {form.target_vwc}% VWC ({waterLevelFor(form.target_vwc)})
+            Water at: {form.target_available}% soil water ({waterLevelFor(form.target_available)})
             <input
               type="range"
-              min="1"
-              max="60"
+              min={MIN_TARGET}
+              max={MAX_TARGET}
               step="1"
-              value={form.target_vwc}
-              onChange={(event) => update('target_vwc', event.target.value)}
+              value={form.target_available}
+              onChange={(event) => update('target_available', event.target.value)}
             />
           </label>
           <p className="field-hint">Watered once the soil dries to this.</p>

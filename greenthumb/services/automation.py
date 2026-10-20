@@ -37,7 +37,7 @@ from greenthumb.hardware.soil_sensors import (
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
 from greenthumb.plants import default_plants, label_for, sweep_edge_limits, zone_for
-from greenthumb import care, dances, moisture, soak, state, system_power
+from greenthumb import care, dances, soak, state, system_power
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ LIBRARY_VERSION = 1
 def _water_level_of(profile: dict) -> dict[str, str]:
     """A stored plant profile's water level, worked out from its target."""
     try:
-        return {"water_level": care.water_level_for(care.check_target_vwc(profile.get("target_vwc")))}
+        return {"water_level": care.water_level_for(care.check_target_available(profile.get("target_available")))}
     except ValueError:
         return {}
 
@@ -85,8 +85,8 @@ def care_fields(plant: PlantSpec) -> dict[str, object]:
     """
     return {
         "preferred_soil": plant.preferred_soil,
-        "target_vwc": plant.target_vwc,
-        "water_level": care.water_level_for(plant.target_vwc),
+        "target_available": plant.target_available,
+        "water_level": care.water_level_for(plant.target_available),
         "watering_volume_ml": plant.watering_volume_ml,
         "light_start_time": plant.light_start_time.isoformat(timespec="minutes"),
         "light_hours": plant.light_hours,
@@ -170,11 +170,6 @@ class GreenThumbAutomation:
         # -1" is also what a planter looks like one second after boot. This
         # distinguishes the two.
         self._has_polled = False
-        # Last band reported per plant, so moisture.band_for can apply its
-        # hysteresis. Not persisted: after a restart the first reading is
-        # taken at face value, which is correct -- there is no stale label
-        # to hold on to.
-        self._bands: dict[str, str] = {}
         self._last_watered: dict[str, datetime] = {}
         self.history = history or HistoryStore(settings.history_db_path or DEFAULT_DB_PATH)
         # Misses before this moment (epoch seconds) no longer count towards the
@@ -292,10 +287,6 @@ class GreenThumbAutomation:
         """
         if not plant.soil:
             return "No soil profile set."
-        # Needed whatever the readings: they turn the reading into the % VWC
-        # a plant's target is written in.
-        if self._soil_vwc(plant) is None:
-            return "Its soil profile needs its field capacity and wilting point % VWC."
         address = plant.sensor_address
         capacity = self.sensor_hub.field_capacity.get(address)
         wilting = self.sensor_hub.wilting_point.get(address)
@@ -370,7 +361,7 @@ class GreenThumbAutomation:
             # The care settings, each checked the way the editor checks it. A
             # bad value keeps the default rather than failing the restore.
             for field_name, check in (
-                ("target_vwc", care.check_target_vwc),
+                ("target_available", care.check_target_available),
                 ("light_hours", care.check_light_hours),
                 ("light_brightness", care.check_light_brightness),
                 ("light_start_time", care.check_start_time),
@@ -1072,100 +1063,17 @@ class GreenThumbAutomation:
         except Exception:
             logger.exception("Failed to record readings")
 
-    def band_for_plant(self, plant: PlantSpec) -> str:
-        """Which moisture band this pot is in, or "unknown".
+    def thirsty(self, plant: PlantSpec) -> bool:
+        """True when this pot has used its water down to the plant's target.
 
-        Unknown when the probe is not reporting *or* when the pot has no scale
-        -- see scale_problem. Different causes with the same honest answer: we
-        cannot say.
-
-        The previous band is passed through so the hysteresis in
-        greenthumb.moisture applies -- without it a reading parked on a
-        boundary would relabel every poll.
-        """
-        band = moisture.band_for(
-            self.percent_for_plant(plant),
-            previous=self._bands.get(plant.plant_id),
-        )
-        self._bands[plant.plant_id] = band
-        return band
-
-    def _soil_vwc(self, plant: PlantSpec) -> tuple[float, float] | None:
-        """(wilting point %, field capacity %) of the pot's soil, or None."""
-        soil = self._soil_entry(plant)
-        if state.available_water_fraction(soil) is None:
-            return None
-        return float(soil["wilting_point_vwc"]), float(soil["field_capacity_vwc"])
-
-    def vwc_for_plant(self, plant: PlantSpec) -> float | None:
-        """The pot's soil moisture as % VWC, or None when it cannot be said.
-
-        Plant-available water placed between the soil profile's wilting point
-        and field capacity %. The same straight line the wilting point estimate
-        assumes, so the two never disagree about where a reading sits.
+        Both are shares of the pot's own soil's available water, so a target
+        can never sit outside what the soil holds. A pot whose moisture cannot
+        be said (-1) is never thirsty. That is the whole protection against
+        watering on a reading we do not have -- a probe that fell out, or a pot
+        whose soil was never recorded.
         """
         percent = self.percent_for_plant(plant)
-        bounds = self._soil_vwc(plant)
-        if percent < 0 or bounds is None:
-            return None
-        wilting, capacity = bounds
-        return round(wilting + percent / 100 * (capacity - wilting), 1)
-
-    def effective_target(self, plant: PlantSpec) -> float | None:
-        """The VWC this pot is actually watered at, or None to never water.
-
-        The plant's target, unless it does not fit the pot's soil:
-
-        * At or above the soil's field capacity, the pot can never dry to it,
-          so it would be watered on every cooldown. None -- held, and said.
-        * At or below the soil's wilting point, the reading would have to
-          reach the point the plant cannot drink at. Watered one point above
-          wilting point instead -- "just above wilting point", the driest any
-          plant here is meant to go.
-        """
-        bounds = self._soil_vwc(plant)
-        if bounds is None:
-            return None
-        wilting, capacity = bounds
-        if plant.target_vwc >= capacity:
-            return None
-        if plant.target_vwc <= wilting:
-            return wilting + 1
-        return float(plant.target_vwc)
-
-    def target_problem(self, plant: PlantSpec) -> str | None:
-        """Why the plant's target does not fit its pot's soil, or None."""
-        bounds = self._soil_vwc(plant)
-        if bounds is None:
-            return None
-        wilting, capacity = bounds
-        if plant.target_vwc >= capacity:
-            return (
-                f"Its target of {plant.target_vwc}% VWC is at or above what "
-                f"{plant.soil} holds ({capacity:g}%), so it would be watered "
-                "constantly. Watering is held; choose a wetter soil profile or a "
-                "lower target."
-            )
-        if plant.target_vwc <= wilting:
-            return (
-                f"Its target of {plant.target_vwc}% VWC is at or below "
-                f"{plant.soil}'s wilting point ({wilting:g}%), so it is watered "
-                f"at {wilting + 1:g}% instead."
-            )
-        return None
-
-    def thirsty(self, plant: PlantSpec) -> bool:
-        """True when this pot has dried to its target moisture.
-
-        A pot whose moisture cannot be said is never thirsty. That is the whole
-        protection against watering on a reading we do not have -- a probe
-        that fell out, or a pot whose soil was never recorded.
-        """
-        vwc = self.vwc_for_plant(plant)
-        target = self.effective_target(plant)
-        if vwc is None or target is None:
-            return False
-        return vwc <= target
+        return 0 <= percent <= plant.target_available
 
     def _smoothed_raw(self, address: int) -> float | None:
         """Mean raw count over the window, or None while it is empty."""
@@ -1417,20 +1325,6 @@ class GreenThumbAutomation:
                 f"Watering is held on {', '.join(p.name for p in unmeasured)} "
                 f"({', '.join(profiles)}): {self.scale_problem(unmeasured[0])} "
                 "Set it up in the Soil Profile Editor.",
-            )
-
-        # A target wetter than the soil can hold is held rather than watered
-        # on every cooldown, and that has to be said: it looks like a plant
-        # that simply is not thirsty.
-        unreachable = [
-            plant.name for plant in self.plants
-            if self._soil_vwc(plant) is not None and self.effective_target(plant) is None
-        ]
-        if unreachable and self.auto_watering_enabled:
-            return state(
-                "attention",
-                f"Watering is held on {', '.join(unreachable)}: its target is "
-                "wetter than its soil profile holds. See the plant card.",
             )
 
         thirsty = [plant.name for plant in self.plants if self.thirsty(plant)]
@@ -1751,10 +1645,10 @@ class GreenThumbAutomation:
                 continue
 
             logger.info(
-                "Plant %s is at %s%% VWC against a target of %s%%, watering",
+                "Plant %s is at %.0f%% soil water against a target of %s%%, watering",
                 plant.plant_id,
-                self.vwc_for_plant(plant),
-                self.effective_target(plant),
+                self.percent_for_plant(plant),
+                plant.target_available,
             )
             self._move_and_water(plant)
 
@@ -1891,17 +1785,20 @@ class GreenThumbAutomation:
             }
         return result
 
+    def _moisture_level(self, plant: PlantSpec) -> str | None:
+        """The pot's live reading in the plant profiles' own words, or None."""
+        percent = self.percent_for_plant(plant)
+        return care.water_level_for(percent) if percent >= 0 else None
+
     def get_overview(self) -> dict[str, object]:
         soaks = self._last_soaks()
         plant_status = [
             PlantStatus(
                 plant_id=spec.plant_id,
                 moisture_percent=self.percent_for_plant(spec),
-                moisture_band=self.band_for_plant(spec),
-                moisture_vwc=self.vwc_for_plant(spec),
-                target_vwc=spec.target_vwc,
+                moisture_level=self._moisture_level(spec),
+                target_available=spec.target_available,
                 thirsty=self.thirsty(spec),
-                target_problem=self.target_problem(spec),
                 pump_active=self.pump.is_running,
                 lighting_mode=self.leds.mode,
                 last_watered=self._last_watered_iso(spec.plant_id),
@@ -1947,7 +1844,7 @@ class GreenThumbAutomation:
                     "plant_id": plant.plant_id,
                     "name": plant.name,
                     "sensor_address": plant.sensor_address,
-                    "target_vwc": plant.target_vwc,
+                    "target_available": plant.target_available,
                     **series[plant.sensor_address],
                 }
                 for plant in self.plants
@@ -1970,9 +1867,6 @@ class GreenThumbAutomation:
                 {
                     **self._latest[address].__dict__,
                     "plant_id": plant.plant_id if plant else None,
-                    "moisture_percent_avg": (
-                        self.percent_for_plant(plant) if plant else -1.0
-                    ),
                     "sample_count": len(self._history[address]),
                 }
             )
@@ -2244,10 +2138,8 @@ class GreenThumbAutomation:
         # Before the sync: an estimated wilting point is measured up from it.
         self.sensor_hub.calibration = {}
         self._sync_scales()
-        # Band hysteresis is per plant and remembers the old one's soil.
         # Last-watered times are kept: they are about the water already in the
         # pots, and dropping them would let the cooldown be skipped.
-        self._bands = {}
 
         self.auto_watering_enabled = settings.auto_watering_enabled
         self.pump.flow_ml_per_second = float(settings.pump_flow_ml_per_second)
@@ -2675,7 +2567,7 @@ class GreenThumbAutomation:
         entry["preferred_soil"] = preferred
 
         # A water level in the body is ignored: it is worked out from this.
-        entry["target_vwc"] = care.check_target_vwc(settings.get("target_vwc"))
+        entry["target_available"] = care.check_target_available(settings.get("target_available"))
 
         volume = settings.get("watering_volume_ml")
         if isinstance(volume, bool) or not isinstance(volume, (int, float)):
@@ -2749,7 +2641,7 @@ class GreenThumbAutomation:
         # should load what it can rather than nothing.
         fresh = next(p for p in default_plants() if p.plant_id == plant_id)
         for field_name, check in (
-            ("target_vwc", care.check_target_vwc),
+            ("target_available", care.check_target_available),
             ("light_start_time", care.check_start_time),
             ("light_hours", care.check_light_hours),
             ("light_brightness", care.check_light_brightness),
@@ -2816,7 +2708,7 @@ class GreenThumbAutomation:
         plant.name = fresh.name
         plant.profile = ""
         for field_name in (
-            "target_vwc",
+            "target_available",
             "preferred_soil",
             "watering_volume_ml",
             "light_start_time",
@@ -3198,8 +3090,8 @@ class GreenThumbAutomation:
             "watering_volume_ml": plant.watering_volume_ml,
         }
 
-    def update_target_vwc(self, plant_id: str, target_vwc: object) -> dict[str, object]:
-        """Set the soil moisture, as % VWC, at which this plant is watered.
+    def update_target_available(self, plant_id: str, target_available: object) -> dict[str, object]:
+        """Set the share of available water at which this plant is watered.
 
         Refused rather than coerced if it is not a whole percentage: a target
         that does not resolve would leave the plant never thirsty, which looks
@@ -3209,13 +3101,12 @@ class GreenThumbAutomation:
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        plant.target_vwc = care.check_target_vwc(target_vwc)
+        plant.target_available = care.check_target_available(target_available)
         self._persist()
 
         return {
             "status": "ok",
             "plant_id": plant_id,
-            "target_vwc": plant.target_vwc,
-            "water_level": care.water_level_for(plant.target_vwc),
-            "target_problem": self.target_problem(plant),
+            "target_available": plant.target_available,
+            "water_level": care.water_level_for(plant.target_available),
         }

@@ -62,7 +62,7 @@ state.save_soil(RICH, {
     "field_capacity_address": 0x37,
 }, source_path)
 source.write_plant_profile("My Basil", {
-    "category": "Culinary Herbs & Leafy Greens", "preferred_soil": RICH, "target_vwc": 31,
+    "category": "Culinary Herbs & Leafy Greens", "preferred_soil": RICH, "target_available": 31,
     "watering_volume_ml": 140, "light_start_time": "06:30", "light_hours": 14,
     "light_brightness": 80, "notes": "south window cutting",
 })
@@ -96,20 +96,22 @@ target = build(target_path)
 state.save_soil(RICH, {"field_capacity_raw": 900}, target_path)
 target.write_plant_profile("Sweet Basil", {
     **{k: v for k, v in backup["plant_profiles"]["Sweet Basil"].items() if k != "saved_at"},
-    "target_vwc": 33,
+    "target_available": 33,
 })
 
 result = target.import_library(backup)
 assert result["plant_profiles"]["Sweet Basil"] == "kept", result
 assert result["plant_profiles"]["My Basil"] == "written", result
 assert result["soil_profiles"][RICH] == "kept", result
-assert state.load_profiles(target_path)["Sweet Basil"]["target_vwc"] == 33
+assert state.load_profiles(target_path)["Sweet Basil"]["target_available"] == 33
 assert state.load_soils(target_path)[RICH]["field_capacity_raw"] == 900
 print("ok: without replace, what is already here is kept and only missing entries are added")
 
 result = target.import_library(backup, replace=True)
 assert result["plant_profiles"]["Sweet Basil"] == "written", result
-assert state.load_profiles(target_path)["Sweet Basil"]["target_vwc"] == 28
+assert state.load_profiles(target_path)["Sweet Basil"]["target_available"] == (
+    backup["plant_profiles"]["Sweet Basil"]["target_available"]
+)
 assert state.load_soils(target_path)[RICH]["field_capacity_raw"] == 812
 assert state.load_soils(target_path)[RICH]["field_capacity_address"] == 0x37
 print("ok: with replace, the backup's figures win, provenance included")

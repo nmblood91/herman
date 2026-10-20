@@ -247,7 +247,7 @@ function App() {
       // changes it, and what was left alone: the pot's position.
       setStatus(
         `Loaded plant profile ${result.name}: waters ${result.watering_volume_ml} mL ` +
-          `at ${result.target_vwc}% VWC, lights ` +
+          `at ${result.target_available}% soil water, lights ` +
           `${describeLighting(result.light_start_time, result.light_hours, result.light_brightness)}. Soil profile: ` +
           `${result.soil || 'not set'}. ` +
           (result.soil_note ? `${result.soil_note} ` : '') +

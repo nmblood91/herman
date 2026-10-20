@@ -77,7 +77,6 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/plants/...` | per-plant name, light window and scheduled light colour, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
 | `/plant-profiles`, `/plants/{id}/profile` | the plant profile library: list, read one, write one from a body, snapshot a pot, load onto a pot, delete |
 | `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
-| `/moisture-bands` | the band scale, for pickers and legends |
 | `/water/{plant_id}` | move to a plant and dose it |
 | `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
@@ -145,7 +144,7 @@ and Soil tab, or over the API:
 
 ```bash
 curl -X POST http://herman.local/api/v1/plant-profiles -H 'Content-Type: application/json' \
-  -d '{"name":"Basil","category":"Culinary Herbs & Leafy Greens","preferred_soil":"Rich & Retentive Mix","target_vwc":28,"watering_volume_ml":120,"light_start_time":"07:30","light_hours":13,"light_brightness":75,"notes":"South window, dries fast in summer."}'
+  -d '{"name":"Basil","category":"Culinary Herbs & Leafy Greens","preferred_soil":"Rich & Retentive Mix","target_available":32,"watering_volume_ml":120,"light_start_time":"07:30","light_hours":13,"light_brightness":75,"notes":"South window, dries fast in summer."}'
 curl http://herman.local/api/v1/plant-profiles/Basil
 ```
 
@@ -155,7 +154,7 @@ What a plant profile carries:
 |---|---|
 | Category | Groups the profile in the dropdowns. Optional. |
 | Preferred soil | The soil profile the plant wants. Loading the profile switches the pot to it. |
-| Water at (% VWC) | The pot is watered once its soil dries to this. See *Watering targets* below. |
+| Water at (% soil water) | The pot is watered once its soil water drops to this, from 10 to 90%. See *Watering targets* below. |
 | Water level | The target in words, from Ultra Dry to Ultra Wet. Worked out from the target, never stored; see *Watering targets*. |
 | Watering volume | Millilitres per dose. |
 | Lights on at, hours | When this plant's stretch of strip comes on, and for how long. The card and editor show when it goes off; nothing stores a stop time. |
@@ -267,7 +266,7 @@ written down, that spread looks like sensor variation.
 percentages**: its field capacity reading (what a probe reads in that soil
 soaked and drained 24 hours), and the mix's field capacity and wilting point as
 % volumetric water content, the table below. Every pot using the soil profile is
-read between field capacity and wilting point — see *Moisture bands* below.
+read between field capacity and wilting point — see *Watering targets* below.
 
 Wilting point is not measured. Each pot estimates it from its field capacity
 reading and its probe's air reading, counted as 0% water. It is placed the
@@ -350,72 +349,38 @@ all, and wilting point must read below field capacity.
 
 ## Watering targets
 
-A pot's reading is first turned into **plant-available water**: 100% at its
-soil profile's field capacity reading, 0% at its wilting point (estimated, or
-the soil profile's reading).
+A pot's reading is turned into **soil water**, the share of the water a plant
+can use that is left: 100% at its soil profile's field capacity reading, 0% at
+its wilting point (estimated, or the soil profile's reading).
 
-`available % = (reading − wilting point) ÷ (field capacity − wilting point)`
+`soil water % = (reading − wilting point) ÷ (field capacity − wilting point)`
 
-That is then placed on the soil profile's **% VWC** scale, between its wilting
-point % and field capacity %:
+**A plant is watered once its pot's soil water drops to its target**, a whole
+percentage from 10 to 90. Because the target is a share of whatever the pot's
+own soil holds, one target means the same thirst in any mix. Targets used to
+be % VWC, which only fitted the soil they were written for: 25% VWC was fairly
+dry in Rich & Retentive Mix and more than Ultra-Coarse Epiphytic Mix can hold
+at all. The card shows the pot's soil water beside its target.
 
-`VWC = wilting point % + available % × (field capacity % − wilting point %)`
+The **water level** names a percentage in words: a plant's target in its
+profile, and a pot's live reading on its card. It is always worked out by this
+key, eight equal slices of the scale, and never stored, so changing the key
+relabels everything:
 
-**A plant is watered once its pot's VWC drops to its target.** The card shows
-the pot's VWC beside the target. The **water level** names the target in words,
-and is always worked out from it by this key — it is never stored, so changing
-the key relabels every plant:
-
-| Water level | Target |
+| Water level | Soil water |
 |---|---|
-| Ultra Wet | over 45% VWC |
-| Very Wet | 41–45% |
-| Wet | 35–40% — keep constantly damp |
-| Wet-Medium | 31–34% |
-| Medium | 25–30% — top 1–2 inches dry |
-| Medium-Dry | 21–24% |
-| Dry | 16–20% — mostly dry 2–3 inches down |
-| Very Dry | 11–15% |
-| Ultra Dry | 10% and under — just above wilting point |
+| Ultra Wet | 88–100% — just watered |
+| Very Wet | 76–87% |
+| Wet | 63–75% |
+| Medium-Wet | 51–62% |
+| Medium-Dry | 38–50% |
+| Dry | 26–37% |
+| Very Dry | 13–25% |
+| Ultra Dry | 0–12% — close to wilting point |
 
-The key is written for a rich mix. Coarse mixes hold much less water, so a
-plant in Ultra-Coarse Epiphytic Mix reads Ultra Dry at a target that is
-comfortably moist for that mix — the percentage, not the label, does the
-watering.
-
-**A target has to fit the pot's soil profile.** Two cases are caught and shown
-on the card:
-
-- **At or above the soil's field capacity %** (e.g. 21% in Ultra-Coarse
-  Epiphytic Mix, which holds 15%): the pot can never dry to it, so it would be
-  watered on every cooldown. Watering is **held** and the status bar says so.
-- **At or below the soil's wilting point %** (e.g. 7% in Fast-Draining Mix,
-  whose wilting point is 8%): the pot would have to reach the point the plant
-  cannot drink at. It is watered **one point above wilting point** instead.
-
-In the shipped library this affects Christmas / Thanksgiving Cactus (held),
-and Peperomia Obtusifolia, Desert Cactus and Prickly Pear Cactus (watered just
-above wilting point).
-
-### Moisture bands
-
-The card also names the reading in words. The bands are fixed slices of the
-plant-available water scale, the same for every soil:
-
-| Band | Available water | Depletion |
-|---|---|---|
-| very wet | 90-100% | 0-10% — just watered |
-| wet | 70-90% | 10-30% |
-| medium | 50-70% | 30-50% |
-| **dry** | **25-50%** | **50-75% — the conventional watering trigger** |
-| very dry | 0-25% | 75-100% — near the limit of what roots can pull out |
-
-The percentage is still kept and still charted — the *rate* of drying says more
-than the level, because it follows light, temperature and growth stage on its
-own where a fixed threshold cannot.
-
-Readings hold their band until one clears a boundary properly, so a value
-parked on a threshold does not relabel on every poll.
+The library's targets were converted from the source table's % VWC through
+each plant's preferred soil, so each waters where it did in that soil. See
+`greenthumb/plant_library.py` for the four that were chosen by hand.
 
 **How far to trust the estimated wilting point.** Soil reads a little above
 air even bone dry, and capacitive probes are not perfectly linear. Both put
@@ -434,7 +399,7 @@ card and status bar say what is missing. Manual watering is unaffected.
 
 70 plant profiles ship in four categories: indoor vegetables and fruiting
 crops, culinary herbs and leafy greens, common houseplants, and succulents,
-cacti and epiphytes. Each names its preferred soil profile, target % VWC, water
+cacti and epiphytes. Each names its preferred soil profile, watering target, water
 level, hours of light and light intensity. The dropdowns group them by
 category.
 
@@ -490,7 +455,7 @@ This repository is set up to become a real product in stages:
 ## How watering decisions are made
 
 A background loop polls every sensor once a minute, averages the last ten
-readings per plant, and waters a plant once its soil dries to its target % VWC.
+readings per plant, and waters a plant once its soil water drops to its target.
 [HOW_WATERING_WORKS.md](HOW_WATERING_WORKS.md) explains the rules and the
 reasoning in plain language, for people who won't be reading the code.
 

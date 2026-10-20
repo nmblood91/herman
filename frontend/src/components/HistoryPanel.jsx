@@ -11,6 +11,9 @@ const RANGES = [
 ]
 
 const PLANT_COLORS = ['#4ade80', '#60a5fa', '#f472b6', '#fbbf24']
+// One empty list, so the temperature view's "no target lines" is the same
+// value every render and does not rebuild the chart data each time.
+const NO_TARGETS = []
 
 // Readings are stored and transmitted in Celsius. This converts for display
 // only -- the history keeps one unit whatever anyone happens to be viewing in.
@@ -80,6 +83,11 @@ export function HistoryPanel() {
     }
   }
 
+  // On the moisture view each pot's target is drawn as a flat dashed line in
+  // its colour: the reading and the target are on the same soil water scale,
+  // so a line dropping to its dashes is a pot coming due.
+  const targets = moisture && history ? history.plants : NO_TARGETS
+
   const data = useMemo(() => {
     if (!history) return [[]]
     return [
@@ -90,8 +98,9 @@ export function HistoryPanel() {
           ? plant.temperature_c.map(toFahrenheit)
           : plant.temperature_c
       }),
+      ...targets.map((plant) => history.timestamps.map(() => plant.target_available ?? null)),
     ]
-  }, [history, moisture, fahrenheit])
+  }, [history, moisture, fahrenheit, targets])
 
   const series = useMemo(() => {
     if (!history) return [{}]
@@ -108,8 +117,15 @@ export function HistoryPanel() {
             ? '--'
             : `${raw.toFixed(1)}${moisture ? '%' : fahrenheit ? '°F' : '°C'}`,
       })),
+      ...targets.map((plant, index) => ({
+        label: `${plant.name} waters at`,
+        stroke: PLANT_COLORS[index % PLANT_COLORS.length],
+        width: 1,
+        dash: [6, 6],
+        value: (self, raw) => (raw == null ? '--' : `${raw}%`),
+      })),
     ]
-  }, [history, moisture, fahrenheit])
+  }, [history, moisture, fahrenheit, targets])
 
   // Fixed for moisture so plants and time ranges stay visually comparable
   // instead of the axis rescaling to whatever happens to be on screen.
@@ -189,7 +205,7 @@ export function HistoryPanel() {
             series={series}
             markers={history.waterings || []}
             yRange={yRange}
-            yLabel={moisture ? 'Moisture %' : fahrenheit ? 'Temp °F' : 'Temp °C'}
+            yLabel={moisture ? 'Soil water %' : fahrenheit ? 'Temp °F' : 'Temp °C'}
           />
           <p className="field-hint">
             {history.waterings?.length === 1

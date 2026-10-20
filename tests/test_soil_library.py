@@ -172,7 +172,7 @@ assert state.load_profiles(shared)["Fern"]["preferred_soil"] == "", (
     "saving a pot with no preference recorded the soil it is in as one"
 )
 auto.write_plant_profile("Fern", {
-    "preferred_soil": "Fast-Draining Mix", "target_vwc": 20, "watering_volume_ml": 50,
+    "preferred_soil": "Fast-Draining Mix", "target_available": 20, "watering_volume_ml": 50,
     "light_start_time": "07:00", "light_hours": 12, "light_brightness": 50,
 })
 print("ok: saving a pot keeps its preferred soil, never the soil it is in")
@@ -188,7 +188,7 @@ print("ok: loading a plant profile switches the pot to its preferred soil profil
 # soil alone and says why, rather than clearing it.
 raw = state.load_state(shared)
 raw["plant_profiles"]["Exotic"] = {
-    "target_vwc": 20,
+    "target_available": 20,
     "watering_volume_ml": 50,
     "preferred_soil": "Moon dust",
 }
@@ -214,7 +214,7 @@ print("ok: a profile saved with an old soil key does not apply it")
 # A preferred soil written in the editor must name a soil profile.
 try:
     auto.write_plant_profile("Typo", {
-        "target_vwc": 20, "watering_volume_ml": 50, "light_start_time": "07:00",
+        "target_available": 20, "watering_volume_ml": 50, "light_start_time": "07:00",
         "light_hours": 12, "light_brightness": 50, "preferred_soil": "Rich and Retentive",
     })
 except ValueError:

@@ -21,7 +21,7 @@ import types
 sys.modules["smbus2"] = types.ModuleType("smbus2")
 sys.modules["spidev"] = types.ModuleType("spidev")
 
-from greenthumb import moisture, soil_library, state
+from greenthumb import soil_library, state
 from greenthumb.config import settings
 from greenthumb.hardware import soil_sensors
 from greenthumb.hardware.soil_sensors import MIN_CALIBRATION_SPAN, measure_endpoint
@@ -126,7 +126,7 @@ auto.update_plant_soil(pot.plant_id, "Rich & Retentive Mix")
 auto._history[pot.sensor_address].extend([600.0] * 10)
 
 assert capacity_of(auto, pot) is None, "a soil profile with no reading handed one over"
-assert auto.band_for_plant(pot) == moisture.UNKNOWN, auto.band_for_plant(pot)
+assert auto._moisture_level(pot) is None, auto._moisture_level(pot)
 assert auto.thirsty(pot) is False, "a pot with no field capacity was judged thirsty"
 print("ok: no field capacity means unknown, and unknown is never thirsty")
 
@@ -446,9 +446,8 @@ auto = GreenThumbAutomation(
 )
 rows = {row["sensor_address"]: row for row in auto.read_sensors()}
 assert rows[0x3A]["plant_id"] is None
-assert rows[0x3A]["moisture_percent_avg"] == -1.0
 assert rows[0x36]["plant_id"] == "plant_1"
-print("ok: an address no pot claims reports no plant and no average, rather than borrowing one")
+print("ok: an address no pot claims reports no plant, rather than borrowing one")
 
 
 # --- 13. the fixture every watering test leans on ---

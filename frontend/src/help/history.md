@@ -1,9 +1,10 @@
 ## History
-The chart shows each pot's moisture over time. Choose 6 hours to 90 days along
-the top, and switch between moisture and temperature. The vertical lines mark
-waterings:
-- **Dashed lines** are waterings that reached the soil.
-- **Amber lines** are waterings that never showed up on the probe.
+The chart shows each pot's soil water over time. Choose 6 hours to 90 days
+along the top, and switch between moisture and temperature.
+- **A flat dashed line** in a pot's colour is the point that pot is watered at.
+  When its line drops to it, the pot is due.
+- **Dashed vertical lines** are waterings that reached the soil.
+- **Amber vertical lines** are waterings that never showed up on the probe.
 
 A gap in a line means that probe couldn't be read at the time.
 

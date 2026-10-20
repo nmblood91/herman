@@ -53,7 +53,7 @@ def build(path=None):
 BODY = {
     "category": "",
     "preferred_soil": "",
-    "target_vwc": 21,
+    "target_available": 21,
     "watering_volume_ml": 120,
     "light_start_time": "07:30",
     "light_hours": 13,
@@ -71,7 +71,7 @@ BODY = {
 auto = build()
 pot = auto.plants[0]
 pot.name = "From a pot"
-pot.target_vwc = 21
+pot.target_available = 21
 pot.watering_volume_ml = 120
 pot.light_start_time = clock(7, 30)
 pot.light_hours = 13
@@ -100,13 +100,13 @@ auto = build()
 for value, why in (
     ("damp", "a word"),
     (None, "no target at all"),
-    (0, "zero, which nothing dries to"),
-    (61, "wetter than any mix here holds"),
+    (9, "below 10%, too close to wilting point"),
+    (91, "above 90%, which would water again as soon as it drained"),
     (12.5, "a fraction"),
     (True, "a boolean"),
 ):
     try:
-        auto.write_plant_profile("Rejected", {**BODY, "target_vwc": value})
+        auto.write_plant_profile("Rejected", {**BODY, "target_available": value})
     except ValueError:
         continue
     raise AssertionError(f"accepted {why}: {value!r}")
@@ -254,7 +254,7 @@ legacy = again.get_plant(second)
 assert legacy.watering_volume_ml == 80 and legacy.light_start_time == clock(9, 0)
 # Fields it does not have take the pot's defaults rather than whatever the
 # previous plant left behind.
-assert legacy.target_vwc == care.DEFAULT_TARGET_VWC, legacy.target_vwc
+assert legacy.target_available == care.DEFAULT_TARGET_AVAILABLE, legacy.target_available
 assert legacy.light_hours == care.DEFAULT_LIGHT_HOURS, legacy.light_hours
 assert legacy.notes == "left alone", legacy.notes
 print("ok: a profile from an older build loads what it can, and leaves the pot's note alone")
@@ -301,32 +301,32 @@ else:
     raise AssertionError("accepted a number as a soil note")
 print("ok: a soil note has to be text too")
 
-# The key, edge to edge.
-for vwc, level in (
-    (60, "Ultra Wet"), (46, "Ultra Wet"), (45, "Very Wet"), (41, "Very Wet"),
-    (40, "Wet"), (35, "Wet"), (34, "Wet-Medium"), (31, "Wet-Medium"),
-    (30, "Medium"), (25, "Medium"), (24, "Medium-Dry"), (21, "Medium-Dry"),
-    (20, "Dry"), (16, "Dry"), (15, "Very Dry"), (11, "Very Dry"),
-    (10, "Ultra Dry"), (1, "Ultra Dry"),
+# The key, edge to edge: eight equal slices of the soil water gauge.
+for percent, level in (
+    (100, "Ultra Wet"), (88, "Ultra Wet"), (87, "Very Wet"), (76, "Very Wet"),
+    (75, "Wet"), (63, "Wet"), (62, "Medium-Wet"), (51, "Medium-Wet"),
+    (50, "Medium-Dry"), (38, "Medium-Dry"), (37, "Dry"), (26, "Dry"),
+    (25, "Very Dry"), (13, "Very Dry"), (12, "Ultra Dry"), (0, "Ultra Dry"),
 ):
-    assert care.water_level_for(vwc) == level, (vwc, care.water_level_for(vwc), level)
-print("ok: a target maps to the water level the key gives it")
+    assert care.water_level_for(percent) == level, (percent, care.water_level_for(percent), level)
+assert len(care.WATER_LEVELS) == 8, care.WATER_LEVELS
+print("ok: a target maps to the water level the key gives it, across eight levels")
 
 # Never stored: a label in the body, or one saved by an older build, is
 # dropped, and what is reported comes from the target.
 labelled = build()
-labelled.write_plant_profile("Labelled", {**BODY, "target_vwc": 9, "water_level": "Wet"})
+labelled.write_plant_profile("Labelled", {**BODY, "target_available": 10, "water_level": "Wet"})
 assert "water_level" not in state.load_profiles(labelled._state_path)["Labelled"]
 raw = state.load_state(labelled._state_path)
-raw["plant_profiles"]["Old"] = {**BODY, "target_vwc": 28, "water_level": "Dry"}
+raw["plant_profiles"]["Old"] = {**BODY, "target_available": 55, "water_level": "Dry"}
 state.save_state(raw, labelled._state_path)
 listed = {entry["name"]: entry for entry in labelled.list_plant_profiles()}
 assert listed["Labelled"]["water_level"] == "Ultra Dry", listed["Labelled"]
-assert listed["Old"]["water_level"] == "Medium", "a stored label outranked the key"
-assert labelled.get_plant_profile("Old")["profile"]["water_level"] == "Medium"
+assert listed["Old"]["water_level"] == "Medium-Wet", "a stored label outranked the key"
+assert labelled.get_plant_profile("Old")["profile"]["water_level"] == "Medium-Wet"
 labelled.apply_plant_profile(labelled.plants[0].plant_id, "Old")
 plant_row = next(p for p in labelled.get_overview()["plants"] if p["plant_id"] == "plant_1")
-assert plant_row["target_vwc"] == 28
+assert plant_row["target_available"] == 55
 print("ok: the water level is always worked out from the target, never stored")
 
 

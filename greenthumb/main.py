@@ -11,7 +11,6 @@ from fastapi import Body, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from greenthumb import moisture
 from greenthumb.config import settings
 from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_stream
 from greenthumb.hardware.lighting import DEFAULT_RAINBOW_SPEED
@@ -586,22 +585,6 @@ async def list_plants() -> list[dict[str, object]]:
 # may carry the same name; a profile is care settings, not a slot.
 
 
-@app.get(f"{settings.api_prefix}/moisture-bands")
-def list_moisture_bands() -> dict[str, object]:
-    """The band scale, wettest to driest, for pickers and legends."""
-    return {
-        "bands": [
-            {
-                "name": band.name,
-                "description": band.description,
-                "depleted_from": band.depleted_from,
-                "depleted_to": band.depleted_to,
-            }
-            for band in moisture.BANDS
-        ]
-    }
-
-
 @app.get(f"{settings.api_prefix}/soils")
 def list_soils() -> dict[str, object]:
     return {"soils": automation.list_soils()}
@@ -708,10 +691,10 @@ def list_plant_profiles() -> dict[str, object]:
 def write_plant_profile(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """Create or replace a plant profile directly, with no pot involved.
 
-    Expects {"name", "category", "preferred_soil", "target_vwc",
+    Expects {"name", "category", "preferred_soil", "target_available",
     "watering_volume_ml", "light_start_time", "light_hours",
     "light_brightness", "notes"}. The water level is worked out from
-    target_vwc. Name is the key, so saving replaces -- the same rule as the
+    target_available. Name is the key, so saving replaces -- the same rule as the
     soil library.
     """
     result = automation.write_plant_profile(
@@ -820,10 +803,10 @@ async def update_light_schedule(plant_id: str, payload: dict[str, object] = Body
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/moisture")
-async def update_target_vwc(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-    """Set the soil moisture this plant is watered at, e.g. {"target_vwc": 28}."""
-    result = automation.update_target_vwc(plant_id, payload.get("target_vwc"))
-    log_event(f"Plant {plant_id} watering target set to {result['target_vwc']}% VWC")
+async def update_target_available(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Set the share of available water this plant is watered at, e.g. {"target_available": 40}."""
+    result = automation.update_target_available(plant_id, payload.get("target_available"))
+    log_event(f"Plant {plant_id} watering target set to {result['target_available']}% soil water")
     return result
 
 

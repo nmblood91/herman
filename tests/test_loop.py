@@ -263,15 +263,15 @@ def fresh(state_file):
 
 
 before = fresh(shared)
-default_target = before.get_plant("plant_1").target_vwc
-before.update_target_vwc("plant_1", 9)
+default_target = before.get_plant("plant_1").target_available
+before.update_target_available("plant_1", 15)
 before.update_watering_volume("plant_2", 250)
 before.set_plant_position("plant_3", 550)
 before.update_plant_name("plant_4", "Monstera")
 before.update_light_schedule("plant_4", "06:30", 15, 100)
 
 after = fresh(shared)
-assert after.get_plant("plant_1").target_vwc == 9, after.get_plant("plant_1").target_vwc
+assert after.get_plant("plant_1").target_available == 15, after.get_plant("plant_1").target_available
 assert after.get_plant("plant_2").watering_volume_ml == 250
 assert after.get_plant("plant_3").position_mm == 550
 assert after.get_plant("plant_4").name == "Monstera"
@@ -279,11 +279,11 @@ lit = after.get_plant("plant_4")
 assert (lit.light_start_time.isoformat(timespec="minutes"), lit.light_hours, lit.light_brightness) == (
     "06:30", 15, 100
 )
-assert default_target != 9, "test would pass vacuously if 9 were the default"
+assert default_target != 15, "test would pass vacuously if 15 were the default"
 print("ok: plant edits survive a restart")
 
 untouched = fresh(temp_state())
-assert untouched.get_plant("plant_1").target_vwc == default_target
+assert untouched.get_plant("plant_1").target_available == default_target
 print("ok: a fresh install still gets the built-in defaults")
 
 # A corrupt settings file must not stop the service booting.
@@ -291,5 +291,5 @@ bad = temp_state()
 bad.parent.mkdir(parents=True, exist_ok=True)
 bad.write_text("{truncated", encoding="utf-8")
 recovered = fresh(bad)
-assert recovered.get_plant("plant_1").target_vwc == default_target
+assert recovered.get_plant("plant_1").target_available == default_target
 print("ok: a corrupt settings file falls back to defaults instead of failing to start")

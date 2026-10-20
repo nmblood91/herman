@@ -26,6 +26,12 @@ The water tank the pump draws from.
 ### Snooze
 A one-off pause in automatic watering.
 
+### Soil water
+How much of the water a plant can use is left in the soil: 100% at
+[field capacity](#field-capacity), 0% at [wilting point](#wilting-point). It's
+the number on each pot's card, and plant profiles set when to water on the
+same scale.
+
 ### Soil profile
 The saved details of a soil mix, used to make sense of the probe's readings.
 

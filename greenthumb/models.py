@@ -12,11 +12,11 @@ class PlantSpec:
     plant_id: str
     sensor_address: int
     watering_volume_ml: int
-    # Water once the soil dries to this, as a whole % volumetric water content.
-    # Turned into a point on the pot's own scale through its soil profile's
-    # field capacity and wilting point %; see greenthumb.care. Its water level
+    # Water once the pot is down to this share of its soil's available water, a
+    # whole percentage: the same scale as its moisture reading, so one target
+    # means the same thirst in any soil. See greenthumb.care. Its water level
     # in words is worked out from it (care.water_level_for), never stored.
-    target_vwc: int = care.DEFAULT_TARGET_VWC
+    target_available: int = care.DEFAULT_TARGET_AVAILABLE
     # The soil profile this plant wants. Loading a plant profile switches the
     # pot to it; the card warns if the pot is later given a different one.
     preferred_soil: str = ""
@@ -91,17 +91,13 @@ class SensorSample:
 class PlantStatus:
     plant_id: str
     moisture_percent: float
-    # The band the reading falls in, for describing it in words. The raw
-    # percentage stays alongside: the history chart needs it, and the rate of
-    # drying says more than the level.
-    moisture_band: str
-    # What waters: the pot's soil moisture as % VWC, None when it cannot be
-    # worked out, against the plant's target.
-    moisture_vwc: float | None
-    target_vwc: int
+    # The reading in the plant profiles' water level words (care.WATER_LEVEL_FLOORS),
+    # or None while there is no reading.
+    moisture_level: str | None
+    # What waters: moisture_percent, the share of available water left,
+    # against the plant's target on the same scale.
+    target_available: int
     thirsty: bool = False
-    # Why the target cannot be used as written for this pot's soil, or None.
-    target_problem: str | None = None
     pump_active: bool = False
     lighting_mode: str = "ambient"
     last_watered: str | None = None

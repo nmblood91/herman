@@ -60,7 +60,7 @@ assert all(plant.profile == "" for plant in auto.plants)
 print("ok: a fresh pot has no plant profile loaded")
 
 auto.update_plant_name(first, "Basil - Wet")
-auto.update_target_vwc(first, 28)
+auto.update_target_available(first, 28)
 auto.update_watering_volume(first, 150)
 
 auto.save_plant_profile(first)
@@ -71,7 +71,7 @@ print("ok: a plant's settings save under its own name")
 auto.apply_plant_profile(second, "Basil - Wet")
 plant = auto.get_plant(second)
 assert plant.name == "Basil - Wet", plant.name
-assert plant.target_vwc == 28, plant.target_vwc
+assert plant.target_available == 28, plant.target_available
 assert plant.watering_volume_ml == 150, plant.watering_volume_ml
 print("ok: loading copies the name and the care settings onto another pot")
 
@@ -96,7 +96,7 @@ from greenthumb.plants import default_plants
 cleared = build(temp_state())
 pot = cleared.get_plant(second)
 cleared.update_plant_name(first, "Fern")
-cleared.update_target_vwc(first, 35)
+cleared.update_target_available(first, 35)
 cleared.update_watering_volume(first, 250)
 cleared.save_plant_profile(first)
 cleared.apply_plant_profile(second, "Fern")
@@ -107,7 +107,7 @@ cleared.clear_plant_profile(second)
 fresh = next(p for p in default_plants() if p.plant_id == second)
 assert pot.profile == ""
 assert pot.name == fresh.name, pot.name
-assert pot.target_vwc == fresh.target_vwc, pot.target_vwc
+assert pot.target_available == fresh.target_available, pot.target_available
 assert pot.watering_volume_ml == fresh.watering_volume_ml, pot.watering_volume_ml
 assert (pot.light_start_time, pot.light_hours, pot.light_brightness) == (
     fresh.light_start_time, fresh.light_hours, fresh.light_brightness
@@ -147,34 +147,34 @@ shared = temp_state()
 auto = build(shared)
 first = ids(auto)[0]
 auto.update_plant_name(first, "Basil")
-auto.update_target_vwc(first, 20)
+auto.update_target_available(first, 20)
 auto.save_plant_profile(first)
-auto.update_target_vwc(first, 35)
+auto.update_target_available(first, 35)
 auto.save_plant_profile(first)
 
 profiles = auto.list_plant_profiles()
 assert len(profiles) == 1, [p["name"] for p in profiles]
-assert profiles[0]["target_vwc"] == 35, profiles[0]
+assert profiles[0]["target_available"] == 35, profiles[0]
 print("ok: saving twice overwrites rather than making a second Basil")
 
 # A stray capital is not a different plant.
 auto.update_plant_name(first, "basil")
-auto.update_target_vwc(first, 28)
+auto.update_target_available(first, 28)
 auto.save_plant_profile(first)
 profiles = auto.list_plant_profiles()
 assert len(profiles) == 1, [p["name"] for p in profiles]
 assert profiles[0]["name"] == "basil", profiles[0]["name"]
-assert profiles[0]["target_vwc"] == 28
+assert profiles[0]["target_available"] == 28
 print("ok: a change of capitalisation renames the entry instead of duplicating it")
 
 # And loading is case-insensitive the same way.
 auto.apply_plant_profile(ids(auto)[1], "BASIL")
-assert auto.get_plant(ids(auto)[1]).target_vwc == 28
+assert auto.get_plant(ids(auto)[1]).target_available == 28
 print("ok: loading matches a name regardless of case")
 
 # Distinct names are distinct plants, which is how you keep wet and dry apart.
 auto.update_plant_name(first, "Basil - Dry")
-auto.update_target_vwc(first, 9)
+auto.update_target_available(first, 15)
 auto.save_plant_profile(first)
 names = sorted(p["name"] for p in auto.list_plant_profiles())
 assert names == ["Basil - Dry", "basil"], names
@@ -220,11 +220,11 @@ else:
 
 # A pot still using a deleted profile keeps what it was given -- the library is
 # a source to copy from, not a live link.
-assert restored.get_plant(ids(restored)[1]).target_vwc == 28
+assert restored.get_plant(ids(restored)[1]).target_available == 28
 print("ok: deleting a plant profile does not change pots already using it")
 
 try:
-    state.save_profile("   ", {"target_vwc": 20}, restored._state_path)
+    state.save_profile("   ", {"target_available": 20}, restored._state_path)
 except ValueError:
     print("ok: a blank name is refused")
 else:
@@ -245,11 +245,11 @@ data[state.PROFILES_KEY]["Broken"] = "not an object"
 data[state.PROFILES_KEY]["Hollow"] = {}
 # A string that happens to contain a field name. "field in value" is a
 # substring test when value is a string, so without the type guard this reaches
-# value["target_vwc"] -- indexing a string with a string -- and the
+# value["target_available"] -- indexing a string with a string -- and the
 # TypeError takes the whole library down rather than one entry.
-data[state.PROFILES_KEY]["Nasty"] = "target_vwc"
-data[state.PROFILES_KEY][""] = {"target_vwc": 20}
-data[state.PROFILES_KEY]["Good"] = {"target_vwc": 20}
+data[state.PROFILES_KEY]["Nasty"] = "target_available"
+data[state.PROFILES_KEY][""] = {"target_available": 20}
+data[state.PROFILES_KEY]["Good"] = {"target_available": 20}
 state.save_state(data, restored._state_path)
 
 names = sorted(state.load_profiles(restored._state_path))

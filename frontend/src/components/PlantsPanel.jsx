@@ -171,8 +171,10 @@ const describeMoisture = (status) => {
   if (status.moisture_percent == null || status.moisture_percent < 0) {
     return { text: 'no reading', hint: 'probe unplugged or unreadable', warn: true }
   }
-  // Plant-available water: 100% at field capacity, 0% at wilting point.
-  const text = `${status.moisture_percent.toFixed(0)}%`
+  // Soil water: the share of the soil's available water that is left, 100%
+  // just watered and 0% at wilting point. The target is on the same scale, so
+  // the two read against each other directly.
+  const text = `Soil water: ${status.moisture_percent.toFixed(0)}%`
   // Below a full window the loop will not water, so say so rather than show a
   // number that looks actionable.
   if (status.window_size && status.sample_count < status.window_size) {
@@ -181,18 +183,10 @@ const describeMoisture = (status) => {
       hint: `gathering history, ${status.sample_count}/${status.window_size}`,
     }
   }
-  // Soil moisture as % VWC leads, because the target is written in it; the
-  // band follows in words.
-  if (status.moisture_vwc == null) return { text, hint: status.moisture_band ?? '' }
-  const vwc = `${Math.round(status.moisture_vwc)}% VWC`
-  if (status.target_problem) {
-    return { text: vwc, hint: status.target_problem, warn: true }
-  }
+  const level = status.moisture_level ? `${status.moisture_level} · ` : ''
   return {
-    text: vwc,
-    hint: status.thirsty
-      ? `${status.moisture_band}, due a drink (waters at ${status.target_vwc}%)`
-      : `${status.moisture_band}, waters at ${status.target_vwc}%`,
+    text,
+    hint: `${level}waters at ${status.target_available}%`,
     dry: status.thirsty,
   }
 }
@@ -463,7 +457,7 @@ export function PlantsPanel({
                   {plant.profile ? (
                     <p className="field-hint">
                       <strong>{plant.name}</strong> — waters{' '}
-                      {plant.watering_volume_ml} mL at {plant.target_vwc}% VWC
+                      {plant.watering_volume_ml} mL at {plant.target_available}% soil water
                       {plant.water_level ? ` (${plant.water_level})` : ''}. Lights{' '}
                       {describeLighting(plant.light_start_time, plant.light_hours, plant.light_brightness)}.
                       {plant.preferred_soil ? ` Prefers ${plant.preferred_soil}.` : ''}

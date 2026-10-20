@@ -47,38 +47,31 @@ the way from air to field capacity as the soil's wilting point % is of its
 field capacity %. Taking a real wilting point reading means drying a pot by
 weight, which is slow and fiddly, and the estimate is close enough to water by.
 
-A reading between those two ends becomes the soil's **water content**, % VWC:
-the share of the pot's volume that is water. Each soil profile knows its own
-figures for both ends, so the reading is placed between them. In Rich &
-Retentive Mix, for example, field capacity is 50% and wilting point 17.5%, so a
-pot halfway between its two readings is at about 34%.
+A reading between those two ends becomes the pot's **soil water**: how much of
+the water the plant can use is left, 100% at field capacity and 0% at wilting
+point. A pot halfway between its two readings is at 50%, whatever the mix.
 
-**Each plant has a target**: water once the soil dries to this % VWC. The plant
-profiles that ship with Herman give one per plant, and the planter names it in
-words with this key:
+**Each plant has a target**: water once soil water drops to this percentage,
+anywhere from 10% for plants that like to dry right out to 90% for ones that
+like to stay wet. The plant profiles that ship with Herman give one per plant,
+and the planter names it in words with this key, which it also uses for each
+pot's live reading:
 
-| Water level | Water when soil drops to |
-| --- | --- |
-| Ultra Wet | over 45% |
-| Very Wet | 41–45% |
-| Wet | 35–40% — keep constantly damp, never dry out |
-| Wet-Medium | 31–34% |
-| Medium | 25–30% — top 1–2 inches dry |
-| Medium-Dry | 21–24% |
-| Dry | 16–20% — soil mostly dry 2–3 inches down |
-| Very Dry | 11–15% |
-| Ultra Dry | 10% and under — just above wilting point |
+| Water level | Soil water |
+|---|---|
+| Ultra Wet | 88–100% — just watered |
+| Very Wet | 76–87% |
+| Wet | 63–75% |
+| Medium-Wet | 51–62% |
+| Medium-Dry | 38–50% |
+| Dry | 26–37% |
+| Very Dry | 13–25% |
+| Ultra Dry | 0–12% — close to wilting point |
 
-The figures are for a rich mix; coarse mixes hold less water, so a plant in a
-coarse mix can show Ultra Dry at a target that is moist for that mix. The card
-shows the pot's water content next to its target, along with a word for how
-wet it is (very wet, wet, medium, dry, very dry).
-
-**A target has to fit the soil.** If it is as wet as the soil can hold or
-wetter, the pot can never dry to it and would be watered every half hour, so
-watering is held and the card says why. If it is at or below the soil's wilting
-point, the pot is watered one point above wilting point instead, and the card
-says that too.
+Because the target is a share of what the pot's own soil holds, it means the
+same thirst in any mix, and can never be out of the soil's reach. Targets used
+to be % VWC, and those only fitted one mix: 25% VWC was more than the coarse
+mix can hold, so a plant set to it in that mix was never watered.
 
 **Without a field capacity reading a pot reads nothing at all** — the card
 shows "no reading" and says what is missing — and is never watered
