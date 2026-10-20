@@ -38,8 +38,10 @@ const BACKEND_MODE_BY_UI = {
 
 // Mirrors rainbow_cycle_seconds in greenthumb/hardware/lighting.py, so the
 // label follows the slider while it is dragged rather than after the save.
+// 0 holds the rainbow still.
 const DEFAULT_RAINBOW_SPEED = 82
 const describeCycle = (speed) => {
+  if (speed <= 0) return 'Paused'
   const seconds = 120 * (2 / 120) ** ((Math.min(Math.max(speed, 1), 100) - 1) / 99)
   if (seconds >= 60) {
     const minutes = Math.floor(seconds / 60)
@@ -489,7 +491,7 @@ export function ControlsPanel({
                 <div className="slider-row">
                   <input
                     type="range"
-                    min="1"
+                    min="0"
                     max="100"
                     value={rainbowSpeed}
                     onChange={(event) => changeRainbowSpeed(Number(event.target.value))}

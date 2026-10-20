@@ -101,6 +101,9 @@ auto.set_quiet_hours(True, "22:30", "06:15")
 auto.snooze_until = datetime.now() + timedelta(hours=2)
 auto.set_light_chip("WS2815")
 auto.set_light_brightness(20)
+auto.set_light_rainbow_speed(0)
+# 0 is falsy, so it is the value most likely to be dropped as "not set".
+assert build(path).leds.rainbow_speed == 0, "a paused rainbow came back moving"
 auto.set_light_rainbow_speed(10)
 assert build(path).leds.rainbow_speed == 10, "the rainbow speed did not survive a restart"
 auto.set_light_color((255, 0, 0))

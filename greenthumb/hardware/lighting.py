@@ -51,21 +51,27 @@ def colour_wheel(position: int) -> tuple[int, int, int]:
     return (0, position * 3, 255 - position * 3)
 
 
-# Rainbow speed is 1-100, mapped onto the time one full trip round the colour
-# wheel takes: two minutes at 1, two seconds at 100. Exponential, so each step
-# of the slider feels like the same change whether it is slow or fast.
+# Rainbow speed is 0-100. 0 holds the rainbow still where it is; 1-100 is
+# mapped onto the time one full trip round the colour wheel takes: two minutes
+# at 1, two seconds at 100. Exponential, so each step of the slider feels like
+# the same change whether it is slow or fast.
 SLOWEST_CYCLE_SECONDS = 120.0
 FASTEST_CYCLE_SECONDS = 2.0
+PAUSED_RAINBOW_SPEED = 0
 
 
 def clamp_rainbow_speed(speed: object) -> int:
     if isinstance(speed, bool):
         raise ValueError(f"Unsupported rainbow speed: {speed}")
-    return max(1, min(int(speed), 100))
+    return max(PAUSED_RAINBOW_SPEED, min(int(speed), 100))
 
 
-def rainbow_cycle_seconds(speed: int) -> float:
-    fraction = (clamp_rainbow_speed(speed) - 1) / 99
+def rainbow_cycle_seconds(speed: int) -> float | None:
+    """Seconds for one trip round the colour wheel, or None when paused."""
+    speed = clamp_rainbow_speed(speed)
+    if speed == PAUSED_RAINBOW_SPEED:
+        return None
+    fraction = (speed - 1) / 99
     return SLOWEST_CYCLE_SECONDS * (FASTEST_CYCLE_SECONDS / SLOWEST_CYCLE_SECONDS) ** fraction
 
 
@@ -141,10 +147,12 @@ class LedController:
             except Exception:
                 logger.exception("LED render failed")
 
-            if self.mode == "rainbow":
+            if self.mode == "rainbow" and self.rainbow_speed != PAUSED_RAINBOW_SPEED:
                 self._advance_rainbow()
                 time.sleep(FRAME_INTERVAL)
             else:
+                # A paused rainbow too: its frame stops changing, so it waits
+                # like a static mode, and set_rainbow_speed wakes it to move on.
                 # Static modes only need redrawing when something changes, so
                 # wait to be woken instead of burning a core on identical frames.
                 self._wake.wait(IDLE_INTERVAL)
@@ -152,7 +160,10 @@ class LedController:
 
     def _advance_rainbow(self) -> None:
         """One frame's turn of the colour wheel at the current speed."""
-        step = 256 * FRAME_INTERVAL / rainbow_cycle_seconds(self.rainbow_speed)
+        cycle = rainbow_cycle_seconds(self.rainbow_speed)
+        if cycle is None:
+            return
+        step = 256 * FRAME_INTERVAL / cycle
         self._rainbow_offset = (self._rainbow_offset + step) % 256
 
     def _render(self) -> None:
@@ -231,10 +242,13 @@ class LedController:
 
     def set_rainbow_speed(self, speed: int) -> dict[str, object]:
         self.rainbow_speed = clamp_rainbow_speed(speed)
+        # Wakes a paused rainbow's idle wait, so it starts moving at once.
+        self._wake.set()
+        cycle = rainbow_cycle_seconds(self.rainbow_speed)
         return {
             "status": "ok",
             "rainbow_speed": self.rainbow_speed,
-            "rainbow_cycle_seconds": round(rainbow_cycle_seconds(self.rainbow_speed), 1),
+            "rainbow_cycle_seconds": round(cycle, 1) if cycle is not None else None,
         }
 
     def set_color_order(self, order: str) -> dict[str, object]:

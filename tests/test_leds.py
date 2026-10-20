@@ -129,7 +129,7 @@ assert abs(rainbow_cycle_seconds(100) - FASTEST_CYCLE_SECONDS) < 1e-9
 cycles = [rainbow_cycle_seconds(speed) for speed in range(1, 101)]
 assert cycles == sorted(cycles, reverse=True), "a faster setting gave a slower rainbow"
 assert 3.5 < rainbow_cycle_seconds(DEFAULT_RAINBOW_SPEED) < 5, rainbow_cycle_seconds(DEFAULT_RAINBOW_SPEED)
-assert led.set_rainbow_speed(0)["rainbow_speed"] == 1
+assert led.set_rainbow_speed(-5)["rainbow_speed"] == 0
 assert led.set_rainbow_speed(250)["rainbow_speed"] == 100
 for bad in (True, "fast", None):
     try:
@@ -152,6 +152,24 @@ for _ in range(frames - 1):
     led._advance_rainbow()
 assert abs(led._rainbow_offset % 256) < 1e-6 or abs(led._rainbow_offset - 256) < 1e-6, led._rainbow_offset
 print("ok: the slowest rainbow still advances, and takes its full two minutes a cycle")
+
+# 0 pauses it where it is: the colours stay, and stop moving.
+led.set_rainbow_speed(37)
+for _ in range(10):
+    led._advance_rainbow()
+held = led._rainbow_offset
+paused = led.set_rainbow_speed(0)
+assert paused["rainbow_speed"] == 0 and paused["rainbow_cycle_seconds"] is None, paused
+assert rainbow_cycle_seconds(0) is None
+for _ in range(100):
+    led._advance_rainbow()
+assert led._rainbow_offset == held, (led._rainbow_offset, held)
+led._render()
+assert len(set(strip.frames[-1])) > 5, "a paused rainbow went blank instead of holding its colours"
+led.set_rainbow_speed(50)
+led._advance_rainbow()
+assert led._rainbow_offset != held, "it did not start again from where it paused"
+print("ok: speed 0 holds the rainbow still, keeps its colours, and it moves on again from there")
 
 # schedule mode lights only the plants that are on, each in its own colour
 led, strip = controller(count=60)

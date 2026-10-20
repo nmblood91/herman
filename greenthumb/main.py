@@ -503,7 +503,11 @@ async def set_light_brightness(payload: dict[str, int] = Body(default_factory=di
 @app.post(f"{settings.api_prefix}/lights/rainbow-speed")
 async def set_light_rainbow_speed(payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
     result = automation.set_light_rainbow_speed(payload.get("rainbow_speed", DEFAULT_RAINBOW_SPEED))
-    log_event(f"Rainbow speed set to {result['rainbow_speed']} ({result['rainbow_cycle_seconds']} s a cycle)")
+    cycle = result["rainbow_cycle_seconds"]
+    log_event(
+        f"Rainbow speed set to {result['rainbow_speed']} "
+        f"({'paused' if cycle is None else f'{cycle} s a cycle'})"
+    )
     return result
 
 
