@@ -62,11 +62,16 @@ class RecordingLeds(LedController):
         super().set_plant_segments(zones)
 
 
-def build(path):
+def build(path, leds=None):
+    # No count given, as on the planter: the strip type sets it.
     return GreenThumbAutomation(
-        Hub(), Klip(), Pump(), RecordingLeds(led_count=20),
+        Hub(), Klip(), Pump(), leds or RecordingLeds(chip=settings.led_chip),
         history=temp_store(), state_path=path,
     )
+
+
+def spans(auto):
+    return [(plant.led_start_index, plant.led_end_index) for plant in auto.plants]
 
 
 # --- an old state file, written before pots had colours ---
@@ -165,14 +170,41 @@ assert by_id["plant_3"]["manual_color"] == [9, 9, 9] and by_id["plant_3"]["manua
 assert lighting["manual_scope"] == "all"
 print("ok: the overview lists every zone's manual settings")
 
-# --- the shipped pixel count splits the reference strip evenly ---
+# --- the strip type sets the pixel count, and the zones follow it ---
 
 # LED_COUNT once shipped as 60 against a 20-pixel WS2811 strip, so the first
 # pot's zone (pixels 0-14) covered three quarters of the real strip and the
-# last two zones fell off its end.
-assert settings.led_count == 20, settings.led_count
-spans = [(plant.led_start_index, plant.led_end_index) for plant in auto.plants]
-assert spans == [(0, 4), (5, 9), (10, 14), (15, 19)], spans
-print("ok: the shipped 20 pixels give each of the four pots an equal quarter")
+# last two zones fell off its end. The strip is always one metre at 60 LEDs a
+# metre, so the chip alone now decides.
+assert settings.led_count == 0, "LED_COUNT should ship unset so the chip decides"
+path = temp_state()
+auto = build(path)
+assert auto.leds.led_count == 20, auto.leds.led_count
+assert spans(auto) == [(0, 4), (5, 9), (10, 14), (15, 19)], spans(auto)
+print("ok: WS2811 is 20 pixels, an equal quarter of the strip per pot")
+
+auto.set_light_chip("WS2815")
+assert auto.leds.led_count == 60, auto.leds.led_count
+assert spans(auto) == [(0, 14), (15, 29), (30, 44), (45, 59)], spans(auto)
+assert max(zone.end for zone in auto.leds.zones) == 59, "the strip still has the old zones"
+options = {option["name"]: option["pixels"] for option in auto.leds.status()["chip_options"]}
+assert options == {"WS2811": 20, "WS2815": 60, "GS8208": 60}, options
+print("ok: changing the strip type re-splits the zones at once, without a restart")
+
+again = build(path)
+assert again.leds.strip.chip == "WS2815" and again.leds.led_count == 60
+assert spans(again) == [(0, 14), (15, 29), (30, 44), (45, 59)], spans(again)
+print("ok: and after a restart the saved strip type still sets the zones")
+
+again.restore_system_defaults()
+assert again.leds.led_count == 20 and spans(again)[-1] == (15, 19), spans(again)
+print("ok: Restore system defaults goes back to WS2811's 20 pixels")
+
+# LED_COUNT in .env, for a strip of another density, wins over the chip.
+fixed = build(temp_state(), RecordingLeds(led_count=48, chip="WS2811"))
+fixed.set_light_chip("WS2815")
+assert fixed.leds.led_count == 48 and fixed.leds.status()["led_count_fixed"] is True
+assert spans(fixed)[-1] == (36, 47), spans(fixed)
+print("ok: a count set in .env is kept whatever the strip type")
 
 print("\nall light zone checks passed")

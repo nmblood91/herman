@@ -233,13 +233,16 @@ and what goes wrong if it is inverted.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| Addressable LED strip, WS2811 12 V | 1 | $10.00 | $10.00 | 3 LEDs per pixel — see note |
+| Addressable LED strip, WS2811 12 V, 1 m at 60 LEDs/m | 1 | $10.00 | $10.00 | 3 LEDs per pixel — see note |
 | Hook-up wire, LED runs | TBD | TBD | TBD | power and data out to the strip |
 | Connectors | TBD | TBD | TBD |  |
 
-WS2811 is the default and drives three LEDs per pixel, so `LED_COUNT` is a
-third of the LEDs you can count on the strip. WS2815 and GS8208 are also
-supported and are one pixel per LED. All three are 12 V; no 5 V chip is
+Buy it at **60 LEDs per metre**, and use 1 m of it: the length of the table.
+The app works out the pixel count from the strip type on that basis, so a
+denser or sparser strip splits into zones of the wrong length unless
+`LED_COUNT` is set in `.env`. WS2811 is the default and drives three LEDs per
+pixel, so it is 20 pixels. WS2815 and GS8208 are also supported and are one
+pixel per LED, so 60. All three are 12 V; no 5 V chip is
 offered, since sixty 5 V pixels would pull about 3.6 A on top of the Pi.
 
 Strip power comes off the same 12 V supply, and the level shifter for its data

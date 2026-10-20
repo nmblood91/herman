@@ -24,6 +24,7 @@ from greenthumb.hardware.lighting import (
     LedController,
     Zone,
 )
+from greenthumb.hardware.led_strip import pixel_count
 from greenthumb.hardware.pump import PumpController
 from greenthumb import sweep
 from greenthumb.hardware.soil_sensors import (
@@ -145,7 +146,7 @@ class GreenThumbAutomation:
             flow_ml_per_second=settings.pump_flow_ml_per_second,
         )
         self.leds = leds or LedController(
-            led_count=settings.led_count,
+            led_count=settings.led_count or None,
             chip=settings.led_chip,
             color_order=settings.led_color_order,
             spi_bus=settings.led_spi_bus,
@@ -225,13 +226,15 @@ class GreenThumbAutomation:
         self.snooze_until: datetime | None = None
 
         self.plants = default_plants()
-        self.apply_default_led_ranges()
         self._warn_on_orphaned_plants()
         self._seed_last_watered()
         # Plant edits, dose volumes, rail positions and LED preferences are all
         # user choices that used to live only in memory, so every restart reset
         # them to the literals above. Restore whatever was saved last.
         self._restore_state()
+        # After the restore: the saved strip type sets the pixel count the
+        # zones are split from.
+        self.apply_default_led_ranges()
         self._sync_scales()
 
     def _sync_scales(self) -> None:
@@ -613,12 +616,23 @@ class GreenThumbAutomation:
         except Exception:
             logger.exception("Could not persist settings")
 
+    def _led_count(self) -> int:
+        """The strip's pixel count, from the controller when it has one.
+
+        Type-checked rather than read with a getattr default, since a test
+        double answers any attribute with a function.
+        """
+        count = getattr(self.leds, "led_count", None)
+        if isinstance(count, int) and not isinstance(count, bool) and count > 0:
+            return count
+        return settings.led_count or pixel_count(settings.led_chip)
+
     def apply_default_led_ranges(self) -> None:
         plant_count = len(self.plants)
         if plant_count == 0:
             return
 
-        total_leds = max(settings.led_count, 1)
+        total_leds = self._led_count()
         segment_length = total_leds // plant_count
         remainder = total_leds % plant_count
 
@@ -2254,6 +2268,8 @@ class GreenThumbAutomation:
         self.leds.set_manual_scope(DEFAULT_MANUAL_SCOPE)
         self.leds.color = DEFAULT_COLOR
         self.leds.set_mode(DEFAULT_MODE)
+        # Again, after the chip: it sets the pixel count the zones split.
+        self.apply_default_led_ranges()
 
         state.keep_only(self.KEPT_STATE_KEYS, self._state_path)
 
@@ -2278,6 +2294,10 @@ class GreenThumbAutomation:
 
     def set_light_chip(self, chip: str) -> dict[str, object]:
         result = self.leds.set_chip(chip)
+        # The chip sets the pixel count, so the zones are split again now
+        # rather than after a restart.
+        self.apply_default_led_ranges()
+        self._apply_lighting()
         self._persist()
         return result
 

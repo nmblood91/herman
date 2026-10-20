@@ -14,6 +14,8 @@ class ChipSpec:
     one: int
     color_order: str
     description: str
+    # How many LEDs one controller IC drives, all showing the same colour.
+    leds_per_pixel: int = 1
 
 
 # These chips share a 1.25us bit period and encode a bit by how long the line
@@ -33,8 +35,20 @@ CHIPS = {
     "GS8208": ChipSpec(2_400_000, 3, 0b100, 0b110, "GRB", "12V, one pixel per LED, 3 pads"),
     # T0H 250ns, T1H 600ns. Needs the faster clock, where a SPI bit is 312ns, so
     # 1000 holds high 312ns and 1100 holds 625ns. Drives three LEDs per pixel.
-    "WS2811": ChipSpec(3_200_000, 4, 0b1000, 0b1100, "RGB", "12V, three LEDs per pixel"),
+    "WS2811": ChipSpec(3_200_000, 4, 0b1000, 0b1100, "RGB", "12V, three LEDs per pixel", leds_per_pixel=3),
 }
+
+# The strip is always one metre, the length of the table, at 60 LEDs a metre.
+# So the chip alone decides how many pixels there are to address, and the
+# strip type picker sets the count rather than leaving a division by three to
+# whoever is wiring it up. A strip of another density needs LED_COUNT in .env.
+STRIP_LEDS = 60
+
+
+def pixel_count(chip: str) -> int:
+    """Addressable pixels on the one-metre, 60-LED strip with this chip."""
+    spec = CHIPS.get(chip, CHIPS[DEFAULT_CHIP])
+    return STRIP_LEDS // spec.leds_per_pixel
 
 # These rates are a hardware requirement on the host, not a preference, and it
 # is the tightest constraint this project puts on the board.
@@ -57,8 +71,8 @@ CHIPS = {
 # flickering colours rather than as an error. Anyone porting this to a board
 # that is not a Pi should scope the line before believing the colours.
 
-# WS2811 is what this build ships with. Note it drives three LEDs per pixel,
-# so led_count is a third of the LEDs you can count on the strip.
+# WS2811 is what this build ships with. It drives three LEDs per pixel, which
+# pixel_count takes care of.
 DEFAULT_CHIP = "WS2811"
 
 # The strip latches on a long low. Later WS281x revisions want 280us rather than

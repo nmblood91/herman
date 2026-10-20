@@ -3,6 +3,22 @@ import { API_BASE } from '../api'
 
 const DEFAULT_COLOR_ORDERS = ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']
 
+// What the picked strip type works out to, before it is saved, so the split
+// is visible before anything changes. The chip decides the count because the
+// strip is always the same length; LED_COUNT in .env overrides it for a strip
+// of another density, and then the count stays put whatever the type.
+function PixelCount({ chip, option, zoneCount, fixed }) {
+  if (!option?.pixels) return null
+  const pixels = option.pixels
+  const perZone = zoneCount ? Math.floor(pixels / zoneCount) : null
+  return (
+    <p className="field-hint">
+      {fixed ? `${pixels} pixels, set by LED_COUNT in .env` : `${chip}: ${pixels} pixels`}
+      {perZone ? `, ${perZone} per pot.` : '.'}
+    </p>
+  )
+}
+
 // Which strip is physically soldered on, and how its channels are wired. Both
 // are build-time facts you set once and then forget, which is why they sit on
 // the Calibration tab with the other hardware truths rather than next to the
@@ -11,6 +27,7 @@ export function LedStripPanel({ overview }) {
   const lighting = overview?.lighting
   const colorOrderOptions = lighting?.color_order_options ?? DEFAULT_COLOR_ORDERS
   const chipOptions = lighting?.chip_options ?? []
+  const zoneCount = lighting?.zones?.length ?? 0
 
   const [chip, setChip] = useState('WS2811')
   const [colorOrder, setColorOrder] = useState('BRG')
@@ -71,8 +88,8 @@ export function LedStripPanel({ overview }) {
       }
       setTesting(
         `Strip set to ${name}. If that is not the colour you see, the colour ` +
-          'order above is wrong. This leaves the lights on manually — set the ' +
-          'mode back to Schedule under Controls when you are done.',
+          'order above is wrong. This leaves the lights on Manual — set the ' +
+          'mode back to Zone Schedule under Controls when you are done.',
       )
     } catch (error) {
       setTesting(`Could not set the strip: ${error.message}`)
@@ -96,9 +113,15 @@ export function LedStripPanel({ overview }) {
             </select>
           </label>
           <p className="field-hint">
-            Sets the signal timing for your strip. WS2811 drives three LEDs per
-            pixel, so set LED count to a third of the LEDs you can see.
+            Sets the signal timing for your strip, and how many pixels it has:
+            the strip is always 1 m at 60 LEDs a metre.
           </p>
+          <PixelCount
+            chip={chip}
+            option={chipOptions.find((option) => option.name === chip)}
+            zoneCount={zoneCount}
+            fixed={lighting?.led_count_fixed}
+          />
         </div>
 
         <div className="field-row">

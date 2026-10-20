@@ -8,7 +8,7 @@ from typing import Literal
 
 from greenthumb.care import DEFAULT_LIGHT_BRIGHTNESS, DEFAULT_LIGHT_COLOR
 
-from greenthumb.hardware.led_strip import CHIPS, DEFAULT_CHIP, AddressableStrip
+from greenthumb.hardware.led_strip import CHIPS, DEFAULT_CHIP, AddressableStrip, pixel_count
 
 logger = logging.getLogger(__name__)
 
@@ -90,14 +90,17 @@ class LedController:
 
     def __init__(
         self,
-        led_count: int = 60,
+        led_count: int | None = None,
         strip: AddressableStrip | None = None,
         chip: str = DEFAULT_CHIP,
         color_order: str | None = None,
         spi_bus: int = 0,
         spi_device: int = 0,
     ) -> None:
-        self.led_count = max(int(led_count), 1)
+        # A count given here is fixed (LED_COUNT in .env, or a test). Without
+        # one, the count follows the chip on the standard one-metre strip, and
+        # changes when the chip does.
+        self._fixed_count = max(int(led_count), 1) if led_count else None
         self.mode: Mode = DEFAULT_MODE
         self.color = DEFAULT_COLOR
         self.brightness = DEFAULT_BRIGHTNESS
@@ -106,6 +109,7 @@ class LedController:
         self.strip = strip if strip is not None else AddressableStrip(
             bus=spi_bus, device=spi_device, chip=chip, color_order=color_order
         )
+        self.led_count = self._count_for(getattr(self.strip, "chip", chip))
 
         self._zones: list[Zone] = []
         # A float, so a slow rainbow can advance by less than one wheel step a
@@ -244,8 +248,12 @@ class LedController:
         self._wake.set()
         return {"status": "ok", "color_order": normalised}
 
+    def _count_for(self, chip: str) -> int:
+        return self._fixed_count or pixel_count(chip)
+
     def set_chip(self, chip: str) -> dict[str, object]:
         spec = self.strip.set_chip(chip)
+        self.led_count = self._count_for(self.strip.chip)
         # Timing and channel order both change, and neither alters the pixel
         # values, so the unchanged-frame check would skip sending the new one.
         self._last_frame = None
@@ -255,6 +263,7 @@ class LedController:
             "chip": self.strip.chip,
             "color_order": self.strip.color_order,
             "description": spec.description,
+            "led_count": self.led_count,
         }
 
     def status(self) -> dict[str, object]:
@@ -265,9 +274,11 @@ class LedController:
             "rainbow_speed": self.rainbow_speed,
             "manual_scope": self.manual_scope,
             "led_count": self.led_count,
+            # True when LED_COUNT in .env sets the count rather than the chip.
+            "led_count_fixed": self._fixed_count is not None,
             "chip": self.strip.chip,
             "chip_options": [
-                {"name": name, "description": spec.description}
+                {"name": name, "description": spec.description, "pixels": self._count_for(name)}
                 for name, spec in CHIPS.items()
             ],
             "color_order": self.strip.color_order,

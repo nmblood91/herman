@@ -132,8 +132,9 @@ give one addressable pixel per LED, so 60 LEDs is 60 pixels. WS2811 wires the
 LEDs in threes — one controller IC per group — so 60 LEDs is only 20 pixels, and
 the three LEDs in a group always show the same colour. Check the cut marks:
 cuttable between every LED means one pixel per LED; cuttable every third LED
-means WS2811. Set `LED_COUNT` to the number of addressable pixels, not the
-number of LEDs you can count.
+means WS2811. Picking the strip type on the Calibration tab sets the pixel
+count, since the strip is always 1 m at 60 LEDs a metre. Only a strip of
+another density needs `LED_COUNT` in `.env`, and then in pixels, not LEDs.
 
 ## DC-DC Converter Specifications
 

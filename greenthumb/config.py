@@ -38,10 +38,10 @@ class Settings(BaseSettings):
     # offered -- sixty 5V pixels would pull about 3.6A, past what the DC-DC can
     # give on top of the Pi.
     led_chip: str = "WS2811"
-    # Pixels, not LEDs: the reference build's 60-LED WS2811 strip is 20. It
-    # used to ship as 60, which split the strip into zones three times too
-    # long, so the first pot's zone covered three quarters of the strip.
-    led_count: int = 20
+    # 0 means the chip decides: the strip is always one metre at 60 LEDs a
+    # metre, so WS2811 is 20 pixels and the others 60 (led_strip.pixel_count).
+    # Set it only for a strip of another density, and then in pixels, not LEDs.
+    led_count: int = 0
     # Overrides the chip's usual order, for strips wired differently. BRG is
     # what the reference build's WS2811 strip turned out to need.
     led_color_order: str = "BRG"
