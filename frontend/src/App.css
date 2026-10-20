@@ -810,3 +810,93 @@ input[type='color'] {
   background: rgba(52, 24, 18, 0.9);
   color: #ffc9b8;
 }
+
+/* --- Help ------------------------------------------------------------------
+   One long page written in Markdown (src/help), so the text sits in normal
+   document styles rather than the form styles the other tabs use. */
+.help-page {
+  line-height: 1.6;
+}
+
+.help-page h1 {
+  margin: 0 0 16px;
+}
+
+.help-page h2 {
+  margin: 36px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2a4737;
+}
+
+.help-page h3 {
+  margin: 24px 0 6px;
+}
+
+/* Clear of the sticky status bar when a link jumps to a heading. */
+.help-page [id] {
+  scroll-margin-top: 90px;
+}
+
+.help-page a {
+  color: #8fd6a6;
+}
+
+.help-page table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.92rem;
+}
+
+.help-page th,
+.help-page td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 10px;
+  border: 1px solid #2a4737;
+}
+
+.help-page th {
+  background: #1d382a;
+}
+
+/* The Wikipedia-style contents box. */
+.help-contents {
+  display: inline-block;
+  max-width: 100%;
+  background: #13261b;
+  border: 1px solid #2a4737;
+  border-radius: 12px;
+  padding: 12px 20px 12px 12px;
+}
+
+.help-contents h2 {
+  margin: 0 0 4px 8px;
+  padding: 0;
+  border: 0;
+  font-size: 1rem;
+}
+
+.help-contents ol {
+  margin: 0;
+  padding-left: 28px;
+}
+
+.help-contents ol ol {
+  padding-left: 20px;
+  font-size: 0.92rem;
+}
+
+.help-back {
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+/* A phone has no room for a wide table, so it scrolls sideways in place
+   rather than pushing the whole page wider than the screen. */
+@media (max-width: 640px) {
+  .help-page table {
+    display: block;
+    overflow-x: auto;
+  }
+}

@@ -11,7 +11,7 @@ It talks to the FastAPI backend under `/api/v1`.
 - `src/components/TopBar.jsx` — header
 - `src/components/TabBar.jsx` — tab switching
 
-Five tabs, in the order `TabBar.jsx` lists them. There is no Settings tab: each
+Six tabs, in the order `TabBar.jsx` lists them. There is no Settings tab: each
 of its groups now sits with the thing it governs.
 
 | Tab | Components |
@@ -21,6 +21,27 @@ of its groups now sits with the thing it governs.
 | Automation | `AutomationPanel.jsx` — automatic watering, homing (startup home, hourly auto-patrol), quiet hours |
 | Calibration | `HomeSwitchPanel.jsx` (endstop test), `PumpPanel.jsx` (pump flow rate), `CalibrationPanel.jsx` (the probes’ air reading, a health check), `LedStripPanel.jsx` (strip type and colour order), `ClockPanel.jsx` (planter clock and time zone), `VersionPanel.jsx` (running and built commits), `LogsPanel.jsx`, mounted side by side |
 | History | `HistoryPanel.jsx` + `Chart.jsx` |
+| Help | `HelpPanel.jsx` — the owner's guide, one long page with a contents box, opened at the section for the tab you came from |
+
+### Editing the Help guide
+
+The guide is plain Markdown in `src/help/`, one file per tab plus a glossary,
+written for owners with no technical background. Edit a file and nothing else:
+VS Code's Markdown preview shows the result, and `npm run dev` shows it in the
+app. `src/help/pages.js` sets the order, so a new file needs a line there.
+
+- Each file starts with `## ` and the tab's name; each `### ` heading becomes
+  an entry in the contents box.
+- Link to any heading with `[text](#heading-name)`: the heading in lower case,
+  punctuation dropped, spaces as dashes. A repeated heading gets `-1`, `-2` in
+  page order.
+- Name a button as **bold** after "press", "choose" or "hold", using its exact
+  label.
+
+`tests/test_help.py` fails if a link points at no heading, if a named button
+does not exist in the app, or if a tab has no section. The guide is built into
+the app, so an edit reaches a planter like any other change: pull, then re-run
+the installer.
 
 The moisture scale is not here: field capacity and wilting point are sensor
 readings on each soil profile, set on the Plants and Soil tab.
