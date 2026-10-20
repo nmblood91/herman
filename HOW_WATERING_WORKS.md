@@ -174,7 +174,10 @@ than the same dose at one spot; it changes *where* the water lands.
 ### Each plant has its own stretch of rail
 
 A watering position and both sweep edges have to sit inside the plant's zone.
-A new planter starts each plant watering at the middle of its zone, with a
+The edges are kept 50 mm from the far end of it: the left edge at least 50 mm
+below the zone's top, the right edge at least 50 mm above its bottom, so
+neither can be set hard against the wrong side of the pot. Each card shows the
+range every field accepts in its title. A new planter starts each plant watering at the middle of its zone, with a
 sweep span 50 mm either side of that middle already filled in, so switching a
 pot to Sweep Range works straight away. Both are starting points: set them
 anywhere in the zone once the pots are placed.

@@ -17,7 +17,7 @@ from greenthumb.hardware.camera import CameraStream, MJPEG_CONTENT_TYPE, mjpeg_s
 from greenthumb.hardware.lighting import DEFAULT_RAINBOW_SPEED
 from greenthumb.logging_setup import log_event, read_recent_logs, setup_logging
 from greenthumb import firmware_info, system_clock, system_hostname, system_power, version
-from greenthumb.plants import zone_for
+from greenthumb.plants import sweep_edge_limits, zone_for
 from greenthumb.services.automation import (
     UNCHANGED,
     GreenThumbAutomation,
@@ -557,6 +557,13 @@ async def list_plants() -> list[dict[str, object]]:
             # Where this plant may be watered, so the card can say so before
             # a save is refused. See plants.ZONES.
             **dict(zip(("zone_min_mm", "zone_max_mm"), zone_for(plant.plant_id, travel))),
+            # The narrower range each sweep edge accepts within that zone.
+            **dict(
+                zip(
+                    ("sweep_left_max_mm", "sweep_right_min_mm"),
+                    sweep_edge_limits(*zone_for(plant.plant_id, travel)),
+                )
+            ),
             "watering_mode": plant.watering_mode,
             "sweep_min_mm": plant.sweep_min_mm,
             "sweep_max_mm": plant.sweep_max_mm,

@@ -37,6 +37,22 @@ ZONES: dict[str, tuple[int, int]] = {
 DEFAULT_SWEEP_REACH_MM = 50
 
 
+# How far a sweep edge has to stay from the far end of its zone: the left edge
+# at least this far below the zone's top, the right edge at least this far
+# above its bottom. So neither edge can be set hard against the wrong end of
+# the pot. Narrows the range each edge accepts; it does not set a span.
+SWEEP_EDGE_MARGIN_MM = 50
+
+
+def sweep_edge_limits(low: int, high: int) -> tuple[int, int]:
+    """(highest left edge, lowest right edge) for a zone from low to high.
+
+    Clamped into the zone, so a zone narrower than the margin (a rail measured
+    short) still accepts something rather than nothing.
+    """
+    return max(low, high - SWEEP_EDGE_MARGIN_MM), min(high, low + SWEEP_EDGE_MARGIN_MM)
+
+
 def zone_midpoint(plant_id: str) -> int | None:
     """The middle of a plant's zone, rounded down to a whole millimetre, or
     None if it has none. Down rather than to nearest so 322.5 and 567.5 do not

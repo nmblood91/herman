@@ -36,7 +36,7 @@ from greenthumb.hardware.soil_sensors import (
 )
 from greenthumb.history import DEFAULT_DB_PATH, HistoryStore
 from greenthumb.models import SensorSample, PlantSpec, PlantStatus
-from greenthumb.plants import default_plants, label_for, zone_for
+from greenthumb.plants import default_plants, label_for, sweep_edge_limits, zone_for
 from greenthumb import care, dances, moisture, soak, state, system_power
 
 logger = logging.getLogger(__name__)
@@ -792,6 +792,12 @@ class GreenThumbAutomation:
                 f"{problem}, so a sweep from {low} to {high} mm is out "
                 "of range. Is this the right plant?"
             )
+        zone_low, zone_high = self.plant_zone(plant)
+        left_max, right_min = sweep_edge_limits(zone_low, zone_high)
+        if low > left_max:
+            raise ValueError(f"{plant.name}'s left edge has to be between {zone_low} and {left_max} mm, not {low}")
+        if high < right_min:
+            raise ValueError(f"{plant.name}'s right edge has to be between {right_min} and {zone_high} mm, not {high}")
         if high - low < sweep.MIN_SPAN_MM:
             raise ValueError(
                 f"A sweep needs at least {sweep.MIN_SPAN_MM:.0f} mm to cross. "

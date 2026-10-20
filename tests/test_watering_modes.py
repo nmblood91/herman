@@ -380,6 +380,30 @@ print("ok: a stored decimal position is restored rounded to a whole millimetre")
 assert auto.set_plant_sweep("plant_1", 0, 200)["sweep_span_mm"] == 200
 print("ok: sweep edges may use the whole zone")
 
+# But neither edge may sit within 50 mm of the far end of its zone: Plant 2's
+# zone is 200-445, so the left edge takes 200-395 and the right edge 250-445.
+for low, high, side in ((396, 445, "left edge"), (200, 249, "right edge")):
+    before = (auto.get_plant("plant_2").sweep_min_mm, auto.get_plant("plant_2").sweep_max_mm)
+    try:
+        auto.set_plant_sweep("plant_2", low, high)
+    except ValueError as exc:
+        assert side in str(exc), exc
+    else:
+        raise AssertionError(f"accepted a {side} past its limit: {low}-{high}")
+    assert (auto.get_plant("plant_2").sweep_min_mm, auto.get_plant("plant_2").sweep_max_mm) == before
+result = auto.set_plant_sweep("plant_2", 395, 445)
+assert (result["sweep_min_mm"], result["sweep_max_mm"]) == (395, 445), result
+result = auto.set_plant_sweep("plant_2", 200, 250)
+assert (result["sweep_min_mm"], result["sweep_max_mm"]) == (200, 250), result
+print("ok: the left edge stops 50 mm short of the zone's top, the right edge 50 mm above its bottom")
+
+from greenthumb.plants import sweep_edge_limits
+
+assert sweep_edge_limits(200, 445) == (395, 250)
+# A zone narrower than the margin (a short rail) still accepts its whole width.
+assert sweep_edge_limits(0, 30) == (0, 30)
+print("ok: and a zone narrower than 50 mm is not left with nowhere to put an edge")
+
 try:
     auto.set_plant_position("plant_4", float("nan"))
 except ValueError:

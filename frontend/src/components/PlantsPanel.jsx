@@ -94,9 +94,9 @@ const reasonToHold = (draft, plant) => {
     // The API refuses a sweep whose span is too narrow to be one, so sending
     // this would be a red error for a card the user is still filling in.
     if (summary.warn) return `${summary.text} Not saved yet.`
-    const edge = outsideZone(plant, Number(draft.sweep_min_mm)) ||
-      outsideZone(plant, Number(draft.sweep_max_mm))
-    if (edge) return `Sweep edge ${edge} Not saved.`
+    const edge = outsideRange(plant, 'left', Number(draft.sweep_min_mm)) ||
+      outsideRange(plant, 'right', Number(draft.sweep_max_mm))
+    if (edge) return `${edge} Not saved.`
   }
   return ''
 }
@@ -117,9 +117,36 @@ const describeZone = (plant) => {
   return zone ? `${zone.low}–${zone.high} mm` : ''
 }
 
+// What each rail field accepts: the whole zone for the watering position, and
+// for the sweep edges the zone less 50 mm at the far end (the left edge stays
+// 50 mm below the zone's top, the right edge 50 mm above its bottom). The
+// planter reports the edge limits, so there is no margin to keep in step here.
+// Null when it has not said.
+const rangeOf = (plant, field = 'position') => {
+  const zone = zoneOf(plant)
+  if (!zone) return null
+  const leftMax = Number(plant.sweep_left_max_mm)
+  const rightMin = Number(plant.sweep_right_min_mm)
+  if (field === 'left' && Number.isFinite(leftMax)) return { low: zone.low, high: leftMax }
+  if (field === 'right' && Number.isFinite(rightMin)) return { low: rightMin, high: zone.high }
+  return zone
+}
+
 // Appended to each rail field's title, so the range it accepts sits right
 // where the number goes in. Nothing when the planter has not said.
-const zoneSuffix = (plant) => (describeZone(plant) ? `: accepts ${describeZone(plant)}` : '')
+const rangeSuffix = (plant, field) => {
+  const range = rangeOf(plant, field)
+  return range ? `: accepts ${range.low}–${range.high} mm` : ''
+}
+
+const EDGE_NAMES = { left: 'Left edge', right: 'Right edge' }
+
+// "Left edge 420 mm is outside 200–395 mm." or '' when it is inside.
+const outsideRange = (plant, field, value) => {
+  const range = rangeOf(plant, field)
+  if (!range || (value >= range.low && value <= range.high)) return ''
+  return `${EDGE_NAMES[field]} ${value} mm is outside ${range.low}–${range.high} mm.`
+}
 
 // "250 mm is outside Plant 1's range (0–200 mm)." or '' when it is inside.
 const outsideZone = (plant, value) => {
@@ -594,7 +621,7 @@ export function PlantsPanel({
                     {draft.watering_mode === 'point' && (
                       <div className="position-fields">
                         <label>
-                          Watering position (mm){zoneSuffix(plant)}
+                          Watering position (mm){rangeSuffix(plant)}
                           <input
                             type="number"
                             step="1"
@@ -618,13 +645,13 @@ export function PlantsPanel({
                     {draft.watering_mode === 'sweep' && (
                       <div className="position-fields">
                         <label>
-                          Left edge (mm){zoneSuffix(plant)}
+                          Left edge (mm){rangeSuffix(plant, 'left')}
                           <input
                             type="number"
                             step="1"
                             value={draft.sweep_min_mm}
-                            min={zoneOf(plant)?.low}
-                            max={zoneOf(plant)?.high}
+                            min={rangeOf(plant, 'left')?.low}
+                            max={rangeOf(plant, 'left')?.high}
                             onChange={(event) =>
                               updateDraft(plant, 'sweep_min_mm', event.target.value)
                             }
@@ -637,13 +664,13 @@ export function PlantsPanel({
                           </button>
                         </label>
                         <label>
-                          Right edge (mm){zoneSuffix(plant)}
+                          Right edge (mm){rangeSuffix(plant, 'right')}
                           <input
                             type="number"
                             step="1"
                             value={draft.sweep_max_mm}
-                            min={zoneOf(plant)?.low}
-                            max={zoneOf(plant)?.high}
+                            min={rangeOf(plant, 'right')?.low}
+                            max={rangeOf(plant, 'right')?.high}
                             onChange={(event) =>
                               updateDraft(plant, 'sweep_max_mm', event.target.value)
                             }
