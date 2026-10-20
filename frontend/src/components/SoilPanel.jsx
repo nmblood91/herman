@@ -367,14 +367,6 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               />
             </label>
           </div>
-          <p className="field-hint">
-            A pot using this soil profile is watered automatically once it has
-            a field capacity reading: its moisture is read as 100% at field
-            capacity and 0% at wilting point. Leave wilting point blank and it
-            is estimated for each pot from its field capacity and the
-            percentages below; fill it in only if you have measured it. Every
-            pot using this soil profile reads against these at once.
-          </p>
         </div>
 
         <div className="field-row">
@@ -400,12 +392,6 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               />
             </label>
           </div>
-          <p className="field-hint">
-            The published water contents for this mix (see SOIL_PROFILES.md).
-            They place wilting point between the probe&apos;s air reading and
-            its field capacity reading, so without a wilting point reading
-            both are needed. Fill in both or neither.
-          </p>
         </div>
 
         {/* Measured, not typed -- so it lives beside the picker rather than
@@ -529,23 +515,6 @@ export function SoilPanel({ soils, plants, onRefresh }) {
             )}
           </div>
           {message && <p className="field-hint">{message}</p>}
-        </div>
-
-        <div className="field-row">
-          <p className="field-hint">
-            <strong>Field capacity:</strong> the built-in soil profiles come
-            with a default reading. To measure your own, soak a pot of the mix
-            through, let it drain 24 hours, pick the probe sitting in that pot,
-            and measure. Re-measure after a repot: mixes lose capacity as they
-            age and compact.
-          </p>
-          <p className="field-hint">
-            <strong>Wilting point (optional):</strong> no plant needs to wilt.
-            Weigh the pot at field capacity, work out how much water it holds
-            at wilting point from the mix&apos;s percentages and the pot&apos;s
-            volume, and let it dry until it has lost the rest. Then measure,
-            with the same probe.
-          </p>
         </div>
       </div>
     </section>

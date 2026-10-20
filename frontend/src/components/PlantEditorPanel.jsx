@@ -267,10 +267,6 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
               </select>
             </label>
           </div>
-          <p className="field-hint">
-            Loading this plant profile onto a pot switches the pot to its
-            preferred soil profile.
-          </p>
 
           <label>
             Water at: {form.target_vwc}% VWC ({waterLevelFor(form.target_vwc)})
@@ -283,12 +279,7 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
               onChange={(event) => update('target_vwc', event.target.value)}
             />
           </label>
-          <p className="field-hint">
-            The pot is watered once its soil dries to this moisture. Ultra Dry
-            up to 10%, Very Dry 11–15%, Dry 16–20%, Medium-Dry 21–24%, Medium
-            25–30%, Wet-Medium 31–34%, Wet 35–40%, Very Wet 41–45%, Ultra Wet
-            over 45%.
-          </p>
+          <p className="field-hint">Watered once the soil dries to this.</p>
           <label>
             Watering Volume (mL)
             <input

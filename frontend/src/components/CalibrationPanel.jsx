@@ -148,12 +148,7 @@ export function CalibrationPanel() {
 
       <div className="general-settings-form">
         <p className="field-hint">
-          Measures each probe&apos;s reading in open air, its 0% water
-          content point. A pot whose soil profile has no wilting point reading
-          estimates one up from it, so calibrate before relying on those. It is
-          also a health check: a probe whose air reading is far from the
-          others, or that reads nothing, needs looking at. Every field capacity
-          and wilting point measured with it has to read above it.
+          Each probe&apos;s reading in open air, its 0% point.
         </p>
 
         <div className="field-row">
@@ -169,17 +164,6 @@ export function CalibrationPanel() {
             All sensors out of any soil, clean and dry, sitting in open air.
             Samples every sensor for {SAMPLE_SECONDS} seconds and takes the
             median. Watering is blocked while it runs.
-          </p>
-          <p className="field-hint warning">
-            These boards are not waterproof. Be sure to have heat shrinked the
-            sensor from the white and above, covering all electrical components
-            and connections.
-          </p>
-          <p className="field-hint">
-            The moisture scale itself is not here. A pot reads 100% at its soil
-            profile&apos;s <strong>field capacity</strong> reading and 0% at its
-            <strong> wilting point</strong> — properties of the soil rather
-            than the probe — so they are set in the Soil Profile Editor.
           </p>
         </div>
 
@@ -226,10 +210,7 @@ export function CalibrationPanel() {
           <button type="button" disabled={Boolean(busy)} onClick={reset}>
             Reset dry calibration
           </button>
-          <p className="field-hint">
-            Returns every probe&apos;s air reading to MOISTURE_RAW_DRY. The soil
-            profiles&apos; readings are not affected.
-          </p>
+          <p className="field-hint">Soil profiles are not affected.</p>
         </div>
       </div>
     </section>

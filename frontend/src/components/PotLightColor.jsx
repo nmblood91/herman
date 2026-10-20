@@ -73,10 +73,6 @@ export function PotLightColor({ plant }) {
           onChange={(event) => change(event.target.value)}
         />
       </label>
-      <p className="field-hint">
-        Shown during this pot&apos;s light hours, at its plant profile&apos;s
-        brightness. Applies as you change it.
-      </p>
       {error && <p className="field-hint warning">{error}</p>}
     </div>
   )

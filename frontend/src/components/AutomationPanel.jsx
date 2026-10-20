@@ -193,15 +193,7 @@ export function AutomationPanel({ overview, onRefresh }) {
               Water plants automatically
             </label>
             <p className="field-hint">
-              Lets the planter water on its own whenever a plant sits below its
-              moisture target. Switched off it still reads the sensors and keeps
-              the history — watering only happens when you press a button.
-            </p>
-            <p className="field-hint">
-              Before turning this on, measure the pump's flow rate under
-              Calibration. A dose is a run time worked out from that number, so
-              if it is wrong every automatic watering is wrong by the same
-              factor and still reports success.
+              Measure the pump&apos;s flow rate under Calibration first.
             </p>
             {autoMsg && <p className="field-hint warning">{autoMsg}</p>}
           </div>
@@ -222,11 +214,8 @@ export function AutomationPanel({ overview, onRefresh }) {
 
           {watering?.soak_check_enabled && (
             <p className="field-hint">
-              After each watering, the pot&apos;s moisture probe has to show the
-              water arriving within {watering.cooldown_minutes} minutes. Until it
-              does, no pot is watered automatically, so an empty reservoir cannot
-              run the pump dry one pot after another. Two waterings in a row that
-              never show up pause automatic watering until you press Resume.
+              Waits up to {watering.cooldown_minutes} min for each watering to
+              show on the pot&apos;s probe before watering again.
             </p>
           )}
         </div>
@@ -247,12 +236,6 @@ export function AutomationPanel({ overview, onRefresh }) {
               />
               Home after startup
             </label>
-            <p className="field-hint">
-              Homes the arm shortly after the planter comes up, and keeps trying
-              once a minute until it succeeds. Until it homes, the board does not
-              know where the arm is, so watering is refused outright. Waits for
-              quiet hours or a snooze to end first.
-            </p>
             {startupLine(startupHome) && (
               <p className={`field-hint${startupHome?.phase === 'retrying' ? ' warning' : ''}`}>
                 {startupLine(startupHome)}
@@ -269,19 +252,6 @@ export function AutomationPanel({ overview, onRefresh }) {
               />
               Hourly auto-patrol
             </label>
-            <p className="field-hint">
-              Every hour, on the hour, the arm homes and then visits each plant
-              in turn, moving the way that plant is watered: a pause over a point
-              pot, a few passes across a sweep. Homing is the point: nothing
-              tells the planter the arm has been nudged or a belt has slipped, so
-              every plant position stays slightly wrong until the next home. The
-              patrol shows you where it now thinks each plant is.
-            </p>
-            <p className="field-hint">
-              Skipped during quiet hours and a snooze, since the arm is the other
-              noisy part. If a watering is running, it waits a few minutes for it
-              to finish.
-            </p>
             {patrolLine(patrol) && (
               <p className={`field-hint${patrol?.last?.ok === false ? ' warning' : ''}`}>
                 {patrolLine(patrol)}
@@ -322,17 +292,7 @@ export function AutomationPanel({ overview, onRefresh }) {
               </label>
               <button type="button" onClick={saveQuiet}>Save quiet hours</button>
             </div>
-            <p className="field-hint">
-              Holds off <em>automatic</em> watering overnight — the pump and the
-              gantry are the only loud parts. A window that ends before it starts
-              runs through midnight. Watering you start yourself is never blocked,
-              and a plant that comes due during the window is watered as soon as
-              it ends rather than skipped.
-            </p>
-            <p className="field-hint">
-              To hold watering off right now rather than on a schedule, use the
-              snooze under Controls.
-            </p>
+            <p className="field-hint">Watering you start yourself is never blocked.</p>
             {quietMsg && <p className="field-hint warning">{quietMsg}</p>}
           </div>
         </div>

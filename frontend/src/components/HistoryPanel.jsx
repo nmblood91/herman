@@ -192,11 +192,9 @@ export function HistoryPanel() {
             yLabel={moisture ? 'Moisture %' : fahrenheit ? 'Temp °F' : 'Temp °C'}
           />
           <p className="field-hint">
-            Dashed vertical lines mark waterings
-            {history.waterings?.length
-              ? ` (${history.waterings.length} in this range)`
-              : ' (none in this range)'}
-            . Gaps in a line mean that sensor could not be read.
+            {history.waterings?.length === 1
+              ? '1 watering in this range.'
+              : `${history.waterings?.length || 'No'} waterings in this range.`}
           </p>
           {missedCount > 0 && (
             <p className="field-hint warning">

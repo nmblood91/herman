@@ -83,11 +83,7 @@ export function ClockPanel() {
             </button>
             <span className="position-readout">Herman&apos;s clock: {planterClock}</span>
           </div>
-          <p className="field-hint">
-            The planter runs its lighting schedule on its own clock, so if this
-            is not your local time the lights come on at the wrong hours.
-            Syncing sets it to {browserZone} — the time zone this device is in.
-          </p>
+          <p className="field-hint">The lights follow this clock.</p>
           {clock && !clock.ntp_synchronised && (
             <p className="field-hint warning">
               The clock has not reached a time server yet, so it may be wrong

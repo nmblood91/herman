@@ -112,10 +112,6 @@ export function LedStripPanel({ overview }) {
               ))}
             </select>
           </label>
-          <p className="field-hint">
-            Sets the signal timing for your strip, and how many pixels it has:
-            the strip is always 1 m at 60 LEDs a metre.
-          </p>
           <PixelCount
             chip={chip}
             option={chipOptions.find((option) => option.name === chip)}
@@ -135,11 +131,7 @@ export function LedStripPanel({ overview }) {
               ))}
             </select>
           </label>
-          <p className="field-hint">
-            If red and green look swapped on the strip, try a different order.
-            Choosing a strip type resets this to that chip's usual order, so set
-            the type first.
-          </p>
+          <p className="field-hint">Set the strip type first; it resets this.</p>
         </div>
 
         <button type="button" className="primary group-save-button" onClick={save}>

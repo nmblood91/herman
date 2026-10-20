@@ -72,9 +72,7 @@ export function HostnamePanel() {
       <div className="general-settings-form">
         <div className="field-row">
           <p className="field-hint">
-            Open the planter at <strong>http://{current ?? '…'}.local</strong>. Only
-            worth changing with more than one planter on the same network, so
-            each has an address of its own.
+            Open the planter at <strong>http://{current ?? '…'}.local</strong>.
           </p>
           <div className="slider-row">
             <input

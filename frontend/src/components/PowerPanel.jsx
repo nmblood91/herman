@@ -71,11 +71,7 @@ export function PowerPanel() {
             {holdButton(shutdownHold, 'Hold to shut down', 'Shutting down…')}
             {holdButton(rebootHold, 'Hold to reboot', 'Rebooting…')}
           </div>
-          <p className="field-hint">
-            Shut down before unplugging. Pulling the power on a running Pi can
-            corrupt its SD card. Both are refused while the planter is watering
-            or moving.
-          </p>
+          <p className="field-hint">Shut down before unplugging.</p>
           {message && <p className="field-hint warning">{message}</p>}
         </div>
       </div>

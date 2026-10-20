@@ -306,11 +306,10 @@ export function ControlsPanel({
           <button className="primary" onClick={onHome}>Home Gantry</button>
         </div>
 
-        {!motionReady && (
+        {boardDown && (
           <p className="field-hint warning">
-            {boardDown
-              ? 'The motion board is not responding, so the gantry cannot be moved. Check the USB lead to the SKR.'
-              : 'Home the gantry first. Until it has a reference, Klipper refuses every move.'}
+            The motion board is not responding, so the gantry cannot be moved.
+            Check the USB lead to the SKR.
           </p>
         )}
 
@@ -354,10 +353,7 @@ export function ControlsPanel({
               <button disabled>No routines loaded</button>
             )}
           </div>
-          <p className="field-hint">
-            Homes first if the arm has lost its place, then runs the routine and
-            parks back at 0. {danceStatus}
-          </p>
+          {danceStatus && <p className="field-hint">{danceStatus}</p>}
           {!dances.length && <p className="field-hint warning">{WAITING_HINT}</p>}
         </div>
 
@@ -398,11 +394,6 @@ export function ControlsPanel({
               <button disabled>No plants loaded</button>
             )}
           </div>
-          <p className="field-hint">
-            Moves to the plant and doses its saved volume. Takes about a minute;
-            watch the status bar at the top.
-            {!motionReady && ' Held until the gantry is homed, since a dose starts with a move.'}
-          </p>
         </div>
       </section>
 
@@ -426,11 +417,7 @@ export function ControlsPanel({
               colour, at the brightness in its plant profile, so one slider for
               the whole strip would do nothing there. */}
           {ledMode === 'schedule' && (
-            <p className="field-hint">
-              Each pot lights during its own hours. Its colour is set on its card
-              under Plants and Soil; its hours and brightness come from its plant
-              profile.
-            </p>
+            <p className="field-hint">Each pot&apos;s colour is set on its card.</p>
           )}
 
           {ledMode === 'manual' && (
@@ -516,12 +503,6 @@ export function ControlsPanel({
             </div>
           )}
 
-          <p className="field-hint">
-            Lighting applies as you change it. Strip type and colour order are
-            under Calibration — they are facts about the strip you soldered on,
-            not things you change day to day.
-          </p>
-
           {lighting && lighting.spi_ready === false && (
             <p className="field-hint warning">
               LED output unavailable, SPI did not open
@@ -551,11 +532,12 @@ export function ControlsPanel({
                 </button>
               </div>
             )}
-            <p className="field-hint">
-              {quiet?.suppressed_because
-                ? `Automatic watering is held: ${quiet.suppressed_because}. A plant that comes due waits rather than being skipped.`
-                : 'Holds off automatic watering for a while. The pump and the gantry are the noisy parts, and a dose you start yourself still runs.'}
-            </p>
+            {quiet?.suppressed_because && (
+              <p className="field-hint">
+                Automatic watering is held: {quiet.suppressed_because}. A plant
+                that comes due waits rather than being skipped.
+              </p>
+            )}
             {quietStatus && <p className="field-hint warning">{quietStatus}</p>}
           </div>
         </div>

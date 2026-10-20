@@ -94,11 +94,7 @@ export function LibraryBackupPanel({ onRefresh }) {
 
       <div className="general-settings-form">
         <div className="field-row">
-          <p className="field-hint">
-            Saves every soil profile and plant profile to a file on this
-            device, measured field capacity readings included. Keep it
-            somewhere safe before reflashing the Pi.
-          </p>
+          <p className="field-hint">Keep a copy before reflashing the Pi.</p>
           <div className="slider-row">
             <button type="button" disabled={Boolean(busy)} onClick={download}>
               {busy === 'export' ? 'Saving…' : 'Download backup'}

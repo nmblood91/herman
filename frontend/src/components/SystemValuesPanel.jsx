@@ -56,13 +56,7 @@ export function SystemValuesPanel() {
             Restore to Defaults
           </button>
           <p className="field-hint">
-            Puts the planter back as it was freshly installed. Every pot returns
-            to its default name, watering position, sweep, soil and field
-            capacity, and every setting returns to the planter&apos;s .env file —
-            including the pump flow rate and the probes&apos; dry calibration.
-          </p>
-          <p className="field-hint">
-            Kept: the plant profile and soil libraries, and the history.
+            Kept: plant profiles, soil profiles and history.
           </p>
           {message && <p className="field-hint warning">{message}</p>}
         </div>

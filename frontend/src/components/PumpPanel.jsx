@@ -177,13 +177,6 @@ export function PumpPanel() {
           >
             Save flow rate
           </button>
-          {/* Nothing to say once the last run is long enough to divide by. */}
-          {!lastRun && (
-            <p className="field-hint warning">
-              Run the pump to calibrate flow rate. A flow rate is the volume of water divided by the
-              time it took to deliver it.
-            </p>
-          )}
           {lastRun && !runLongEnough && (
             <p className="field-hint warning">
               The last run was only {lastRun.seconds}s — too short to weigh accurately. Run the full{' '}

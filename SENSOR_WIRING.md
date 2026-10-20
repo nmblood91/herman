@@ -143,7 +143,9 @@ reading.
 > is the same mistake as using a glass of water, just smaller.
 
 > **Never put these boards in water.** They are not waterproof, and submerging
-> the PCB or the connector end destroys the sensor.
+> the PCB or the connector end destroys the sensor. Before a probe goes into
+> soil, heat-shrink it from the white line up, so every component and the
+> connection are covered.
 
 Results are written to `data/state.json`, which is gitignored and survives both
 restarts and `git pull`. Air readings are stored under `moisture_calibration`

@@ -101,14 +101,10 @@ export function HomeSwitchPanel() {
             </p>
           )}
 
-          {endstop?.ok && (
+          {endstop?.ok && endstop.homed === false && (
             <p className="field-hint">
-              Wired normally closed, so a closed contact reads <em>open</em> and
-              an open circuit reads <em>triggered</em>. That is why an unplugged
-              switch makes homing refuse rather than drive into the end of the
-              rail.
-              {endstop.homed === false &&
-                ' The axis is not homed, so the position is a counter rather than a measurement.'}
+              The axis is not homed, so the position is a counter rather than a
+              measurement.
             </p>
           )}
         </div>
