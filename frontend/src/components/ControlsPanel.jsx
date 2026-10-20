@@ -49,6 +49,12 @@ const describeCycle = (speed) => {
   return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)} s a cycle`
 }
 
+// A zone's manual brightness and colour as the controls hold them.
+const lookFrom = (zone) => ({
+  brightness: zone.manual_brightness ?? 75,
+  color: toHexColor(zone.manual_color),
+})
+
 const toHexColor = (value) => {
   if (Array.isArray(value)) {
     const [r, g, b] = value
@@ -103,8 +109,15 @@ export function ControlsPanel({
   // the two never carries one zone's look onto the whole strip.
   const [manualScope, setManualScope] = useState('all')
   const [zoneId, setZoneId] = useState('')
-  const [zoneBrightness, setZoneBrightness] = useState(75)
-  const [zoneColor, setZoneColor] = useState('#ffffff')
+  // Every zone's own look, held here rather than read from the overview when a
+  // zone is picked: the overview is only as fresh as the last dashboard load,
+  // and editing the lights does not trigger one, so a zone changed and then
+  // revisited used to come back showing its old values.
+  const [zoneLooks, setZoneLooks] = useState({})
+  // Zones with an edit not yet confirmed by the planter. Their local look is
+  // kept through a refresh, which could otherwise land between the edit and
+  // its save and put the old values back.
+  const [unsavedZones, setUnsavedZones] = useState({})
   const [lightingError, setLightingError] = useState('')
   const [quietStatus, setQuietStatus] = useState('')
   const [dances, setDances] = useState([])
@@ -121,11 +134,19 @@ export function ControlsPanel({
     setRainbowSpeed(lighting?.rainbow_speed ?? rainbowSpeed)
     setColor(toHexColor(lighting?.color || color))
     setManualScope(lighting?.manual_scope ?? manualScope)
-    const synced = (lighting?.zones ?? []).find((zone) => zone.plant_id === zoneId) ?? lighting?.zones?.[0]
-    if (synced) {
-      setZoneId(synced.plant_id)
-      setZoneBrightness(synced.manual_brightness)
-      setZoneColor(toHexColor(synced.manual_color))
+    const served = lighting?.zones ?? []
+    if (served.length) {
+      setZoneLooks((current) =>
+        Object.fromEntries(
+          served.map((zone) => [
+            zone.plant_id,
+            unsavedZones[zone.plant_id] && current[zone.plant_id]
+              ? current[zone.plant_id]
+              : lookFrom(zone),
+          ]),
+        ),
+      )
+      if (!served.some((zone) => zone.plant_id === zoneId)) setZoneId(served[0].plant_id)
     }
   }
 
@@ -176,19 +197,27 @@ export function ControlsPanel({
     post('/lights/manual-scope', { scope: value })
   }
 
-  const changeZone = (plantId) => {
-    const zone = zones.find((entry) => entry.plant_id === plantId)
-    setZoneId(plantId)
-    if (zone) {
-      setZoneBrightness(zone.manual_brightness)
-      setZoneColor(toHexColor(zone.manual_color))
-    }
+  const zoneLook = zoneLooks[zoneId] ?? { brightness: 75, color: '#ffffff' }
+
+  // Shows the edit at once, and marks the zone unsaved until the planter has
+  // it. Cleared only if no newer edit to the same zone is waiting behind it.
+  const editZone = (field, value, body) => {
+    const id = zoneId
+    const key = `zone-${field}-${id}`
+    setZoneLooks((current) => ({ ...current, [id]: { ...(current[id] ?? zoneLook), [field]: value } }))
+    setUnsavedZones((current) => ({ ...current, [id]: true }))
+    clearTimeout(timers.current[key])
+    timers.current[key] = setTimeout(async () => {
+      delete timers.current[key]
+      await post(`/lights/zones/${id}`, body)
+      const waiting = Object.keys(timers.current).some((name) => name.endsWith(`-${id}`))
+      if (!waiting) setUnsavedZones((current) => ({ ...current, [id]: false }))
+    }, APPLY_DEBOUNCE_MS)
   }
 
   const changeBrightness = (value) => {
     if (byZone) {
-      setZoneBrightness(value)
-      postDebounced(`zone-brightness-${zoneId}`, `/lights/zones/${zoneId}`, { brightness: Number(value) })
+      editZone('brightness', value, { brightness: Number(value) })
       return
     }
     setBrightness(value)
@@ -202,8 +231,7 @@ export function ControlsPanel({
 
   const changeColor = (value) => {
     if (byZone) {
-      setZoneColor(value)
-      postDebounced(`zone-color-${zoneId}`, `/lights/zones/${zoneId}`, parseHexColor(value))
+      editZone('color', value, parseHexColor(value))
       return
     }
     setColor(value)
@@ -422,7 +450,7 @@ export function ControlsPanel({
                 <select
                   value={zoneId}
                   disabled={zones.length === 0}
-                  onChange={(event) => changeZone(event.target.value)}
+                  onChange={(event) => setZoneId(event.target.value)}
                 >
                   {zones.length === 0 && <option value="">Waiting on the planter…</option>}
                   {zones.map((zone) => (
@@ -444,11 +472,11 @@ export function ControlsPanel({
                     type="range"
                     min="0"
                     max="100"
-                    value={byZone ? zoneBrightness : brightness}
+                    value={byZone ? zoneLook.brightness : brightness}
                     disabled={byZone && !zoneId}
                     onChange={(event) => changeBrightness(Number(event.target.value))}
                   />
-                  <span>{byZone ? zoneBrightness : brightness}%</span>
+                  <span>{byZone ? zoneLook.brightness : brightness}%</span>
                 </div>
               </label>
             </div>
@@ -478,7 +506,7 @@ export function ControlsPanel({
                 LED color
                 <input
                   type="color"
-                  value={byZone ? zoneColor : color}
+                  value={byZone ? zoneLook.color : color}
                   disabled={byZone && !zoneId}
                   onChange={(event) => changeColor(event.target.value)}
                 />
