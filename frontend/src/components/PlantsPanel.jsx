@@ -117,6 +117,10 @@ const describeZone = (plant) => {
   return zone ? `${zone.low}–${zone.high} mm` : ''
 }
 
+// Appended to each rail field's title, so the range it accepts sits right
+// where the number goes in. Nothing when the planter has not said.
+const zoneSuffix = (plant) => (describeZone(plant) ? `: accepts ${describeZone(plant)}` : '')
+
 // "250 mm is outside Plant 1's range (0–200 mm)." or '' when it is inside.
 const outsideZone = (plant, value) => {
   const zone = zoneOf(plant)
@@ -584,18 +588,13 @@ export function PlantsPanel({
                         <option value="sweep">Sweep Range</option>
                       </select>
                     </label>
-                    {describeZone(plant) && (
-                      <p className="field-hint">
-                        This plant waters between {describeZone(plant)} on the rail.
-                      </p>
-                    )}
 
                     {/* Same container as the sweep edges, so the field and its
                         button are laid out the same in either mode. */}
                     {draft.watering_mode === 'point' && (
                       <div className="position-fields">
                         <label>
-                          Watering location (mm)
+                          Watering location (mm){zoneSuffix(plant)}
                           <input
                             type="number"
                             step="1"
@@ -619,7 +618,7 @@ export function PlantsPanel({
                     {draft.watering_mode === 'sweep' && (
                       <div className="position-fields">
                         <label>
-                          Left edge (mm)
+                          Left edge (mm){zoneSuffix(plant)}
                           <input
                             type="number"
                             step="1"
@@ -638,7 +637,7 @@ export function PlantsPanel({
                           </button>
                         </label>
                         <label>
-                          Right edge (mm)
+                          Right edge (mm){zoneSuffix(plant)}
                           <input
                             type="number"
                             step="1"
