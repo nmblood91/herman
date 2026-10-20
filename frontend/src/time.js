@@ -43,19 +43,26 @@ export const LIGHT_LEVELS = [
 ]
 
 // "75% (High)": the nearest named level, for describing a brightness.
-export const describeBrightness = (brightness) => {
+// "75% (High)", or "75% brightness (High)" with the noun, for a sentence
+// where a bare percentage would not say what it is a percentage of.
+export const describeBrightness = (brightness, noun = '') => {
   const value = Number(brightness)
   if (!Number.isFinite(value)) return ''
   const [name] = LIGHT_LEVELS.reduce((best, level) =>
     Math.abs(level[1] - value) < Math.abs(best[1] - value) ? level : best,
   )
-  return `${value}% (${name})`
+  return `${value}%${noun ? ` ${noun}` : ''} (${name})`
 }
 
-// "07:00–22:00 (15 h)", or "on all day" / "off" at the extremes.
-export const describeLightWindow = (start, hours) => {
+// The words after "Lights": "on 7:00 AM to 6:00 PM (11 h) at 75% brightness
+// (High)", "on all day at ...", or just "off", which has no brightness to give.
+export const describeLighting = (start, hours, brightness) => {
   const length = Number(hours)
-  if (length >= 24) return 'on all day'
   if (length <= 0) return 'off'
-  return `${formatClock(start)}–${formatClock(lightStop(start, length))} (${length} h)`
+  const level = describeBrightness(brightness, 'brightness')
+  const when =
+    length >= 24
+      ? 'on all day'
+      : `on ${formatClock(start)} to ${formatClock(lightStop(start, length))} (${length} h)`
+  return level ? `${when} at ${level}` : when
 }

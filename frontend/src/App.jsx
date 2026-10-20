@@ -20,7 +20,7 @@ import { LedStripPanel } from './components/LedStripPanel'
 import { LogsPanel } from './components/LogsPanel'
 import './App.css'
 import { API_BASE } from './api'
-import { describeBrightness, describeLightWindow } from './time'
+import { describeLighting } from './time'
 
 const fetchJson = async (path, options = {}) => {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -241,8 +241,7 @@ function App() {
       setStatus(
         `Loaded plant profile ${result.name}: waters ${result.watering_volume_ml} mL ` +
           `at ${result.target_vwc}% VWC, lights ` +
-          `${describeLightWindow(result.light_start_time, result.light_hours)} at ` +
-          `${describeBrightness(result.light_brightness)}. Soil profile: ` +
+          `${describeLighting(result.light_start_time, result.light_hours, result.light_brightness)}. Soil profile: ` +
           `${result.soil || 'not set'}. ` +
           (result.soil_note ? `${result.soil_note} ` : '') +
           `The pot keeps its location (${result.position_mm} mm).`,

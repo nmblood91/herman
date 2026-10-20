@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { describeBrightness, describeLightWindow } from '../time'
+import { describeLighting } from '../time'
 import { cardTitle } from '../potLabel'
 import { groupByCategory } from '../profileGroups'
 import { PotLightColor } from './PotLightColor'
@@ -432,8 +432,7 @@ export function PlantsPanel({
                       <strong>{plant.name}</strong> — waters{' '}
                       {plant.watering_volume_ml} mL at {plant.target_vwc}% VWC
                       {plant.water_level ? ` (${plant.water_level})` : ''}. Lights{' '}
-                      {describeLightWindow(plant.light_start_time, plant.light_hours)}{' '}
-                      at {describeBrightness(plant.light_brightness)}.
+                      {describeLighting(plant.light_start_time, plant.light_hours, plant.light_brightness)}.
                       {plant.preferred_soil ? ` Prefers ${plant.preferred_soil}.` : ''}
                     </p>
                   ) : (
