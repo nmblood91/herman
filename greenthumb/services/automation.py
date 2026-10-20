@@ -731,7 +731,7 @@ class GreenThumbAutomation:
         # millimetre, and round() raises on both with a message nobody wants.
         raw = float(position_mm)
         if not math.isfinite(raw):
-            raise ValueError("The watering location must be a number")
+            raise ValueError("The watering position must be a number")
         position = round(raw)
         problem = self._outside_zone(plant, position)
         if problem:

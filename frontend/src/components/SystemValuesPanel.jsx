@@ -13,7 +13,7 @@ export function SystemValuesPanel() {
     // and the flow rate and dry points without measuring them again.
     const ok = window.confirm(
       'Restore the planter to its defaults, as if freshly installed?\n\n' +
-        'Every pot goes back to its default: name, watering location, sweep, ' +
+        'Every pot goes back to its default: name, watering position, sweep, ' +
         'soil profile. Every setting goes back too, including the ' +
         "pump flow rate and the probes' dry calibration.\n\n" +
         'Kept: the plant profile and soil libraries, and the history.',
@@ -57,7 +57,7 @@ export function SystemValuesPanel() {
           </button>
           <p className="field-hint">
             Puts the planter back as it was freshly installed. Every pot returns
-            to its default name, watering location, sweep, soil and field
+            to its default name, watering position, sweep, soil and field
             capacity, and every setting returns to the planter&apos;s .env file —
             including the pump flow rate and the probes&apos; dry calibration.
           </p>

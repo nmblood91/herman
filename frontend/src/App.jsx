@@ -237,14 +237,14 @@ function App() {
         body: JSON.stringify({ name }),
       })
       // Says what the soil profile became, because loading a plant profile
-      // changes it, and what was left alone: the pot's location.
+      // changes it, and what was left alone: the pot's position.
       setStatus(
         `Loaded plant profile ${result.name}: waters ${result.watering_volume_ml} mL ` +
           `at ${result.target_vwc}% VWC, lights ` +
           `${describeLighting(result.light_start_time, result.light_hours, result.light_brightness)}. Soil profile: ` +
           `${result.soil || 'not set'}. ` +
           (result.soil_note ? `${result.soil_note} ` : '') +
-          `The pot keeps its location (${result.position_mm} mm).`,
+          `The pot keeps its position (${result.position_mm} mm).`,
       )
       await loadDashboard()
     } catch (error) {
@@ -256,7 +256,7 @@ function App() {
     try {
       const result = await fetchJson(`/plants/${plantId}/profile/clear`, { method: 'POST' })
       setStatus(
-        `Cleared the plant profile. ${result.name} keeps its location and soil.`,
+        `Cleared the plant profile. ${result.name} keeps its position and soil.`,
       )
       await loadDashboard()
     } catch (error) {

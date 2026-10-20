@@ -176,7 +176,7 @@ and nothing else — saving used to also write a profile as a side effect, so yo
 could not store a rail coordinate without saving a plant.
 
 Two kinds of edit are deliberately held back rather than sent: a blank watering
-location, because an empty box reads as 0 mm and would park the nozzle at the
+position, because an empty box reads as 0 mm and would park the nozzle at the
 left end of the rail; and a sweep whose span is not yet wide enough to be one,
 because the API refuses it and the card is usually still being filled in. Both
 say so on the card.
@@ -187,7 +187,7 @@ why, which is the part nobody remembers a season later. The soil library's
 recipes are carried this way.
 
 **Nothing describing the pot's placement is part of a plant profile** -- not
-the watering location, the watering mode or its sweep bounds. If the location
+the watering position, the watering mode or its sweep bounds. If the position
 travelled, loading one plant onto a second pot would give both the same rail
 coordinate and watering one would dribble into the other.
 

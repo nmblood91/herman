@@ -151,7 +151,7 @@ Only then does the pump run.
 Each pot chooses one, on its card under **Watering mode**.
 
 **Fixed Position** is the original behaviour: the arm goes to the pot's
-watering location and the whole dose goes in there.
+watering position and the whole dose goes in there.
 
 **Sweep Range** walks the nozzle between a left edge and a right edge
 for as long as the pump runs, so the same volume arrives spread across the pot
@@ -162,7 +162,7 @@ reading barely moves after watering, and the top of the pot is dry a centimetre
 away from the wet patch.
 
 Set the edges by jogging the arm to each side of the pot and pressing the
-button next to each field, the same way you set a watering location. The span
+button next to each field, the same way you set a watering position. The span
 needs to be at least 10 mm; anything narrower is a spot with extra steps and is
 refused rather than quietly rounded.
 
@@ -173,7 +173,7 @@ than the same dose at one spot; it changes *where* the water lands.
 
 ### Each plant has its own stretch of rail
 
-A watering location and both sweep edges have to sit inside the plant's zone.
+A watering position and both sweep edges have to sit inside the plant's zone.
 A new planter starts each plant watering at the middle of its zone, with a
 sweep span 50 mm either side of that middle already filled in, so switching a
 pot to Sweep Range works straight away. Both are starting points: set them

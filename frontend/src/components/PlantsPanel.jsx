@@ -74,7 +74,7 @@ const reasonToHold = (draft, plant) => {
   // without this, clearing the box to retype would park the watering spot
   // there the moment the debounce fired.
   if (String(draft.position_mm).trim() === '' || !Number.isFinite(Number(draft.position_mm))) {
-    return 'Watering location is blank, so nothing has been saved.'
+    return 'Watering position is blank, so nothing has been saved.'
   }
   // Positions are whole millimetres. Held rather than rounded quietly, so the
   // card never saves a different number from the one on screen.
@@ -88,7 +88,7 @@ const reasonToHold = (draft, plant) => {
   // The planter refuses these too. Held here so a half-typed number reads as
   // "not yet" under the field rather than a red failure in the status bar.
   const out = outsideZone(plant, Number(draft.position_mm))
-  if (out) return `Watering location ${out} Not saved.`
+  if (out) return `Watering position ${out} Not saved.`
   if (draft.watering_mode === 'sweep') {
     const summary = describeSweep(draft)
     // The API refuses a sweep whose span is too narrow to be one, so sending
@@ -594,7 +594,7 @@ export function PlantsPanel({
                     {draft.watering_mode === 'point' && (
                       <div className="position-fields">
                         <label>
-                          Watering location (mm){zoneSuffix(plant)}
+                          Watering position (mm){zoneSuffix(plant)}
                           <input
                             type="number"
                             step="1"
@@ -606,7 +606,7 @@ export function PlantsPanel({
                             }
                           />
                           {/* No field argument: this one captures the watering
-                              location, and that is also the only field whose
+                              position, and that is also the only field whose
                               capture checks for a neighbouring pot. */}
                           <button type="button" onClick={() => capturePosition(plant)}>
                             Use current position
