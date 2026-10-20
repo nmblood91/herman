@@ -165,4 +165,14 @@ assert by_id["plant_3"]["manual_color"] == [9, 9, 9] and by_id["plant_3"]["manua
 assert lighting["manual_scope"] == "all"
 print("ok: the overview lists every zone's manual settings")
 
+# --- the shipped pixel count splits the reference strip evenly ---
+
+# LED_COUNT once shipped as 60 against a 20-pixel WS2811 strip, so the first
+# pot's zone (pixels 0-14) covered three quarters of the real strip and the
+# last two zones fell off its end.
+assert settings.led_count == 20, settings.led_count
+spans = [(plant.led_start_index, plant.led_end_index) for plant in auto.plants]
+assert spans == [(0, 4), (5, 9), (10, 14), (15, 19)], spans
+print("ok: the shipped 20 pixels give each of the four pots an equal quarter")
+
 print("\nall light zone checks passed")
