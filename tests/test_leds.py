@@ -10,6 +10,7 @@ from greenthumb.hardware.lighting import (
     FRAME_INTERVAL,
     SLOWEST_CYCLE_SECONDS,
     LedController,
+    Zone,
     rainbow_cycle_seconds,
 )
 from greenthumb.services.automation import within_window
@@ -152,44 +153,94 @@ for _ in range(frames - 1):
 assert abs(led._rainbow_offset % 256) < 1e-6 or abs(led._rainbow_offset - 256) < 1e-6, led._rainbow_offset
 print("ok: the slowest rainbow still advances, and takes its full two minutes a cycle")
 
-# schedule mode lights only the plants that are on
+# schedule mode lights only the plants that are on, each in its own colour
 led, strip = controller(count=60)
+GREEN, RED = (0, 255, 0), (255, 0, 0)
 led.set_mode("schedule")
-led.set_static_color((0, 255, 0))
-led.set_mode("schedule")  # set_static_color flips to manual, put it back
-led.set_brightness(100)
-led.set_plant_segments([(0, 4, True), (5, 9, False), (10, 14, True), (15, 19, False)])
+led.set_plant_segments([
+    Zone(0, 4, lit=True, brightness=100, color=GREEN),
+    Zone(5, 9, lit=False, brightness=100, color=GREEN),
+    Zone(10, 14, lit=True, brightness=100, color=RED),
+    Zone(15, 19, lit=False, brightness=100),
+])
 led._render()
 frame = strip.frames[-1]
-assert frame[0:5] == [(0, 255, 0)] * 5, frame[0:5]
+assert frame[0:5] == [GREEN] * 5, frame[0:5]
 assert frame[5:10] == [(0, 0, 0)] * 5, frame[5:10]
-assert frame[10:15] == [(0, 255, 0)] * 5
+assert frame[10:15] == [RED] * 5, frame[10:15]
 assert frame[15:20] == [(0, 0, 0)] * 5
-print("ok: schedule lights only the plants inside their window")
+print("ok: schedule lights only the plants inside their window, each in its own colour")
+
+# The regression: schedule used to light every pot in the colour last picked
+# for manual mode.
+led.set_static_color((0, 0, 255))
+led.set_mode("schedule")
+led.set_plant_segments([Zone(0, 4, lit=True, brightness=100)])
+led._render()
+assert strip.frames[-1][0:5] == [(255, 255, 255)] * 5, strip.frames[-1][0:5]
+print("ok: a manual colour no longer leaks into schedule, which defaults to white")
 
 # Each plant's stretch runs at that plant's own brightness, and the strip-wide
 # brightness does not scale it on top.
 led.set_brightness(10)
-led.set_plant_segments([(0, 4, True, 100), (5, 9, True, 50), (10, 14, False, 100), (15, 19, True, 0)])
+led.set_plant_segments([
+    Zone(0, 4, lit=True, brightness=100, color=GREEN),
+    Zone(5, 9, lit=True, brightness=50, color=GREEN),
+    Zone(10, 14, lit=False, brightness=100, color=GREEN),
+    Zone(15, 19, lit=True, brightness=0, color=GREEN),
+])
 led._render()
 frame = strip.frames[-1]
-assert frame[0:5] == [(0, 255, 0)] * 5, frame[0:5]
+assert frame[0:5] == [GREEN] * 5, frame[0:5]
 assert frame[5:10] == [(0, 127, 0)] * 5, frame[5:10]
 assert frame[10:15] == [(0, 0, 0)] * 5, "an unlit plant was drawn"
 assert frame[15:20] == [(0, 0, 0)] * 5, "a plant at 0% was drawn"
 print("ok: in schedule mode each plant is lit at its own brightness")
 
-# Outside schedule mode the strip-wide brightness still applies.
+# Manual, all zones: the strip-wide colour and brightness, and white at 75%
+# out of the box.
+led, strip = controller(count=60)
+led.set_mode("manual")
+assert led.manual_scope == "all"
+led._render()
+assert set(strip.frames[-1]) == {(191, 191, 191)}, set(strip.frames[-1])
 led.set_static_color((0, 200, 0))
 led.set_brightness(50)
 led._render()
-assert strip.frames[-1][0] == (0, 100, 0), strip.frames[-1][0]
-led.set_mode("schedule")
-led.set_brightness(100)
-print("ok: and the strip-wide brightness still sets manual mode")
+assert set(strip.frames[-1]) == {(0, 100, 0)}, set(strip.frames[-1])
+print("ok: manual for all zones fills the strip, white at 75% by default")
+
+# Manual, each zone separately: every pot its own colour and brightness, the
+# strip-wide pair ignored, and LEDs between zones dark.
+led.set_manual_scope("zones")
+led.set_plant_segments([
+    Zone(0, 4, manual_color=RED, manual_brightness=100),
+    Zone(5, 9),
+    Zone(12, 14, lit=True, color=GREEN, manual_color=(0, 0, 255), manual_brightness=0),
+])
+led._render()
+frame = strip.frames[-1]
+assert frame[0:5] == [RED] * 5, frame[0:5]
+assert frame[5:10] == [(191, 191, 191)] * 5, "an untouched zone is not white at 75%"
+assert frame[10:12] == [(0, 0, 0)] * 2, "LEDs between zones were lit"
+assert frame[12:15] == [(0, 0, 0)] * 3, "a zone at 0% was drawn, or its schedule colour leaked in"
+assert frame[15:] == [(0, 0, 0)] * 45
+print("ok: manual for separate zones lights each its own way and leaves the gaps dark")
+
+led.set_manual_scope("ALL")
+assert led.manual_scope == "all"
+for bad in ("some", "", None):
+    try:
+        led.set_manual_scope(bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted manual scope {bad!r}")
+print("ok: the manual scope is all or zones and nothing else")
 
 # segments beyond the strip must not blow up or wrap
-led.set_plant_segments([(18, 99, True)])
+led.set_mode("schedule")
+led.set_plant_segments([Zone(18, 99, lit=True)])
 led._render()
 assert len(strip.frames[-1]) == 60
 print("ok: an over-long segment is clipped to the strip")

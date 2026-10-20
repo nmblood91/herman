@@ -20,6 +20,7 @@ from greenthumb.config import settings
 from greenthumb.hardware.lighting import (
     DEFAULT_BRIGHTNESS,
     DEFAULT_COLOR,
+    DEFAULT_MANUAL_SCOPE,
     DEFAULT_MODE,
     DEFAULT_RAINBOW_SPEED,
     LedController,
@@ -75,6 +76,7 @@ def placement(plant):
         plant.sweep_max_mm, plant.soil, plant.preferred_soil, plant.target_vwc,
         plant.watering_volume_ml, plant.light_start_time,
         plant.light_hours, plant.light_brightness,
+        plant.light_color, plant.manual_color, plant.manual_brightness,
     )
 
 
@@ -102,6 +104,16 @@ auto.set_light_brightness(20)
 auto.set_light_rainbow_speed(10)
 assert build(path).leds.rainbow_speed == 10, "the rainbow speed did not survive a restart"
 auto.set_light_color((255, 0, 0))
+auto.set_light_manual_scope("zones")
+auto.set_plant_light_color("plant_1", [255, 0, 0])
+auto.set_zone_manual("plant_2", [0, 0, 255], 30)
+again = build(path)
+assert again.leds.color == (255, 0, 0), again.leds.color
+assert again.leds.manual_scope == "zones", "the manual scope did not survive a restart"
+assert again.get_plant("plant_1").light_color == (255, 0, 0)
+assert (again.get_plant("plant_2").manual_color, again.get_plant("plant_2").manual_brightness) == ((0, 0, 255), 30)
+assert again.get_plant("plant_3").light_color == (255, 255, 255), "an untouched pot is not white"
+print("ok: the manual colour and scope and each pot's colours survive a restart")
 auto.sensor_hub.calibration = {0x36: {"dry": 410}}
 state.save_calibration_point(0x36, "dry", 410, path=path)
 
@@ -155,6 +167,7 @@ assert auto.leds.brightness == DEFAULT_BRIGHTNESS
 assert auto.leds.rainbow_speed == DEFAULT_RAINBOW_SPEED
 assert auto.leds.color == DEFAULT_COLOR
 assert auto.leds.mode == DEFAULT_MODE
+assert auto.leds.manual_scope == DEFAULT_MANUAL_SCOPE
 assert auto.sensor_hub.calibration == {}
 print("ok: every setting is back on its default, without a restart")
 

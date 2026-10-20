@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from typing import Literal
+
+from greenthumb.care import DEFAULT_LIGHT_BRIGHTNESS, DEFAULT_LIGHT_COLOR
 
 from greenthumb.hardware.led_strip import CHIPS, DEFAULT_CHIP, AddressableStrip
 
@@ -12,6 +15,26 @@ logger = logging.getLogger(__name__)
 Mode = Literal["off", "schedule", "manual", "rainbow"]
 VALID_MODES = {"off", "schedule", "manual", "rainbow"}
 VALID_COLOR_ORDERS = ("RGB", "RBG", "GRB", "GBR", "BRG", "BGR")
+# Manual mode lights the whole strip one way, or each pot's zone its own way.
+VALID_MANUAL_SCOPES = ("all", "zones")
+
+
+@dataclass(frozen=True)
+class Zone:
+    """One pot's stretch of strip and everything that decides how it is lit.
+
+    Schedule mode uses lit, brightness and color; manual mode with the zones
+    scope uses manual_color and manual_brightness. They are separate settings,
+    so changing a pot's manual look never changes its scheduled one.
+    """
+
+    start: int
+    end: int
+    lit: bool = False
+    brightness: int = DEFAULT_LIGHT_BRIGHTNESS
+    color: tuple[int, int, int] = DEFAULT_LIGHT_COLOR
+    manual_color: tuple[int, int, int] = DEFAULT_LIGHT_COLOR
+    manual_brightness: int = DEFAULT_LIGHT_BRIGHTNESS
 
 FRAME_INTERVAL = 1 / 30
 IDLE_INTERVAL = 0.5
@@ -55,8 +78,9 @@ def _dim(pixel: tuple[int, int, int], brightness: int) -> tuple[int, int, int]:
 # What a new controller starts with, and what Restore to Defaults returns to.
 # Chip and colour order are not here: those come from .env.
 DEFAULT_MODE = "schedule"
-DEFAULT_COLOR = (0, 255, 128)
-DEFAULT_BRIGHTNESS = 75
+DEFAULT_COLOR = DEFAULT_LIGHT_COLOR
+DEFAULT_BRIGHTNESS = DEFAULT_LIGHT_BRIGHTNESS
+DEFAULT_MANUAL_SCOPE = "all"
 # About 4 s a cycle, the speed the rainbow ran at before it had a setting.
 DEFAULT_RAINBOW_SPEED = 82
 
@@ -78,13 +102,12 @@ class LedController:
         self.color = DEFAULT_COLOR
         self.brightness = DEFAULT_BRIGHTNESS
         self.rainbow_speed = DEFAULT_RAINBOW_SPEED
+        self.manual_scope = DEFAULT_MANUAL_SCOPE
         self.strip = strip if strip is not None else AddressableStrip(
             bus=spi_bus, device=spi_device, chip=chip, color_order=color_order
         )
 
-        # (first LED, last LED, lit, brightness %). Brightness is per plant and
-        # may be None, which means the strip-wide brightness.
-        self._segments: list[tuple] = []
+        self._zones: list[Zone] = []
         # A float, so a slow rainbow can advance by less than one wheel step a
         # frame.
         self._rainbow_offset = 0.0
@@ -137,7 +160,9 @@ class LedController:
 
     def _build_frame(self) -> list[tuple[int, int, int]]:
         if self.mode == "schedule":
-            return self._schedule_frame()
+            return self._zone_frame(lambda zone: (zone.color, zone.brightness) if zone.lit else None)
+        if self.mode == "manual" and self.manual_scope == "zones":
+            return self._zone_frame(lambda zone: (zone.manual_color, zone.manual_brightness))
         if self.mode == "off":
             pixels = [(0, 0, 0)] * self.led_count
         elif self.mode == "manual":
@@ -149,28 +174,38 @@ class LedController:
             ]
         return [_dim(pixel, self.brightness) for pixel in pixels]
 
-    def _schedule_frame(self) -> list[tuple[int, int, int]]:
-        """Each plant's stretch of strip at that plant's own brightness."""
+    def _zone_frame(self, look) -> list[tuple[int, int, int]]:
+        """Each pot's stretch of strip lit its own way.
+
+        look(zone) gives (colour, brightness %), or None to leave that zone
+        dark. LEDs outside every zone stay dark. Neither the strip-wide colour
+        nor the strip-wide brightness is applied on top: until this was split
+        out, schedule mode lit every pot in the colour last picked for manual.
+        """
         pixels = [(0, 0, 0)] * self.led_count
-        for segment in self._segments:
-            start, end, lit = segment[:3]
-            if not lit:
+        for zone in self._zones:
+            chosen = look(zone)
+            if chosen is None:
                 continue
-            brightness = segment[3] if len(segment) > 3 and segment[3] is not None else self.brightness
-            colour = _dim(self.color, brightness)
-            for index in range(max(start, 0), min(end, self.led_count - 1) + 1):
+            colour = _dim(*chosen)
+            for index in range(max(zone.start, 0), min(zone.end, self.led_count - 1) + 1):
                 pixels[index] = colour
         return pixels
 
-    def set_plant_segments(self, segments: list[tuple]) -> None:
-        """Which LED ranges the schedule wants lit, and how bright.
-
-        Each is (first, last, lit) or (first, last, lit, brightness %). Ignored
-        outside schedule mode.
-        """
-        if segments != self._segments:
-            self._segments = segments
+    def set_plant_segments(self, zones: list[Zone]) -> None:
+        """Each pot's stretch of strip, and how schedule and manual light it."""
+        zones = list(zones)
+        if zones != self._zones:
+            self._zones = zones
             self._wake.set()
+
+    def set_manual_scope(self, scope: str) -> dict[str, object]:
+        normalised = str(scope).strip().lower()
+        if normalised not in VALID_MANUAL_SCOPES:
+            raise ValueError(f"Manual lighting covers all zones or each zone separately, not {scope!r}")
+        self.manual_scope = normalised
+        self._wake.set()
+        return {"status": "ok", "manual_scope": normalised}
 
     def set_mode(self, mode: str) -> dict[str, str]:
         if mode not in VALID_MODES:
@@ -228,6 +263,7 @@ class LedController:
             "color": self.color,
             "brightness": self.brightness,
             "rainbow_speed": self.rainbow_speed,
+            "manual_scope": self.manual_scope,
             "led_count": self.led_count,
             "chip": self.strip.chip,
             "chip_options": [

@@ -24,14 +24,14 @@ const NO_PLANTS_HINT =
 
 const UI_MODE_BY_BACKEND = {
   schedule: 'schedule',
-  manual: 'on',
+  manual: 'manual',
   rainbow: 'rainbow',
   off: 'off',
 }
 
 const BACKEND_MODE_BY_UI = {
   schedule: 'schedule',
-  on: 'manual',
+  manual: 'manual',
   rainbow: 'rainbow',
   off: 'off',
 }
@@ -54,7 +54,7 @@ const toHexColor = (value) => {
     const [r, g, b] = value
     return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`
   }
-  return value || '#00ff80'
+  return value || '#ffffff'
 }
 
 const parseHexColor = (hex) => {
@@ -97,7 +97,14 @@ export function ControlsPanel({
   const [ledMode, setLedMode] = useState('schedule')
   const [brightness, setBrightness] = useState(75)
   const [rainbowSpeed, setRainbowSpeed] = useState(DEFAULT_RAINBOW_SPEED)
-  const [color, setColor] = useState('#00ff80')
+  const [color, setColor] = useState('#ffffff')
+  // Manual lights the whole strip one way, or each pot's zone its own way. The
+  // zone's own pair is held apart from the strip-wide one, so flipping between
+  // the two never carries one zone's look onto the whole strip.
+  const [manualScope, setManualScope] = useState('all')
+  const [zoneId, setZoneId] = useState('')
+  const [zoneBrightness, setZoneBrightness] = useState(75)
+  const [zoneColor, setZoneColor] = useState('#ffffff')
   const [lightingError, setLightingError] = useState('')
   const [quietStatus, setQuietStatus] = useState('')
   const [dances, setDances] = useState([])
@@ -113,6 +120,13 @@ export function ControlsPanel({
     setBrightness(lighting?.brightness ?? brightness)
     setRainbowSpeed(lighting?.rainbow_speed ?? rainbowSpeed)
     setColor(toHexColor(lighting?.color || color))
+    setManualScope(lighting?.manual_scope ?? manualScope)
+    const synced = (lighting?.zones ?? []).find((zone) => zone.plant_id === zoneId) ?? lighting?.zones?.[0]
+    if (synced) {
+      setZoneId(synced.plant_id)
+      setZoneBrightness(synced.manual_brightness)
+      setZoneColor(toHexColor(synced.manual_color))
+    }
   }
 
   const timers = useRef({})
@@ -148,13 +162,35 @@ export function ControlsPanel({
   const changeMode = (value) => {
     setLedMode(value)
     post('/lights/mode', { mode: BACKEND_MODE_BY_UI[value] || 'schedule' })
-    if (value === 'on') {
+    if (value === 'manual') {
       const { r, g, b } = parseHexColor(color)
       post('/lights/color', { r, g, b })
     }
   }
 
+  const zones = lighting?.zones ?? []
+  const byZone = ledMode === 'manual' && manualScope === 'zones'
+
+  const changeScope = (value) => {
+    setManualScope(value)
+    post('/lights/manual-scope', { scope: value })
+  }
+
+  const changeZone = (plantId) => {
+    const zone = zones.find((entry) => entry.plant_id === plantId)
+    setZoneId(plantId)
+    if (zone) {
+      setZoneBrightness(zone.manual_brightness)
+      setZoneColor(toHexColor(zone.manual_color))
+    }
+  }
+
   const changeBrightness = (value) => {
+    if (byZone) {
+      setZoneBrightness(value)
+      postDebounced(`zone-brightness-${zoneId}`, `/lights/zones/${zoneId}`, { brightness: Number(value) })
+      return
+    }
     setBrightness(value)
     postDebounced('brightness', '/lights/brightness', { brightness: Number(value) })
   }
@@ -165,6 +201,11 @@ export function ControlsPanel({
   }
 
   const changeColor = (value) => {
+    if (byZone) {
+      setZoneColor(value)
+      postDebounced(`zone-color-${zoneId}`, `/lights/zones/${zoneId}`, parseHexColor(value))
+      return
+    }
     setColor(value)
     postDebounced('color', '/lights/color', parseHexColor(value))
   }
@@ -343,21 +384,56 @@ export function ControlsPanel({
             <label>
               LED mode
               <select value={ledMode} onChange={(event) => changeMode(event.target.value)}>
-                <option value="schedule">Schedule</option>
-                <option value="on">On</option>
-                <option value="rainbow">Rainbow Mode</option>
+                <option value="schedule">Zone Schedule</option>
+                <option value="manual">Manual</option>
+                <option value="rainbow">Rainbow</option>
                 <option value="off">Off</option>
               </select>
             </label>
           </div>
 
-          {/* In Schedule each plant's stretch of strip runs at that plant's
-              own brightness, set in its plant profile, so one slider for the
-              whole strip would do nothing there. */}
+          {/* In Zone Schedule each pot's stretch of strip runs in its own
+              colour, at the brightness in its plant profile, so one slider for
+              the whole strip would do nothing there. */}
           {ledMode === 'schedule' && (
             <p className="field-hint">
-              Each plant&apos;s lights use the brightness in its plant profile.
+              Each pot lights during its own hours. Its colour is set on its card
+              under Plants and Soil; its hours and brightness come from its plant
+              profile.
             </p>
+          )}
+
+          {ledMode === 'manual' && (
+            <div className="field-row">
+              <label>
+                Zones
+                <select value={manualScope} onChange={(event) => changeScope(event.target.value)}>
+                  <option value="all">All zones</option>
+                  <option value="zones">Separate</option>
+                </select>
+              </label>
+            </div>
+          )}
+
+          {byZone && (
+            <div className="field-row">
+              <label>
+                Zone
+                <select
+                  value={zoneId}
+                  disabled={zones.length === 0}
+                  onChange={(event) => changeZone(event.target.value)}
+                >
+                  {zones.length === 0 && <option value="">Waiting on the planter…</option>}
+                  {zones.map((zone) => (
+                    <option key={zone.plant_id} value={zone.plant_id}>
+                      {zone.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {zones.length === 0 && <p className="field-hint">{WAITING_HINT}</p>}
+            </div>
           )}
           {ledMode !== 'off' && ledMode !== 'schedule' && (
             <div className="field-row">
@@ -368,10 +444,11 @@ export function ControlsPanel({
                     type="range"
                     min="0"
                     max="100"
-                    value={brightness}
+                    value={byZone ? zoneBrightness : brightness}
+                    disabled={byZone && !zoneId}
                     onChange={(event) => changeBrightness(Number(event.target.value))}
                   />
-                  <span>{brightness}%</span>
+                  <span>{byZone ? zoneBrightness : brightness}%</span>
                 </div>
               </label>
             </div>
@@ -395,13 +472,14 @@ export function ControlsPanel({
             </div>
           )}
 
-          {ledMode === 'on' && (
+          {ledMode === 'manual' && (
             <div className="field-row">
               <label>
                 LED color
                 <input
                   type="color"
-                  value={color}
+                  value={byZone ? zoneColor : color}
+                  disabled={byZone && !zoneId}
                   onChange={(event) => changeColor(event.target.value)}
                 />
               </label>

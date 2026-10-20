@@ -44,6 +44,9 @@ BRIGHTNESS_FOR = {name: percent for name, percent in LIGHT_LEVELS}
 DEFAULT_TARGET_VWC = 25
 DEFAULT_LIGHT_HOURS = 12
 DEFAULT_LIGHT_BRIGHTNESS = 75
+# White, so a pot nobody has chosen a colour for lights as plain light rather
+# than as whatever colour was last picked for something else.
+DEFAULT_LIGHT_COLOR = (255, 255, 255)
 
 
 # The lowest target % VWC each water level starts at, wettest first: the key
@@ -120,6 +123,18 @@ def check_light_brightness(value: object) -> int:
     if not 0 <= brightness <= 100:
         raise ValueError(f"Brightness must be between 0 and 100%, not {brightness}")
     return brightness
+
+
+def check_light_color(value: object) -> tuple[int, int, int]:
+    """Three whole numbers from 0 to 255, red, green and blue."""
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        raise ValueError(f"A colour must be three numbers, red, green and blue, not {value!r}")
+    channels = []
+    for channel in value:
+        if isinstance(channel, bool) or not isinstance(channel, int) or not 0 <= channel <= 255:
+            raise ValueError(f"Each colour channel must be a whole number from 0 to 255, not {channel!r}")
+        channels.append(channel)
+    return tuple(channels)
 
 
 def check_start_time(value: object) -> time:

@@ -507,9 +507,39 @@ async def set_light_rainbow_speed(payload: dict[str, int] = Body(default_factory
     return result
 
 
+@app.post(f"{settings.api_prefix}/lights/manual-scope")
+async def set_light_manual_scope(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+    """{"scope": "all"} lights the whole strip one way; "zones" each pot its own."""
+    result = automation.set_light_manual_scope(str(payload.get("scope", "all")))
+    log_event(f"Manual lighting set to {'each zone separately' if result['manual_scope'] == 'zones' else 'all zones'}")
+    return result
+
+
+def _rgb(payload: dict) -> list[object] | None:
+    """{"r", "g", "b"} as a colour, None when none of them is given.
+
+    Left unclamped: care.check_light_color refuses a bad channel, where a clamp
+    would quietly show a colour nobody picked.
+    """
+    if not any(key in payload for key in ("r", "g", "b")):
+        return None
+    return [payload.get("r"), payload.get("g"), payload.get("b")]
+
+
+@app.post(f"{settings.api_prefix}/lights/zones/{{plant_id}}")
+async def set_zone_manual(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """{"r", "g", "b"} and/or {"brightness"}: this pot's own manual lighting."""
+    result = automation.set_zone_manual(plant_id, _rgb(payload), payload.get("brightness"))
+    log_event(
+        f"{result['name']} manual lighting set to {tuple(result['manual_color'])} "
+        f"at {result['manual_brightness']}%"
+    )
+    return result
+
+
 # Declared last: a path parameter here matches anything, so it would otherwise
-# swallow /lights/mode, /lights/color, /lights/color-order, /lights/brightness
-# and /lights/rainbow-speed.
+# swallow /lights/mode, /lights/color, /lights/color-order, /lights/brightness,
+# /lights/rainbow-speed and /lights/manual-scope.
 @app.get(f"{settings.api_prefix}/plants")
 async def list_plants() -> list[dict[str, object]]:
     plants = automation.plants
@@ -533,6 +563,7 @@ async def list_plants() -> list[dict[str, object]]:
             "soil": plant.soil,
             "led_start_index": plant.led_start_index,
             "led_end_index": plant.led_end_index,
+            "light_color": list(plant.light_color),
         }
         for plant in plants
     ]
@@ -749,6 +780,14 @@ async def update_plant_name(plant_id: str, payload: dict[str, str] = Body(defaul
     name = str(payload.get("name", "")).strip()
     result = automation.update_plant_name(plant_id, name)
     log_event(f"Plant {plant_id} plant name updated to {name}")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/light-color")
+async def set_plant_light_color(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """{"r", "g", "b"}: the colour this pot shows during its scheduled hours."""
+    result = automation.set_plant_light_color(plant_id, _rgb(payload))
+    log_event(f"Plant {plant_id} scheduled light colour set to {tuple(result['light_color'])}")
     return result
 
 

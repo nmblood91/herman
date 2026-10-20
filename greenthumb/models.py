@@ -68,6 +68,14 @@ class PlantSpec:
     # not exposed to the user for manual editing.
     led_start_index: int = 0
     led_end_index: int = 0
+    # How this pot's stretch of strip is lit. Properties of the pot, like its
+    # position, so loading a plant profile leaves them alone. light_color is
+    # used during its scheduled hours (the brightness then comes from the
+    # profile); the manual pair is used in manual mode with each zone set
+    # separately. Two settings on purpose: changing one never changes the other.
+    light_color: tuple[int, int, int] = care.DEFAULT_LIGHT_COLOR
+    manual_color: tuple[int, int, int] = care.DEFAULT_LIGHT_COLOR
+    manual_brightness: int = care.DEFAULT_LIGHT_BRIGHTNESS
 
 
 @dataclass

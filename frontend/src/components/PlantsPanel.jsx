@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { describeBrightness, describeLightWindow } from '../time'
 import { cardTitle } from '../potLabel'
 import { groupByCategory } from '../profileGroups'
+import { PotLightColor } from './PotLightColor'
 
 // Pot fields only. A card no longer edits what a plant wants -- that is the
 // Plant Profile Editor's job, and a pot takes those settings by loading a
@@ -495,6 +496,12 @@ export function PlantsPanel({
                       </div>
                     )}
                   </div>
+
+                  {/* The pot's own, not the plant profile's: loading a profile
+                      leaves it alone, which is why it sits outside the read-only
+                      summary above. */}
+                  <h3 className="card-group-title">Lights</h3>
+                  <PotLightColor plant={plant} />
 
                   <h3 className="card-group-title">Soil Profile</h3>
                   <div className="field-grid">

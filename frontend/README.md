@@ -16,7 +16,7 @@ of its groups now sits with the thing it governs.
 
 | Tab | Components |
 |---|---|
-| Plants and Soil | `PlantsPanel.jsx` — a card per pot, with its moisture and an expandable form for the pot's mix, rail position and watering mode; `PlantEditorPanel.jsx` — the plant-profile library; `SoilPanel.jsx` — the soil library. Both libraries sit below the cards, which pick from them |
+| Plants and Soil | `PlantsPanel.jsx` — a card per pot, with its moisture and an expandable form for the pot's mix, rail position and watering mode, and its Zone Schedule light colour (`PotLightColor.jsx`); `PlantEditorPanel.jsx` — the plant-profile library; `SoilPanel.jsx` — the soil library. Both libraries sit below the cards, which pick from them |
 | Controls | `ControlsPanel.jsx` — gantry homing and jogging, dances, move-to-plant, water-a-plant, lighting, quiet snooze |
 | Automation | `AutomationPanel.jsx` — automatic watering, homing (startup home, hourly auto-patrol), quiet hours |
 | Calibration | `HomeSwitchPanel.jsx` (endstop test), `PumpPanel.jsx` (pump flow rate), `CalibrationPanel.jsx` (the probes’ air reading, a health check), `LedStripPanel.jsx` (strip type and colour order), `ClockPanel.jsx` (planter clock and time zone), `VersionPanel.jsx` (running and built commits), `LogsPanel.jsx`, mounted side by side |

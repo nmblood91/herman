@@ -74,7 +74,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | Group | What it covers |
 |---|---|
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
-| `/plants/...` | per-plant name, light window, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
+| `/plants/...` | per-plant name, light window and scheduled light colour, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
 | `/plant-profiles`, `/plants/{id}/profile` | the plant profile library: list, read one, write one from a body, snapshot a pot, load onto a pot, delete |
 | `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
 | `/moisture-bands` | the band scale, for pickers and legends |
@@ -85,7 +85,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/dances`, `/dances/run/{name}` | the routines, run by hand |
 | `/patrol/auto`, `/gantry/home-on-startup` | the hourly auto-patrol and the startup home, each on or off |
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
-| `/lights/...` | mode, brightness, colour, rainbow speed, strip type, colour order |
+| `/lights/...` | mode (Zone Schedule, Manual, Rainbow, Off), brightness, colour, Manual for all zones or each zone (`/lights/manual-scope`, `/lights/zones/{plant_id}`), rainbow speed, strip type, colour order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
 | `/system/restore-defaults` | back to a fresh install; the plant profile and soil libraries and the history are kept |
 | `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame. No UI — reach these directly |

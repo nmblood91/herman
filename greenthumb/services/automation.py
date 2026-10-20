@@ -18,9 +18,11 @@ from greenthumb.hardware.klipper_client import KlipperClient, MOTION_TIMEOUT
 from greenthumb.hardware.lighting import (
     DEFAULT_BRIGHTNESS,
     DEFAULT_COLOR,
+    DEFAULT_MANUAL_SCOPE,
     DEFAULT_MODE,
     DEFAULT_RAINBOW_SPEED,
     LedController,
+    Zone,
 )
 from greenthumb.hardware.pump import PumpController
 from greenthumb import sweep
@@ -394,6 +396,18 @@ class GreenThumbAutomation:
             elif mode is not None:
                 logger.warning("Ignoring unknown watering mode %r", mode)
 
+            for field_name, check in (
+                ("light_color", care.check_light_color),
+                ("manual_color", care.check_light_color),
+                ("manual_brightness", care.check_light_brightness),
+            ):
+                if field_name not in saved:
+                    continue
+                try:
+                    setattr(plant, field_name, check(saved[field_name]))
+                except ValueError:
+                    logger.warning("Ignoring bad %s %r", field_name, saved[field_name])
+
             for field_name in (
                 "watering_volume_ml",
                 "position_mm",
@@ -488,6 +502,7 @@ class GreenThumbAutomation:
             ("color_order", "set_color_order"),
             ("brightness", "set_brightness"),
             ("rainbow_speed", "set_rainbow_speed"),
+            ("manual_scope", "set_manual_scope"),
             ("mode", "set_mode"),
         ):
             value = leds.get(key)
@@ -521,6 +536,9 @@ class GreenThumbAutomation:
                     "sweep_max_mm": plant.sweep_max_mm,
                     "soil": plant.soil,
                     "profile": plant.profile,
+                    "light_color": list(plant.light_color),
+                    "manual_color": list(plant.manual_color),
+                    "manual_brightness": plant.manual_brightness,
                     **{
                         key: value for key, value in care_fields(plant).items()
                         if key not in DERIVED_CARE_FIELDS
@@ -556,6 +574,7 @@ class GreenThumbAutomation:
                     ("color", list(getattr(self.leds, "color", []) or []) or None),
                     ("brightness", getattr(self.leds, "brightness", None)),
                     ("rainbow_speed", self._rainbow_speed()),
+                    ("manual_scope", self._manual_scope()),
                     ("chip", getattr(getattr(self.leds, "strip", None), "chip", None)),
                     (
                         "color_order",
@@ -577,6 +596,14 @@ class GreenThumbAutomation:
         if isinstance(speed, bool) or not isinstance(speed, int):
             return None
         return speed
+
+    def _manual_scope(self) -> str | None:
+        """Whether manual lights the whole strip or each zone, or None.
+
+        Type-checked for the same reason as _rainbow_speed.
+        """
+        scope = getattr(self.leds, "manual_scope", None)
+        return scope if isinstance(scope, str) else None
 
     def _persist(self) -> None:
         """Write the current settings. Never raises: a failed save must not
@@ -994,11 +1021,14 @@ class GreenThumbAutomation:
         now = datetime.now().time()
         self.leds.set_plant_segments(
             [
-                (
-                    plant.led_start_index,
-                    plant.led_end_index,
-                    care.light_on(now, plant.light_start_time, plant.light_hours),
-                    plant.light_brightness,
+                Zone(
+                    start=plant.led_start_index,
+                    end=plant.led_end_index,
+                    lit=care.light_on(now, plant.light_start_time, plant.light_hours),
+                    brightness=plant.light_brightness,
+                    color=plant.light_color,
+                    manual_color=plant.manual_color,
+                    manual_brightness=plant.manual_brightness,
                 )
                 for plant in self.plants
             ]
@@ -1866,7 +1896,11 @@ class GreenThumbAutomation:
         return {
             "app": settings.app_name,
             "movement": self.klipper.status(),
-            "lighting": self.leds.status(),
+            "lighting": {
+                **self.leds.status(),
+                # The pots' own manual settings, for the zone picker.
+                "zones": [self._zone_status(plant) for plant in self.plants],
+            },
             "plants": [status.__dict__ for status in plant_status],
             # So the UI can say why nothing is watering rather than leaving it
             # looking broken.
@@ -2217,6 +2251,7 @@ class GreenThumbAutomation:
             self.leds.set_color_order(settings.led_color_order)
         self.leds.set_brightness(DEFAULT_BRIGHTNESS)
         self.leds.set_rainbow_speed(DEFAULT_RAINBOW_SPEED)
+        self.leds.set_manual_scope(DEFAULT_MANUAL_SCOPE)
         self.leds.color = DEFAULT_COLOR
         self.leds.set_mode(DEFAULT_MODE)
 
@@ -2258,6 +2293,50 @@ class GreenThumbAutomation:
         result = self.leds.set_rainbow_speed(speed)
         self._persist()
         return result
+
+    def set_light_manual_scope(self, scope: str) -> dict[str, object]:
+        result = self.leds.set_manual_scope(scope)
+        self._persist()
+        return result
+
+    def _plant_or_error(self, plant_id: str) -> PlantSpec:
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+        return plant
+
+    def set_plant_light_color(self, plant_id: str, color: object) -> dict[str, object]:
+        """The colour this pot's stretch of strip shows during its scheduled hours."""
+        plant = self._plant_or_error(plant_id)
+        plant.light_color = care.check_light_color(color)
+        self._persist()
+        self._apply_lighting()
+        return {"status": "ok", "plant_id": plant_id, "light_color": list(plant.light_color)}
+
+    def set_zone_manual(
+        self, plant_id: str, color: object = None, brightness: object = None
+    ) -> dict[str, object]:
+        """This pot's own colour and brightness in manual mode, zones scope."""
+        plant = self._plant_or_error(plant_id)
+        # Both checked before either is applied, so a bad one changes nothing.
+        checked_color = care.check_light_color(color) if color is not None else plant.manual_color
+        checked_brightness = (
+            care.check_light_brightness(brightness) if brightness is not None else plant.manual_brightness
+        )
+        plant.manual_color = checked_color
+        plant.manual_brightness = checked_brightness
+        self._persist()
+        self._apply_lighting()
+        return {"status": "ok", **self._zone_status(plant)}
+
+    @staticmethod
+    def _zone_status(plant: PlantSpec) -> dict[str, object]:
+        return {
+            "plant_id": plant.plant_id,
+            "name": plant.name,
+            "manual_color": list(plant.manual_color),
+            "manual_brightness": plant.manual_brightness,
+        }
 
     # --- routines ---------------------------------------------------------
 
