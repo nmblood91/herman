@@ -57,7 +57,7 @@ class PlantSpec:
     sweep_max_mm: int = 0
     # Free text about this plant, saved and loaded with the rest of its care
     # settings. A property of the plant, not the pot: the reason you water
-    # something at a given band travels with it.
+    # something at a given level travels with it.
     notes: str = ""
     # Which plant profile this pot's care settings came from, or "" for none.
     # Set by loading one onto the pot or saving the pot as one. Until then the

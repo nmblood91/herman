@@ -167,7 +167,7 @@ class SoilSensorHub:
           capacity barely above the probe's air reading estimates a wilting
           point just under it, and a reading taken on one probe can land close
           on another that reads differently. A narrow span turns a few counts
-          of noise into whole bands.
+          of noise into whole water levels.
         """
         if address is None:
             return None
@@ -341,7 +341,7 @@ def wilting_point_for(soil: dict | None, capacity_raw: int | None, dry_raw: int)
     fraction of the way up as wilting point % is of field capacity %.
 
     The probe's response is not truly straight, so this is an estimate. It
-    only has to place the bottom of the scale near enough for the bands; a
+    only has to place the bottom of the scale near enough for the water levels; a
     soil profile with a measured reading uses that instead.
 
     None when there is neither a reading nor what an estimate needs.

@@ -67,8 +67,8 @@ Leave it for 24 hours, then choose that pot's probe and press
 **Measure field capacity**. Measure again after repotting, because soil holds
 less water as it ages.
 
-The wilting point reading is optional, because taking it means drying a pot out
-until its plant wilts for good. If you leave it blank, Herman estimates it from
+The wilting point reading is optional, because it's fiddly to take: you dry a
+pot of the mix, with no plant in it, down to a set weight. If you leave it blank, Herman estimates it from
 the probe's dry (open air) reading, its field capacity reading, and the two
 % VWC figures.
 

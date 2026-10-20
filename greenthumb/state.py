@@ -522,6 +522,6 @@ def available_water_fraction(soil: dict[str, Any] | None) -> float | None:
             return None
     if not 0 < wilting_point < field_capacity:
         # Wilting point at or above field capacity would mean no usable water
-        # at all, and a negative window breaks every band derived from it.
+        # at all, and a negative window breaks every soil water reading derived from it.
         return None
     return wilting_point / field_capacity

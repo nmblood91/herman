@@ -123,9 +123,10 @@ and loading it onto a pot switches the pot to that soil profile:
 | Fast-Draining Mix | 15 — rosemary, thyme, oregano, sage, snake and ZZ plants, and the desert succulents and cacti |
 | Ultra-Coarse Epiphytic Mix | 10 — Monstera adansonii, the orchids, anthuriums, hoyas, Christmas cactus and staghorn fern |
 
-Each plant also has a target soil moisture in % VWC. A few targets fall
-outside their soil's range; the plant card flags those (see README, *Watering
-targets*).
+Each plant also has a watering target in % **soil water**: the share of the
+water a plant can use that is left, 100% at the soil's field capacity and 0% at
+its wilting point. Because it is a share of what the pot's own soil holds, the
+same target means the same thirst in any mix (see README, *Watering targets*).
 
 ---
 
@@ -159,11 +160,11 @@ field capacity puts wilting point at about 488. Each pot works this out from
 its own probe's air reading.
 
 Every pot using the soil profile then reads 100% at field capacity and 0% at
-wilting point, and is watered when it dries past its plant's target.
+wilting point, and is watered when its soil water drops to its plant's target.
 
 The probe does not respond in a perfectly straight line, so the wilting point
-is an estimate. It only has to be close enough to sort a pot into the right
-dryness band. If you have measured wilting point properly, type it into
+is an estimate. It only has to place the bottom of the soil water scale near
+enough to give the right water level. If you have measured wilting point properly, type it into
 **Wilting point (sensor reading)** in the Soil Profile Editor, or press
 **Measure wilting point**, and the soil profile uses that instead. To measure
 it without wilting a plant, weigh a pot of the mix with no plant at field

@@ -1311,7 +1311,7 @@ class GreenThumbAutomation:
             )
 
         # A pot with a soil profile but no usable scale cannot be judged at
-        # all: its reading is -1, its band is unknown, and it is skipped by
+        # all: its reading is -1, its water level is unknown, and it is skipped by
         # every cycle. Without this it fell through to "all plants are happy".
         unmeasured = [
             plant
