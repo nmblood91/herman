@@ -217,8 +217,8 @@ What it can see follows from where it sits. The 120° lens on the Camera
   890 mm would take 260 mm of depth — which this frame does not have. A fixed
   mount therefore sees part of the rail, and the mount decides which part:
 
-  - **Centred on the rail**, for the widest symmetric view of the middle.
-  - **Or deliberately off-centre**, trading the far end for a closer look at
+  - **Centered on the rail**, for the widest symmetric view of the middle.
+  - **Or deliberately off-center**, trading the far end for a closer look at
     one or two plants.
 
   Worth measuring the standoff actually available before committing, since it
@@ -231,7 +231,7 @@ What it can see follows from where it sits. The 120° lens on the Camera
 ## Worth capturing later
 
 The obvious next columns once the open items above are closed: material and
-colour, print time, layer height and whether the part needs supports. Of those,
+color, print time, layer height and whether the part needs supports. Of those,
 **material matters most** — several of these parts sit near the water path or
 under the LED strip, and that is a PETG-or-PLA decision with a real consequence
 rather than a preference.

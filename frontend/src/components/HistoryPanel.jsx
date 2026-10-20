@@ -44,14 +44,14 @@ export function HistoryPanel() {
   const [status, setStatus] = useState('Loading history...')
 
   useEffect(() => {
-    let cancelled = false
+    let canceled = false
 
     const load = async () => {
       setStatus('Loading history...')
       try {
         const response = await fetch(`${API_BASE}/history?hours=${hours}`)
         const data = await response.json()
-        if (cancelled) return
+        if (canceled) return
         if (!response.ok) {
           setStatus(data.error || 'Failed to load history')
           return
@@ -59,14 +59,14 @@ export function HistoryPanel() {
         setHistory(data)
         setStatus('')
       } catch (error) {
-        if (!cancelled) setStatus(`Failed to load history: ${error.message}`)
+        if (!canceled) setStatus(`Failed to load history: ${error.message}`)
       }
     }
 
     load()
     // Ignore a response that arrives after the range changed again.
     return () => {
-      cancelled = true
+      canceled = true
     }
   }, [hours])
 
@@ -84,7 +84,7 @@ export function HistoryPanel() {
   }
 
   // On the moisture view each pot's target is drawn as a flat dashed line in
-  // its colour: the reading and the target are on the same soil water scale,
+  // its color: the reading and the target are on the same soil water scale,
   // so a line dropping to its dashes is a pot coming due.
   const targets = moisture && history ? history.plants : NO_TARGETS
 

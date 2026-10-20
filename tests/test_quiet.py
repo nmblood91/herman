@@ -66,12 +66,12 @@ print("ok: a snooze holds watering and says so")
 
 auto.snooze_until = datetime.now() - timedelta(seconds=1)
 assert auto.watering_suppressed() is None, "an expired snooze must release on its own"
-print("ok: a snooze expires without needing to be cancelled")
+print("ok: a snooze expires without needing to be canceled")
 
 auto.snooze_watering(1)
 auto.cancel_snooze()
 assert auto.watering_suppressed() is None
-print("ok: a snooze can be cancelled early")
+print("ok: a snooze can be canceled early")
 
 for bad in (0, -1, 25):
     try:

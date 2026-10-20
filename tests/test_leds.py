@@ -120,7 +120,7 @@ assert len(set(first)) > 5, f"rainbow not varied: {set(first)}"
 led._rainbow_offset = 40
 led._render()
 assert strip.frames[-1] != first, "rainbow did not advance"
-print(f"ok: rainbow spans {len(set(first))} distinct colours and animates")
+print(f"ok: rainbow spans {len(set(first))} distinct colors and animates")
 
 # The speed slider runs from a two-minute cycle to a two-second one, and the
 # default keeps the speed the rainbow had before the slider existed.
@@ -153,7 +153,7 @@ for _ in range(frames - 1):
 assert abs(led._rainbow_offset % 256) < 1e-6 or abs(led._rainbow_offset - 256) < 1e-6, led._rainbow_offset
 print("ok: the slowest rainbow still advances, and takes its full two minutes a cycle")
 
-# 0 pauses it where it is: the colours stay, and stop moving.
+# 0 pauses it where it is: the colors stay, and stop moving.
 led.set_rainbow_speed(37)
 for _ in range(10):
     led._advance_rainbow()
@@ -165,13 +165,13 @@ for _ in range(100):
     led._advance_rainbow()
 assert led._rainbow_offset == held, (led._rainbow_offset, held)
 led._render()
-assert len(set(strip.frames[-1])) > 5, "a paused rainbow went blank instead of holding its colours"
+assert len(set(strip.frames[-1])) > 5, "a paused rainbow went blank instead of holding its colors"
 led.set_rainbow_speed(50)
 led._advance_rainbow()
 assert led._rainbow_offset != held, "it did not start again from where it paused"
-print("ok: speed 0 holds the rainbow still, keeps its colours, and it moves on again from there")
+print("ok: speed 0 holds the rainbow still, keeps its colors, and it moves on again from there")
 
-# schedule mode lights only the plants that are on, each in its own colour
+# schedule mode lights only the plants that are on, each in its own color
 led, strip = controller(count=60)
 GREEN, RED = (0, 255, 0), (255, 0, 0)
 led.set_mode("schedule")
@@ -187,16 +187,16 @@ assert frame[0:5] == [GREEN] * 5, frame[0:5]
 assert frame[5:10] == [(0, 0, 0)] * 5, frame[5:10]
 assert frame[10:15] == [RED] * 5, frame[10:15]
 assert frame[15:20] == [(0, 0, 0)] * 5
-print("ok: schedule lights only the plants inside their window, each in its own colour")
+print("ok: schedule lights only the plants inside their window, each in its own color")
 
-# The regression: schedule used to light every pot in the colour last picked
+# The regression: schedule used to light every pot in the color last picked
 # for manual mode.
 led.set_static_color((0, 0, 255))
 led.set_mode("schedule")
 led.set_plant_segments([Zone(0, 4, lit=True, brightness=100)])
 led._render()
 assert strip.frames[-1][0:5] == [(255, 255, 255)] * 5, strip.frames[-1][0:5]
-print("ok: a manual colour no longer leaks into schedule, which defaults to white")
+print("ok: a manual color no longer leaks into schedule, which defaults to white")
 
 # Each plant's stretch runs at that plant's own brightness, and the strip-wide
 # brightness does not scale it on top.
@@ -215,7 +215,7 @@ assert frame[10:15] == [(0, 0, 0)] * 5, "an unlit plant was drawn"
 assert frame[15:20] == [(0, 0, 0)] * 5, "a plant at 0% was drawn"
 print("ok: in schedule mode each plant is lit at its own brightness")
 
-# Manual, all zones: the strip-wide colour and brightness, and white at 75%
+# Manual, all zones: the strip-wide color and brightness, and white at 75%
 # out of the box.
 led, strip = controller(count=60)
 led.set_mode("manual")
@@ -228,7 +228,7 @@ led._render()
 assert set(strip.frames[-1]) == {(0, 100, 0)}, set(strip.frames[-1])
 print("ok: manual for all zones fills the strip, white at 75% by default")
 
-# Manual, each zone separately: every pot its own colour and brightness, the
+# Manual, each zone separately: every pot its own color and brightness, the
 # strip-wide pair ignored, and LEDs between zones dark.
 led.set_manual_scope("zones")
 led.set_plant_segments([
@@ -241,7 +241,7 @@ frame = strip.frames[-1]
 assert frame[0:5] == [RED] * 5, frame[0:5]
 assert frame[5:10] == [(191, 191, 191)] * 5, "an untouched zone is not white at 75%"
 assert frame[10:12] == [(0, 0, 0)] * 2, "LEDs between zones were lit"
-assert frame[12:15] == [(0, 0, 0)] * 3, "a zone at 0% was drawn, or its schedule colour leaked in"
+assert frame[12:15] == [(0, 0, 0)] * 3, "a zone at 0% was drawn, or its schedule color leaked in"
 assert frame[15:] == [(0, 0, 0)] * 45
 print("ok: manual for separate zones lights each its own way and leaves the gaps dark")
 
@@ -263,7 +263,7 @@ led._render()
 assert len(strip.frames[-1]) == 60
 print("ok: an over-long segment is clipped to the strip")
 
-# colour order actually reorders the wire bytes
+# color order actually reorders the wire bytes
 # This had been claimed by a comment for a while without being tested: the two
 # FakeStrips that used to sit here were assigned and never used, and the
 # assertion below them checks something else entirely.
@@ -297,7 +297,7 @@ assert red_first[:per_channel] == green_first[per_channel:per_channel * 2], (
 assert red_first[per_channel * 2:] == green_first[per_channel * 2:], (
     "the blue block should be unaffected by swapping R and G"
 )
-print("ok: colour order reorders the channel bytes on the wire")
+print("ok: color order reorders the channel bytes on the wire")
 
 real = AddressableStrip.__new__(AddressableStrip)
 real.spi = None

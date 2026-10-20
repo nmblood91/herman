@@ -1,7 +1,7 @@
-"""Each pot's own light colours, and manual mode lit zone by zone.
+"""Each pot's own light colors, and manual mode lit zone by zone.
 
-A pot has two looks: the colour it shows during its scheduled hours, and its
-own colour and brightness for manual mode with each zone set separately. They
+A pot has two looks: the color it shows during its scheduled hours, and its
+own color and brightness for manual mode with each zone set separately. They
 come from the browser and from state.json, so a bad value has to be refused
 or ignored rather than drawn, and an old state file with neither has to come
 back white.
@@ -74,7 +74,7 @@ def spans(auto):
     return [(plant.led_start_index, plant.led_end_index) for plant in auto.plants]
 
 
-# --- an old state file, written before pots had colours ---
+# --- an old state file, written before pots had colors ---
 
 path = temp_state()
 state.save_state({"plants": [{"plant_id": "plant_1", "name": "Basil"}]}, path)
@@ -82,7 +82,7 @@ auto = build(path)
 assert auto.get_plant("plant_1").name == "Basil"
 for plant in auto.plants:
     assert (plant.light_color, plant.manual_color, plant.manual_brightness) == (WHITE, WHITE, 75), plant
-print("ok: a state file from before pot colours comes back white at 75%")
+print("ok: a state file from before pot colors comes back white at 75%")
 
 # --- junk in the file is ignored, not drawn ---
 
@@ -106,7 +106,7 @@ for plant_id in ("plant_1", "plant_2"):
 plant = auto.get_plant("plant_3")
 assert (plant.light_color, plant.manual_color, plant.manual_brightness) == ((10, 20, 30), (40, 50, 60), 5)
 assert auto.leds.manual_scope == "all", auto.leds.manual_scope
-print("ok: bad stored colours, brightness and scope are ignored, good ones restored")
+print("ok: bad stored colors, brightness and scope are ignored, good ones restored")
 
 # --- the setters refuse junk and change nothing when they do ---
 
@@ -117,14 +117,14 @@ for bad in junk:
     except ValueError:
         pass
     else:
-        raise AssertionError(f"accepted light colour {bad!r}")
+        raise AssertionError(f"accepted light color {bad!r}")
     try:
         auto.set_zone_manual("plant_1", bad, 40)
     except ValueError:
         pass
     else:
         if bad is not None:
-            raise AssertionError(f"accepted manual colour {bad!r}")
+            raise AssertionError(f"accepted manual color {bad!r}")
 assert auto.get_plant("plant_1").light_color == WHITE
 try:
     auto.set_zone_manual("plant_2", [1, 2, 3], 101)
@@ -132,7 +132,7 @@ except ValueError:
     pass
 else:
     raise AssertionError("accepted a brightness of 101%")
-assert auto.get_plant("plant_2").manual_color == WHITE, "a refused brightness still changed the colour"
+assert auto.get_plant("plant_2").manual_color == WHITE, "a refused brightness still changed the color"
 for call in (lambda: auto.set_plant_light_color("nope", [1, 2, 3]), lambda: auto.set_zone_manual("nope", [1, 2, 3])):
     try:
         call()
@@ -140,15 +140,15 @@ for call in (lambda: auto.set_plant_light_color("nope", [1, 2, 3]), lambda: auto
         pass
     else:
         raise AssertionError("an unknown pot was accepted")
-print("ok: bad colours, brightness and unknown pots are refused and change nothing")
+print("ok: bad colors, brightness and unknown pots are refused and change nothing")
 
-# A colour without a brightness keeps the brightness, and the other way round.
-# (The colour-only call with None above set plant_1's brightness to 40.)
+# A color without a brightness keeps the brightness, and the other way round.
+# (The color-only call with None above set plant_1's brightness to 40.)
 auto.set_zone_manual("plant_3", [9, 9, 9], None)
 auto.set_zone_manual("plant_3", None, 20)
 plant = auto.get_plant("plant_3")
 assert (plant.manual_color, plant.manual_brightness) == ((9, 9, 9), 20), plant
-print("ok: a zone's colour and brightness can each be changed on its own")
+print("ok: a zone's color and brightness can each be changed on its own")
 
 # --- the controller sees a change at once, not on the next tick ---
 
@@ -159,7 +159,7 @@ zone = zones[plant.led_start_index]
 assert isinstance(zone, Zone)
 assert zone.color == (0, 255, 0) and zone.end == plant.led_end_index, zone
 assert zones[auto.get_plant("plant_3").led_start_index].manual_color == (9, 9, 9)
-print("ok: a pot's new colour reaches the strip straight away")
+print("ok: a pot's new color reaches the strip straight away")
 
 # --- the overview lists each zone for the picker ---
 
@@ -174,8 +174,8 @@ print("ok: the overview lists every zone's manual settings")
 
 # LED_COUNT once shipped as 60 against a 20-pixel WS2811 strip, so the first
 # pot's zone (pixels 0-14) covered three quarters of the real strip and the
-# last two zones fell off its end. The strip is always one metre at 60 LEDs a
-# metre, so the chip alone now decides.
+# last two zones fell off its end. The strip is always one meter at 60 LEDs a
+# meter, so the chip alone now decides.
 assert settings.led_count == 0, "LED_COUNT should ship unset so the chip decides"
 path = temp_state()
 auto = build(path)

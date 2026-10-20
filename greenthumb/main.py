@@ -265,7 +265,7 @@ def resume_watering() -> dict[str, object]:
 
 @app.get(f"{settings.api_prefix}/dances")
 def list_dances() -> dict[str, object]:
-    return {"dances": automation.dance_catalogue()}
+    return {"dances": automation.dance_catalog()}
 
 
 @app.post(f"{settings.api_prefix}/dances/run/{{name}}")
@@ -334,7 +334,7 @@ def snooze_watering(payload: dict[str, float] = Body(default_factory=dict)) -> d
 @app.post(f"{settings.api_prefix}/quiet/resume")
 def cancel_snooze() -> dict[str, object]:
     result = automation.cancel_snooze()
-    log_event("Watering snooze cancelled")
+    log_event("Watering snooze canceled")
     return result
 
 
@@ -474,7 +474,7 @@ async def set_light_color(payload: dict[str, int] = Body(default_factory=dict)) 
 @app.post(f"{settings.api_prefix}/lights/color-order")
 async def set_light_color_order(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     # settings.led_color_order, not a literal: a request with the key missing
-    # used to silently set RGB and scramble the colours on the strip.
+    # used to silently set RGB and scramble the colors on the strip.
     order = str(payload.get("color_order", settings.led_color_order))
     result = automation.set_light_color_order(order)
     log_event(f"LED color order set to {result['color_order']}")
@@ -519,10 +519,10 @@ async def set_light_manual_scope(payload: dict[str, str] = Body(default_factory=
 
 
 def _rgb(payload: dict) -> list[object] | None:
-    """{"r", "g", "b"} as a colour, None when none of them is given.
+    """{"r", "g", "b"} as a color, None when none of them is given.
 
     Left unclamped: care.check_light_color refuses a bad channel, where a clamp
-    would quietly show a colour nobody picked.
+    would quietly show a color nobody picked.
     """
     if not any(key in payload for key in ("r", "g", "b")):
         return None
@@ -779,9 +779,9 @@ async def update_plant_name(plant_id: str, payload: dict[str, str] = Body(defaul
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/light-color")
 async def set_plant_light_color(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-    """{"r", "g", "b"}: the colour this pot shows during its scheduled hours."""
+    """{"r", "g", "b"}: the color this pot shows during its scheduled hours."""
     result = automation.set_plant_light_color(plant_id, _rgb(payload))
-    log_event(f"Plant {plant_id} scheduled light colour set to {tuple(result['light_color'])}")
+    log_event(f"Plant {plant_id} scheduled light color set to {tuple(result['light_color'])}")
     return result
 
 

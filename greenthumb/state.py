@@ -408,7 +408,7 @@ def _save_named(
 
     entry = {field: settings[field] for field in fields if field in settings}
     if not entry:
-        raise ValueError(f"Nothing to save: no recognised {noun} settings given")
+        raise ValueError(f"Nothing to save: no recognized {noun} settings given")
 
     data = load_state(path)
     stored = data.get(key)

@@ -18,11 +18,11 @@ export function ClockPanel() {
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   useEffect(() => {
-    let cancelled = false
+    let canceled = false
     async function readClock() {
       try {
         const response = await fetch(`${API_BASE}/system/time`)
-        if (!response.ok || cancelled) return
+        if (!response.ok || canceled) return
         const data = await response.json()
         setClock(data)
         setSkewMs(new Date(data.now).getTime() - Date.now())
@@ -33,7 +33,7 @@ export function ClockPanel() {
     readClock()
     const id = setInterval(() => setTick(Date.now()), 1000)
     return () => {
-      cancelled = true
+      canceled = true
       clearInterval(id)
     }
   }, [])
@@ -73,7 +73,7 @@ export function ClockPanel() {
 
   return (
     <section className="panel-section">
-      <h2>Clock</h2>
+      <h2>System Time</h2>
 
       <div className="general-settings-form">
         <div className="field-row">

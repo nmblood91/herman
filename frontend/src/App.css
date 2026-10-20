@@ -14,7 +14,7 @@
 
 /* Excluded from the white-everything rule above, and the only element that
    needs to be: a code chip sits on a pale background, so inheriting white text
-   made it invisible. Colours are literal rather than themed on purpose -- the
+   made it invisible. Colors are literal rather than themed on purpose -- the
    chip has to stay legible whatever the surrounding panel does.
 
    `inline`, not `inline-flex`, so a long command wraps instead of forcing the
@@ -240,7 +240,7 @@ button:disabled {
 
 /* The control that is actually running stays legible. It is disabled to stop a
    second run, not to say nothing is happening, and it is the one carrying the
-   countdown -- greying that out to 40% is the opposite of what it is for. */
+   countdown -- graying that out to 40% is the opposite of what it is for. */
 button:disabled.working {
   background: #2e7d4b;
   color: rgba(255, 255, 255, 0.92);
@@ -293,7 +293,7 @@ button:disabled.working {
 
 /* The header is a button for the keyboard, not an action control, so it must
    not take the lift-and-brighten hover.
-   :not(:disabled) is here for specificity rather than for behaviour --
+   :not(:disabled) is here for specificity rather than for behavior --
    button:not(:disabled):hover scores (0,2,1) and a plain .plant-header:hover
    only (0,2,0), so the global rule was winning and the card turned green under
    the cursor. This scores (0,3,0) and actually takes effect. */
@@ -419,7 +419,7 @@ option {
 }
 
 /* Standalone it wants its own spacing, but beside a button in a flex row those
-   margins push it off the button's centre line. */
+   margins push it off the button's center line. */
 .slider-row .position-readout {
   margin-top: 0;
   margin-bottom: 0;
@@ -717,7 +717,7 @@ input[type='color'] {
   }
 
   /* Beside a wrapped button this would otherwise sit on its own line with the
-     button's centre-line spacing still applied. */
+     button's center-line spacing still applied. */
   .slider-row .position-readout {
     flex-basis: 100%;
   }
@@ -786,7 +786,7 @@ input[type='color'] {
 }
 
 /* The status bar carries a severity when it is showing the planter's own
-   state rather than feedback from something you just pressed. Colour is a
+   state rather than feedback from something you just pressed. Color is a
    second channel on top of the words, not a replacement for them -- the
    message says what is wrong either way, which matters for anyone who does
    not distinguish these hues. */

@@ -130,10 +130,10 @@ supply.
 **How many pixels you actually address depends on the chip.** WS2815 and GS8208
 give one addressable pixel per LED, so 60 LEDs is 60 pixels. WS2811 wires the
 LEDs in threes — one controller IC per group — so 60 LEDs is only 20 pixels, and
-the three LEDs in a group always show the same colour. Check the cut marks:
+the three LEDs in a group always show the same color. Check the cut marks:
 cuttable between every LED means one pixel per LED; cuttable every third LED
 means WS2811. Picking the strip type on the Calibration tab sets the pixel
-count, since the strip is always 1 m at 60 LEDs a metre. Only a strip of
+count, since the strip is always 1 m at 60 LEDs a meter. Only a strip of
 another density needs `LED_COUNT` in `.env`, and then in pixels, not LEDs.
 
 ## DC-DC Converter Specifications
@@ -268,7 +268,7 @@ carry. They are short runs, so this costs nothing but stiffness.
 | LEDs flicker or dim | Voltage sag under LED draw | Upgrade charger or add capacitor |
 | LEDs do nothing at all | Pi and strip grounds not tied together | Run a ground wire from a Pi GND pin to the busbar ground |
 | LEDs flicker or show junk on the first pixels | 3.3V data is marginal for WS2811 | Add a 74AHCT125 level shifter on the data line |
-| Red and green are swapped | Strip uses a different channel order | Press Red/Green/Blue under LED strip on the Calibration tab to see which is which, then change the colour order there |
+| Red and green are swapped | Strip uses a different channel order | Press Red/Green/Blue under LED strip on the Calibration tab to see which is which, then change the color order there |
 | Charger warm/hot | Overload or internal short | Reduce load; check for shorts; consider larger PSU |
 | Fuses blow immediately | Direct short somewhere | Inspect all wiring for damage before replacing |
 

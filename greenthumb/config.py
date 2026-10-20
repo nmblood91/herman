@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # Measured on this build: 66 mL in 60 s after a priming run, through the
     # real lift and tubing. The pump is rated 100 mL/min (1.67 mL/s), but that
     # assumes no head pressure, and this plumbing delivers about a third less.
-    # This converts millilitres into a run time, so an error here scales every
+    # This converts milliliters into a run time, so an error here scales every
     # watering by the same factor while still reporting success.
     # The starting point only. Once the pump has been run against a scale under
     # Calibration, the measured figure lives in state.json and wins over this,
@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     # offered -- sixty 5V pixels would pull about 3.6A, past what the DC-DC can
     # give on top of the Pi.
     led_chip: str = "WS2811"
-    # 0 means the chip decides: the strip is always one metre at 60 LEDs a
-    # metre, so WS2811 is 20 pixels and the others 60 (led_strip.pixel_count).
+    # 0 means the chip decides: the strip is always one meter at 60 LEDs a
+    # meter, so WS2811 is 20 pixels and the others 60 (led_strip.pixel_count).
     # Set it only for a strip of another density, and then in pixels, not LEDs.
     led_count: int = 0
     # Overrides the chip's usual order, for strips wired differently. BRG is

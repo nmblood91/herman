@@ -14,7 +14,7 @@ class ChipSpec:
     one: int
     color_order: str
     description: str
-    # How many LEDs one controller IC drives, all showing the same colour.
+    # How many LEDs one controller IC drives, all showing the same color.
     leds_per_pixel: int = 1
 
 
@@ -38,7 +38,7 @@ CHIPS = {
     "WS2811": ChipSpec(3_200_000, 4, 0b1000, 0b1100, "RGB", "12V, three LEDs per pixel", leds_per_pixel=3),
 }
 
-# The strip is always one metre, the length of the table, at 60 LEDs a metre.
+# The strip is always one meter, the length of the table, at 60 LEDs a meter.
 # So the chip alone decides how many pixels there are to address, and the
 # strip type picker sets the count rather than leaving a division by three to
 # whoever is wiring it up. A strip of another density needs LED_COUNT in .env.
@@ -46,7 +46,7 @@ STRIP_LEDS = 60
 
 
 def pixel_count(chip: str) -> int:
-    """Addressable pixels on the one-metre, 60-LED strip with this chip."""
+    """Addressable pixels on the one-meter, 60-LED strip with this chip."""
     spec = CHIPS.get(chip, CHIPS[DEFAULT_CHIP])
     return STRIP_LEDS // spec.leds_per_pixel
 
@@ -68,8 +68,8 @@ def pixel_count(chip: str) -> int:
 # The failure mode is quiet. spidev treats max_speed_hz as a ceiling and
 # substitutes the nearest rate its driver can produce, reporting nothing, so a
 # host that cannot land in these windows shows up as a strip with wrong or
-# flickering colours rather than as an error. Anyone porting this to a board
-# that is not a Pi should scope the line before believing the colours.
+# flickering colors rather than as an error. Anyone porting this to a board
+# that is not a Pi should scope the line before believing the colors.
 
 # WS2811 is what this build ships with. It drives three LEDs per pixel, which
 # pixel_count takes care of.

@@ -104,13 +104,13 @@ function App() {
     // Guarded rather than a bare loadDashboard(): a response that lands after
     // the component is gone would set state on nothing, and setting state
     // straight from an effect body is what the hooks lint objects to.
-    let cancelled = false
+    let canceled = false
     async function loadOnMount() {
-      if (!cancelled) await loadDashboard()
+      if (!canceled) await loadDashboard()
     }
     loadOnMount()
     return () => {
-      cancelled = true
+      canceled = true
     }
   }, [loadDashboard])
 
@@ -129,11 +129,11 @@ function App() {
 
   useEffect(() => {
     if (activeTab !== 'controls') return undefined
-    let cancelled = false
+    let canceled = false
     async function poll() {
       try {
         const data = await fetchJson('/gantry/position')
-        if (!cancelled) setLivePosition(data)
+        if (!canceled) setLivePosition(data)
       } catch {
         // A missed poll keeps the last reading; the next one replaces it.
       }
@@ -141,7 +141,7 @@ function App() {
     poll()
     const id = setInterval(poll, GANTRY_POLL_MS)
     return () => {
-      cancelled = true
+      canceled = true
       clearInterval(id)
       // Dropped on leaving the tab, so coming back shows the dashboard's
       // reading until the first poll lands rather than one from minutes ago.
@@ -157,7 +157,7 @@ function App() {
     if (movement.homing) return 'homing…'
     if (!movement.homed) return 'not homed'
 
-    // Whole millimetres: Klipper reports tenths, and the decimal flickers on a
+    // Whole millimeters: Klipper reports tenths, and the decimal flickers on a
     // readout polled every second without telling anyone anything.
     const numericValue = Math.round(Number(movement.position))
     if (!Number.isFinite(numericValue)) return 'unknown'

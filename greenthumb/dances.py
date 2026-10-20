@@ -11,7 +11,7 @@ carriage nudged by hand leaves every plant position quietly wrong until the
 next home. Doing it hourly keeps that window to an hour, and patrolling after
 it shows where the planter now thinks each plant is.
 
-Positions are fractions of usable travel rather than millimetres, so a dance
+Positions are fractions of usable travel rather than millimeters, so a dance
 scales to whatever the rail measures and cannot be sent somewhere the carriage
 cannot reach. Every routine ends at 0.0 — the same place homing parks — so the
 carriage always comes to rest at the end a reader can interpret.
@@ -68,7 +68,7 @@ DANCES: dict[str, Dance] = {
     ),
     "wave": Dance(
         title="Wave",
-        description="Swings either side of centre, each pass smaller than the last.",
+        description="Swings either side of center, each pass smaller than the last.",
         steps=(
             Step(0.50, CRUISE),
             Step(0.88, BRISK),
@@ -149,7 +149,7 @@ def steps_for(
 
     limit = max(float(travel_mm), 1.0)
 
-    # Whole millimetres, like every stored position. Floored at the top end
+    # Whole millimeters, like every stored position. Floored at the top end
     # rather than rounded, so a rail reported as 889.6 cannot be sent to 890.
     def clamp(mm: float) -> int:
         return min(round(max(mm, 0.0)), int(limit))
@@ -204,7 +204,7 @@ def gcode_for(steps: list[tuple[float, int, int]]) -> str:
     return "\n".join(lines)
 
 
-def catalogue() -> list[dict]:
+def catalog() -> list[dict]:
     """Every routine, with what it does.
 
     Names and descriptions only, so this needs neither the rail length nor the

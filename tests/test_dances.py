@@ -364,7 +364,7 @@ assert klip.homes == 0, klip.homes
 assert auto.startup_home_status()["phase"] == "next_start", auto.startup_home_status()
 print("ok: switched on after startup, it waits for the next start rather than homing now")
 
-# Deferred, not cancelled, by a snooze.
+# Deferred, not canceled, by a snooze.
 auto, klip = build(klip=Klip(homed=False))
 auto.set_home_on_startup(True)
 auto.snooze_watering(2)

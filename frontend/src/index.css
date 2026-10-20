@@ -77,7 +77,7 @@ h2 {
   font-weight: 500;
 }
 
-/* Sizes only. Colour comes from App.css, which sets it for everything inside
+/* Sizes only. Color comes from App.css, which sets it for everything inside
    .app-shell, so declaring it here would be overridden anyway. */
 h2 {
   font-size: 1.35rem;

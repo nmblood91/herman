@@ -9,23 +9,23 @@ export function LogsPanel() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    let cancelled = false
+    let canceled = false
     async function read() {
       try {
         const response = await fetch(`${API_BASE}/logs?lines=20`)
-        if (cancelled) return
+        if (canceled) return
         if (!response.ok) {
           setError(`Could not read the log (HTTP ${response.status})`)
           return
         }
         setLogs(await response.json())
       } catch (err) {
-        if (!cancelled) setError(`Could not read the log: ${err.message}`)
+        if (!canceled) setError(`Could not read the log: ${err.message}`)
       }
     }
     read()
     return () => {
-      cancelled = true
+      canceled = true
     }
   }, [])
 

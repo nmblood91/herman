@@ -143,7 +143,7 @@ loses:
   and runs at 1 GHz rather than 1.4, which makes the prebuilt frontend bundle
   more necessary rather than less.
 
-Revisit if supply normalises *and* volume makes 3% worth a third chassis.
+Revisit if supply normalizes *and* volume makes 3% worth a third chassis.
 
 **Not suitable at all:** Pi Zero / Zero W and any ARMv6 Pi. No 64-bit, and
 NodeSource ships no ARMv6 packages — though note that second objection
@@ -237,7 +237,7 @@ and what goes wrong if it is inverted.
 | Hook-up wire, LED runs | TBD | TBD | TBD | power and data out to the strip |
 | Connectors | TBD | TBD | TBD |  |
 
-Buy it at **60 LEDs per metre**, and use 1 m of it: the length of the table.
+Buy it at **60 LEDs per meter**, and use 1 m of it: the length of the table.
 The app works out the pixel count from the strip type on that basis, so a
 denser or sparser strip splits into zones of the wrong length unless
 `LED_COUNT` is set in `.env`. WS2811 is the default and drives three LEDs per

@@ -42,7 +42,7 @@ export function LedStripPanel({ overview }) {
   }
 
   // Explicit save, unlike the lighting controls under Controls: selecting a
-  // chip resets the colour order to that chip's default, so the two have to be
+  // chip resets the color order to that chip's default, so the two have to be
   // sent in a known order.
   const save = async () => {
     setStatus('')
@@ -69,8 +69,8 @@ export function LedStripPanel({ overview }) {
   }
 
   // Lights the whole strip one primary at a time, which is the only way to
-  // check the colour order above: if red comes out green, the order is wrong.
-  // Deliberately the existing colour endpoint rather than a test mode of its
+  // check the color order above: if red comes out green, the order is wrong.
+  // Deliberately the existing color endpoint rather than a test mode of its
   // own -- a "test" that drove the strip differently from normal use would
   // prove the test path works, not the strip.
   const show = async (name, rgb) => {
@@ -87,7 +87,7 @@ export function LedStripPanel({ overview }) {
         return
       }
       setTesting(
-        `Strip set to ${name}. If that is not the colour you see, the colour ` +
+        `Strip set to ${name}. If that is not the color you see, the color ` +
           'order above is wrong. This leaves the lights on Manual — set the ' +
           'mode back to Zone Schedule under Controls when you are done.',
       )
@@ -122,7 +122,7 @@ export function LedStripPanel({ overview }) {
 
         <div className="field-row">
           <label>
-            LED colour order
+            LED color order
             <select value={colorOrder} onChange={(event) => setColorOrder(event.target.value)}>
               {colorOrderOptions.map((order) => (
                 <option key={order} value={order}>
@@ -140,7 +140,7 @@ export function LedStripPanel({ overview }) {
         {status && <p className="field-hint warning">{status}</p>}
 
         <div className="field-row">
-          <label>Test the colour order</label>
+          <label>Test the color order</label>
           <div className="motion-grid">
             <button type="button" onClick={() => show('red', { r: 255, g: 0, b: 0 })}>
               Red

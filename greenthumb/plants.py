@@ -3,7 +3,7 @@
 Kept here rather than inside `Automation.__init__` so that anything needing to
 name a sensor can do so without constructing the whole service. An I2C address
 is an implementation detail, and nobody who owns one of these should have to
-recognise `0x38` as the third plant.
+recognize `0x38` as the third plant.
 
 The plant set itself is defined by the code -- how many plants there are, and
 which address each one reads. What the user may change is a plant's *name*, which
@@ -19,12 +19,12 @@ from greenthumb.models import PlantSpec
 
 
 # The stretch of rail each plant's watering may use, inclusive at both ends,
-# so neighbours share a boundary. A watering spot or sweep edge outside its
+# so neighbors share a boundary. A watering spot or sweep edge outside its
 # plant's zone is refused: it is almost always a position captured on the
-# wrong card, and the result would water the neighbouring pot. Plant 4 runs to
+# wrong card, and the result would water the neighboring pot. Plant 4 runs to
 # the end of this build's 890 mm rail; zone_for clips every zone to the rail
 # Klipper actually reports, so a rail measured shorter still wins.
-# Whole millimetres throughout, like every stored position.
+# Whole millimeters throughout, like every stored position.
 ZONES: dict[str, tuple[int, int]] = {
     "plant_1": (0, 200),
     "plant_2": (200, 445),
@@ -54,7 +54,7 @@ def sweep_edge_limits(low: int, high: int) -> tuple[int, int]:
 
 
 def zone_midpoint(plant_id: str) -> int | None:
-    """The middle of a plant's zone, rounded down to a whole millimetre, or
+    """The middle of a plant's zone, rounded down to a whole millimeter, or
     None if it has none. Down rather than to nearest so 322.5 and 567.5 do not
     go opposite ways under Python's round-half-to-even."""
     zone = ZONES.get(plant_id)
@@ -66,7 +66,7 @@ def zone_for(plant_id: str, travel_mm: float) -> tuple[int, int]:
 
     A plant with no zone gets the whole rail, so adding a plant to
     default_plants without a zone cannot strand it. The rail is floored to a
-    whole millimetre: Klipper reports position_max as a float, and the top of
+    whole millimeter: Klipper reports position_max as a float, and the top of
     a zone must not land past it.
     """
     rail = int(travel_mm)
@@ -126,11 +126,11 @@ def label_for(
 ) -> str:
     """"Plant 1 (0x36)", or just the address if it belongs to no plant.
 
-    Both halves on purpose: the name is what the owner recognises, and the
+    Both halves on purpose: the name is what the owner recognizes, and the
     address is what they would read off a sensor or type into `i2cdetect` when
     something needs tracing.
 
-    Pass `names` when labelling several addresses at once. Without it each call
+    Pass `names` when labeling several addresses at once. Without it each call
     reads the state file, which is fine for printing a four-row table and not
     fine in a loop that runs per reading.
     """

@@ -221,7 +221,7 @@ and the shipped 1.1 mL/s was measured on the reference build. Your tubing and
 lift may differ, so it is worth checking.
 
 On the **Calibration** tab, under **Pump**, press **Run calibration** (60 s) with
-the nozzle over a cup on a scale, enter the millilitres that came out, and press
+the nozzle over a cup on a scale, enter the milliliters that came out, and press
 **Save flow rate**. Throw away the first run, since it fills the tube. The
 measurement overrides the value in `.env`.
 
@@ -233,7 +233,7 @@ measured. Then enable it in the **Settings** tab. The switch persists in
 
 Optional extras, each covered in [deploy/README.md](deploy/README.md):
 
-- **LED strip:** pick the chip type in the app before the colour order.
+- **LED strip:** pick the chip type in the app before the color order.
 - **Camera:** the service account needs the `video` group:
   `sudo usermod -aG video pi`.
 - **Homing:** once the endstop is confirmed and the rail is clear, switch on

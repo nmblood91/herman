@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 
 // The pump's flow rate: run it for a fixed time, weigh what came out, type in
-// the millilitres.
+// the milliliters.
 //
 // Nothing in the app runs the pump by hand except the calibration run below --
 // watering a plant is a measured volume and stays under Controls. A raw run is
@@ -32,14 +32,14 @@ export function PumpPanel() {
   }
 
   useEffect(() => {
-    let cancelled = false
+    let canceled = false
     async function load() {
-      if (!cancelled) await readPump()
+      if (!canceled) await readPump()
     }
     load()
     const id = setInterval(() => setTick(Date.now()), 1000)
     return () => {
-      cancelled = true
+      canceled = true
       clearInterval(id)
     }
   }, [])

@@ -404,7 +404,7 @@ assert second.soil == "Fast-Draining Mix", second.soil
 assert capacity_of(auto, second) == 915, capacity_of(auto, second)
 state.save_soil("Fast-Draining Mix", {"field_capacity_raw": 870}, shared)
 auto._sync_scales()
-assert capacity_of(auto, second) == 870, "the scale travelled with the plant profile"
+assert capacity_of(auto, second) == 870, "the scale traveled with the plant profile"
 print("ok: a plant profile carries no field capacity; the pot reads its soil profile's")
 
 

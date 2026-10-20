@@ -9,11 +9,11 @@ export function VersionPanel() {
   const [build, setBuild] = useState(null)
 
   useEffect(() => {
-    let cancelled = false
+    let canceled = false
     async function readVersion() {
       try {
         const response = await fetch(`${API_BASE}/version`)
-        if (!response.ok || cancelled) return
+        if (!response.ok || canceled) return
         setBuild(await response.json())
       } catch {
         // Leaves the panel without a version rather than breaking it.
@@ -21,7 +21,7 @@ export function VersionPanel() {
     }
     readVersion()
     return () => {
-      cancelled = true
+      canceled = true
     }
   }, [])
 

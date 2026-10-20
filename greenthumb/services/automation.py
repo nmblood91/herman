@@ -415,7 +415,7 @@ class GreenThumbAutomation:
                     continue
                 # All whole numbers. Rounded rather than truncated, so a
                 # position stored with a decimal before positions became whole
-                # millimetres comes back at the nearest one, not the one below.
+                # millimeters comes back at the nearest one, not the one below.
                 setattr(plant, field_name, round(value))
 
         patrol = stored.get("auto_patrol")
@@ -717,9 +717,9 @@ class GreenThumbAutomation:
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        # Whole millimetres, rounded before the range check so the value
+        # Whole millimeters, rounded before the range check so the value
         # checked is the value stored. Infinity and not-a-number have no whole
-        # millimetre, and round() raises on both with a message nobody wants.
+        # millimeter, and round() raises on both with a message nobody wants.
         raw = float(position_mm)
         if not math.isfinite(raw):
             raise ValueError("The watering position must be a number")
@@ -768,7 +768,7 @@ class GreenThumbAutomation:
         # check: every comparison against nan is false, so both fail here.
         if not (float("-inf") < low <= high < float("inf")):
             raise ValueError("Sweep bounds must be numbers")
-        # Whole millimetres, rounded before any check so the span checked is
+        # Whole millimeters, rounded before any check so the span checked is
         # the span stored.
         low, high = round(low), round(high)
 
@@ -811,7 +811,7 @@ class GreenThumbAutomation:
 
         Turning on sweep is refused while the span is too narrow to be one. The
         mode and the span are separate settings, so the alternative is a pot
-        labelled "sweep" that waters as a point every time -- configured for
+        labeled "sweep" that waters as a point every time -- configured for
         something it never does, which is the failure mode this codebase keeps
         running into and the reason for the refusal rather than a default span.
         """
@@ -883,7 +883,7 @@ class GreenThumbAutomation:
         """Where to start the dose, and what to run while it is delivered.
 
         A motion of None is a point dose, and that is also the fallback every
-        time a configured sweep cannot be honoured. The plant still drinks and
+        time a configured sweep cannot be honored. The plant still drinks and
         the log says the sweep did not happen, which is the right way round:
         the sweep decides how the water is spread, not whether it arrives.
         """
@@ -1497,7 +1497,7 @@ class GreenThumbAutomation:
             )
 
         if isinstance(measured_ml, bool) or not isinstance(measured_ml, (int, float)):
-            raise ValueError("Give the measured volume as a number of millilitres")
+            raise ValueError("Give the measured volume as a number of milliliters")
         volume = float(measured_ml)
 
         seconds = float(self._last_pump_run["seconds"])
@@ -1514,7 +1514,7 @@ class GreenThumbAutomation:
         flow = volume / seconds
         if not (MIN_FLOW_ML_PER_SECOND <= flow <= MAX_FLOW_ML_PER_SECOND):
             # Catches the realistic slip: a decimal in the wrong place, or
-            # millilitres confused with something else. Both give a number that
+            # milliliters confused with something else. Both give a number that
             # stores happily and then mis-doses every pot by that factor.
             #
             # It is also what rejects a volume of zero, a negative one, or an
@@ -1618,7 +1618,7 @@ class GreenThumbAutomation:
     def cancel_snooze(self) -> dict[str, object]:
         self.snooze_until = None
         self._persist()
-        logger.info("Watering snooze cancelled")
+        logger.info("Watering snooze canceled")
         return self.quiet_status()
 
     def quiet_status(self) -> dict[str, object]:
@@ -1903,7 +1903,7 @@ class GreenThumbAutomation:
 
         stored =sum(1 for item in results.values() if item.get("written"))
         # Carries the plant name as well as the address: the owner of one of
-        # these should be told "Plant 2", not asked to recognise 0x37.
+        # these should be told "Plant 2", not asked to recognize 0x37.
         names = self.plant_names()
         return {
             "status": "ok",
@@ -2224,7 +2224,7 @@ class GreenThumbAutomation:
         return plant
 
     def set_plant_light_color(self, plant_id: str, color: object) -> dict[str, object]:
-        """The colour this pot's stretch of strip shows during its scheduled hours."""
+        """The color this pot's stretch of strip shows during its scheduled hours."""
         plant = self._plant_or_error(plant_id)
         plant.light_color = care.check_light_color(color)
         self._persist()
@@ -2234,7 +2234,7 @@ class GreenThumbAutomation:
     def set_zone_manual(
         self, plant_id: str, color: object = None, brightness: object = None
     ) -> dict[str, object]:
-        """This pot's own colour and brightness in manual mode, zones scope."""
+        """This pot's own color and brightness in manual mode, zones scope."""
         plant = self._plant_or_error(plant_id)
         # Both checked before either is applied, so a bad one changes nothing.
         checked_color = care.check_light_color(color) if color is not None else plant.manual_color
@@ -2448,10 +2448,10 @@ class GreenThumbAutomation:
             "last": self._last_patrol,
         }
 
-    def dance_catalogue(self) -> list[dict]:
+    def dance_catalog(self) -> list[dict]:
         """The routines and what they do. No Klipper round trip -- the list
         does not depend on the rail length."""
-        return dances.catalogue()
+        return dances.catalog()
 
     def home_gantry(self) -> dict[str, object]:
         with self._exclusive("Homing gantry"):
@@ -2571,7 +2571,7 @@ class GreenThumbAutomation:
 
         volume = settings.get("watering_volume_ml")
         if isinstance(volume, bool) or not isinstance(volume, (int, float)):
-            raise ValueError("Watering volume must be a number of millilitres")
+            raise ValueError("Watering volume must be a number of milliliters")
         # Clamped at zero and left unbounded above, matching
         # update_watering_volume. An upper limit enforced only here would mean
         # the editor refusing a dose the plant card accepts.

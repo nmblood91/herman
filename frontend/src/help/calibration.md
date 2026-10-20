@@ -1,7 +1,7 @@
 ## Calibration
 Settings you set once. Most never need changing.
 
-### Clock
+### System Time
 The lights follow the planter's own clock. If the time shown isn't your local
 time, press **Sync to Local Time**.
 
@@ -19,7 +19,7 @@ Measures how much water the pump moves, so each watering is the right amount.
 2. Press **Run calibration**. The pump runs for 60 seconds.
 3. Run it once to fill the tube, and throw that water away.
 4. Run it again, and enter the grams of water in the cup. One gram is one
-   millilitre.
+   milliliter.
 5. Press **Save flow rate**.
 
 ### Moisture probes
@@ -30,7 +30,7 @@ be faulty.
 
 ### LED strip
 Choose your strip type first. Then use the **Red**, **Green** and **Blue**
-buttons. If the colour on the strip doesn't match the button, change the colour
+buttons. If the color on the strip doesn't match the button, change the color
 order until it does.
 
 ### System Values
@@ -45,5 +45,5 @@ need these if support asks for them.
 | What you see | What to do |
 |---|---|
 | The home switch reading never changes | The switch or its cable may be loose. Contact support. |
-| The clock may be wrong | The planter isn't online yet. Check its Wi-Fi. |
+| "The clock has not reached a time server yet" | The planter isn't online yet. Check its Wi-Fi. |
 | A pot shows "no usable scale" | That pot's soil profile has no field capacity. See [Soil Profile Editor](#soil-profile-editor). |

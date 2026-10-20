@@ -87,7 +87,7 @@ as possible, so thick, fleshy roots never sit in standing water or fine sludge.
 
 | Property | Value |
 | --- | --- |
-| Field capacity | 12–18% VWC — water is held only inside the bark and the coir fibres |
+| Field capacity | 12–18% VWC — water is held only inside the bark and the coir fibers |
 | Permanent wilting point | 3–5% VWC — almost no capillary hold; once the bark surface dries, it is near zero |
 | Plant-available water | about 10% VWC |
 | Air space after draining | extreme, about 45–55% |
@@ -168,7 +168,7 @@ dryness band. If you have measured wilting point properly, type it into
 **Measure wilting point**, and the soil profile uses that instead. To measure
 it without wilting a plant, weigh a pot of the mix with no plant at field
 capacity. Let it dry until it has lost about *soil volume in mL ×
-(field capacity % − wilting point %) ÷ 100* grams (1 litre of Rich & Retentive
+(field capacity % − wilting point %) ÷ 100* grams (1 liter of Rich & Retentive
 Mix loses about 325 g), then take the reading.
 
 **If you measured your own, re-measure after repotting.** Mixes compact and

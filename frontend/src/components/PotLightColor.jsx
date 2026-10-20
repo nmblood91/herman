@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api'
 
-// A colour picker fires a change per pixel of drag, and this applies on the
+// A color picker fires a change per pixel of drag, and this applies on the
 // spot like the Lighting controls rather than waiting for the pot's save.
 const APPLY_DEBOUNCE_MS = 250
 
@@ -15,8 +15,8 @@ const fromHex = (hex) => {
   return { r: (numeric >> 16) & 255, g: (numeric >> 8) & 255, b: numeric & 255 }
 }
 
-// The colour this pot's stretch of strip shows during its scheduled hours in
-// Zone Schedule. Separate from its Manual colour on the Controls tab, so
+// The color this pot's stretch of strip shows during its scheduled hours in
+// Zone Schedule. Separate from its Manual color on the Controls tab, so
 // changing one never changes the other.
 export function PotLightColor({ plant }) {
   const [color, setColor] = useState(toHex(plant.light_color))
@@ -27,7 +27,7 @@ export function PotLightColor({ plant }) {
   // Follows the server during render, as the other controls do, except while
   // a change is still waiting to go out: the dashboard refresh would
   // otherwise snap the picker back mid-drag. Compared as hex, since every
-  // refresh brings a new array for the same colour.
+  // refresh brings a new array for the same color.
   const served = toHex(plant.light_color)
   const [synced, setSynced] = useState(served)
   if (served !== synced) {
@@ -52,7 +52,7 @@ export function PotLightColor({ plant }) {
         })
         if (!response.ok) {
           const data = await response.json().catch(() => ({}))
-          setError(data.error || `Could not set the colour (HTTP ${response.status})`)
+          setError(data.error || `Could not set the color (HTTP ${response.status})`)
           return
         }
         setError('')
@@ -65,10 +65,10 @@ export function PotLightColor({ plant }) {
   return (
     <div className="field-row">
       <label>
-        Light colour (Zone Schedule)
+        Light color (Zone Schedule)
         <input
           type="color"
-          aria-label={`Scheduled light colour for ${plant.name}`}
+          aria-label={`Scheduled light color for ${plant.name}`}
           value={color}
           onChange={(event) => change(event.target.value)}
         />

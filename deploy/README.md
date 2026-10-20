@@ -336,7 +336,7 @@ the switch only has to pull it to ground. Nothing here needs power.
 
 **Most limit switches sold for printers are 3-pin, so one wire comes off.**
 Which one depends on the board, and the S / G / V silkscreen is not a reliable
-guide — on many of them it is generic connector labelling over a straight
+guide — on many of them it is generic connector labeling over a straight
 passthrough of the microswitch's own C / NO / NC terminals, with no LED and no
 supply pin at all. Trace it before cutting: multimeter on continuity, work the
 lever, and find the pair that is **closed with the lever released**. That is
@@ -676,7 +676,7 @@ of the fuse — the topology the diagram above describes. Four things to respect
   open, not because the positive side is dead. Power the board down before
   opening the block, and do not assume an idle pump means a safe node.
 - **Seat the diode leads fully.** They are stiff 0.9 mm solid wire, within a
-  Wago 221's range, but leave a few millimetres straight out of the diode body
+  Wago 221's range, but leave a few millimeters straight out of the diode body
   before any bend so the glass seal is not stressed, and sleeve the legs.
 - **Label the block.** Reinstalling the diode backwards during maintenance is
   the one mistake that costs a mosfet, and nothing about the assembled block
@@ -807,7 +807,7 @@ Three things keep it healthy:
 - **Route away from the LED data line and the stepper wiring.** 1.5 m of I2C run
   parallel to an 800 kHz addressable-LED data line will cause more trouble than the
   capacitance ever will. Crossing at right angles is fine; running alongside is
-  not. Sharing a few centimetres near the Pi header is harmless.
+  not. Sharing a few centimeters near the Pi header is harmless.
 
 Verify with a soak test rather than a single read:
 
@@ -897,7 +897,7 @@ All 12V. A 5V strip is deliberately not supported: sixty 5V pixels pull about
 | GS8208 | 12V | one per LED | 3 | Often sold as "12V WS2812B" |
 
 They use different bit timing, so picking the wrong one gives no light or
-garbage rather than a subtle colour shift. **To tell 12V strips apart, check the
+garbage rather than a subtle color shift. **To tell 12V strips apart, check the
 cut marks.** Cuttable between every LED means one pixel per LED (WS2815 /
 GS8208); cuttable only every third LED means WS2811.
 
@@ -928,7 +928,7 @@ Two things that look like software faults but are not:
 about 3.6A -- which is one of the reasons 5V is not supported. Either way the
 strip's supply must not touch the Pi's pins.
 
-If red and green come out swapped, change **LED colour order** in settings.
+If red and green come out swapped, change **LED color order** in settings.
 Selecting a strip type resets that order to the one that chip normally uses, so
 choose the type first and adjust the order afterwards.
 

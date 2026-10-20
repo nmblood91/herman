@@ -237,11 +237,11 @@ assert FakeKlipper({"stepper_x": 1}).endstop_state()["triggered"] is True
 assert FakeKlipper({"stepper_x": 0}).endstop_state()["triggered"] is False
 print("ok: numeric 0 and 1 are accepted too")
 
-# Something unrecognised must be reported, never guessed at.
+# Something unrecognized must be reported, never guessed at.
 result = FakeKlipper({"stepper_x": "maybe"}).endstop_state()
 assert result["ok"] is False, result
 assert "maybe" in result["error"], result["error"]
-print("ok: an unrecognised value is reported rather than guessed")
+print("ok: an unrecognized value is reported rather than guessed")
 
 # Moonraker and some versions wrap the same mapping in last_query.
 assert FakeKlipper({"last_query": REAL}).endstop_state() == {"ok": True, "triggered": False}

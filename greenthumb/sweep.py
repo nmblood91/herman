@@ -18,7 +18,7 @@ Which makes the travel time the dose, and that is why acceleration is in here.
 A pass is not `span / speed`: the carriage ramps up and down at every
 reversal, so the real time is longer. Timing a dose against the ideal would
 leave the pump running through the extra, over-dosing by the total ramp time --
-tens of passes worth of it. So each pass is modelled as the trapezoid Klipper
+tens of passes worth of it. So each pass is modeled as the trapezoid Klipper
 will actually run, and the speed is then solved backwards from the dose.
 
 Everything here is arithmetic on floats: no hardware, no Klipper, no state.
@@ -121,7 +121,7 @@ def plan(
 ) -> Plan | None:
     """Fit whole passes into the dose, then solve the speed to match it exactly.
 
-    None when a sweep cannot honour the dose, and the caller must then water as
+    None when a sweep cannot honor the dose, and the caller must then water as
     a point rather than adjust anything. Two cases reach it, and neither should
     be papered over:
 

@@ -14,11 +14,11 @@ export function HostnamePanel() {
   const [moved, setMoved] = useState(null)
 
   useEffect(() => {
-    let cancelled = false
+    let canceled = false
     async function readName() {
       try {
         const response = await fetch(`${API_BASE}/system/hostname`)
-        if (!response.ok || cancelled) return
+        if (!response.ok || canceled) return
         const data = await response.json()
         setCurrent(data.hostname)
         setName(data.hostname)
@@ -28,7 +28,7 @@ export function HostnamePanel() {
     }
     readName()
     return () => {
-      cancelled = true
+      canceled = true
     }
   }, [])
 

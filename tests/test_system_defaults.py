@@ -116,7 +116,7 @@ assert again.leds.manual_scope == "zones", "the manual scope did not survive a r
 assert again.get_plant("plant_1").light_color == (255, 0, 0)
 assert (again.get_plant("plant_2").manual_color, again.get_plant("plant_2").manual_brightness) == ((0, 0, 255), 30)
 assert again.get_plant("plant_3").light_color == (255, 255, 255), "an untouched pot is not white"
-print("ok: the manual colour and scope and each pot's colours survive a restart")
+print("ok: the manual color and scope and each pot's colors survive a restart")
 auto.sensor_hub.calibration = {0x36: {"dry": 410}}
 state.save_calibration_point(0x36, "dry", 410, path=path)
 

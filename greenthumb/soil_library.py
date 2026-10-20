@@ -97,7 +97,7 @@ LIBRARY: tuple[LibrarySoil, ...] = (
             "Recipe 3, for orchids and jungle epiphytes. 3 parts coarse bark, "
             "1 part chunk coir or peat, 1 part coarse perlite (or pumice). "
             "Maximum air around thick, fleshy roots; water is held only inside "
-            "the bark and the coir fibres. Field capacity 12-18% VWC, "
+            "the bark and the coir fibers. Field capacity 12-18% VWC, "
             "permanent wilting point 3-5%, about 10% available water. Dries "
             "out in 1-3 days indoors. "
             "For: phalaenopsis, cattleya, dendrobium, oncidium orchids; "

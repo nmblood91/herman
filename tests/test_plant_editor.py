@@ -145,7 +145,7 @@ assert auto.write_plant_profile("Zero", {**BODY, "watering_volume_ml": -5})
 assert state.load_profiles(auto._state_path)["Zero"]["watering_volume_ml"] == 0
 print("ok: a negative dose clamps to zero, as it does on the plant card")
 
-# Normalised on the way in, not stored as typed. Both paths into the store
+# Normalized on the way in, not stored as typed. Both paths into the store
 # have to agree byte for byte -- the snapshot path writes
 # isoformat(timespec="minutes") -- or the equivalence above holds only for
 # input that happened to be formatted the same way already.
@@ -153,7 +153,7 @@ auto.write_plant_profile("Odd times", {**BODY, "light_start_time": "07:30:45"})
 odd = state.load_profiles(auto._state_path)["Odd times"]
 assert odd["light_start_time"] == "07:30", odd
 assert "light_stop_time" not in odd, "a stop time was stored beside the hours"
-print("ok: a loosely typed start time is normalised, and no stop time is stored")
+print("ok: a loosely typed start time is normalized, and no stop time is stored")
 
 try:
     auto.write_plant_profile("Bad notes", {**BODY, "notes": 42})
@@ -314,18 +314,18 @@ print("ok: a target maps to the water level the key gives it, across eight level
 
 # Never stored: a label in the body, or one saved by an older build, is
 # dropped, and what is reported comes from the target.
-labelled = build()
-labelled.write_plant_profile("Labelled", {**BODY, "target_available": 10, "water_level": "Wet"})
-assert "water_level" not in state.load_profiles(labelled._state_path)["Labelled"]
-raw = state.load_state(labelled._state_path)
+labeled = build()
+labeled.write_plant_profile("Labeled", {**BODY, "target_available": 10, "water_level": "Wet"})
+assert "water_level" not in state.load_profiles(labeled._state_path)["Labeled"]
+raw = state.load_state(labeled._state_path)
 raw["plant_profiles"]["Old"] = {**BODY, "target_available": 55, "water_level": "Dry"}
-state.save_state(raw, labelled._state_path)
-listed = {entry["name"]: entry for entry in labelled.list_plant_profiles()}
-assert listed["Labelled"]["water_level"] == "Ultra Dry", listed["Labelled"]
+state.save_state(raw, labeled._state_path)
+listed = {entry["name"]: entry for entry in labeled.list_plant_profiles()}
+assert listed["Labeled"]["water_level"] == "Ultra Dry", listed["Labeled"]
 assert listed["Old"]["water_level"] == "Medium-Wet", "a stored label outranked the key"
-assert labelled.get_plant_profile("Old")["profile"]["water_level"] == "Medium-Wet"
-labelled.apply_plant_profile(labelled.plants[0].plant_id, "Old")
-plant_row = next(p for p in labelled.get_overview()["plants"] if p["plant_id"] == "plant_1")
+assert labeled.get_plant_profile("Old")["profile"]["water_level"] == "Medium-Wet"
+labeled.apply_plant_profile(labeled.plants[0].plant_id, "Old")
+plant_row = next(p for p in labeled.get_overview()["plants"] if p["plant_id"] == "plant_1")
 assert plant_row["target_available"] == 55
 print("ok: the water level is always worked out from the target, never stored")
 

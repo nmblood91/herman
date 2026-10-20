@@ -93,7 +93,7 @@ assert status["measured_at"] is None
 assert status["last_run"] is None
 print("ok: an uncalibrated planter reports the default and no measurement date")
 
-# The dose timing is derived from it, so the readout and the behaviour agree.
+# The dose timing is derived from it, so the readout and the behavior agree.
 assert abs(status["seconds_for_100ml"] - auto._dose_seconds(100)) < 0.05
 print("ok: the reported 100 mL run time is the one a dose would actually use")
 

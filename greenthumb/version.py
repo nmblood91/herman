@@ -7,7 +7,7 @@ should have reset and did not. Both were invisible until something broke oddly.
 So this reports two commits, not one. `running` is captured when the process
 starts and never changes; `checkout` is read live from disk. If they differ,
 new code arrived without a restart, and the UI can say so instead of leaving
-you to infer it from strange behaviour.
+you to infer it from strange behavior.
 
 Two kinds of "on disk". A git checkout reads the working tree's commit. An
 installed package has no git at all, and reads BUILD_INFO.json, which CI writes

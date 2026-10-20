@@ -160,7 +160,7 @@ print("ok: a too-narrow or inverted span is refused rather than clamped")
 print("\nall state and calibration checks passed")
 
 
-# --- the averaged value must honour calibration too ---
+# --- the averaged value must honor calibration too ---
 # Regression: the averaged figure used to be computed from an address alone,
 # which dropped per-sensor calibration from the one number that decides
 # watering. It now takes the plant, because the top of the scale belongs to

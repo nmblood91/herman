@@ -235,7 +235,7 @@ that happens to water plants. Roughly $25 saved against rewriting the repo.
 
 **Moving the host off the planter** is worth naming because it is tempting:
 nothing says the Linux machine has to be inside the furniture. USB past about
-three metres is unreliable, and it makes every unit depend on a household
+three meters is unreliable, and it makes every unit depend on a household
 server. Reasonable on a bench, fatal for something sold.
 
 **At volume the answer is none of the above.** The saving is not a cheaper
@@ -257,7 +257,7 @@ the camera was wrong. Coverage is `2 · standoff · tan(HFOV/2)`, so framing
 | 143° | 120 mm |
 | 170°+ fisheye | effectively none |
 
-This frame does not give 260 mm. **That ceiling is a Raspberry Pi catalogue
+This frame does not give 260 mm. **That ceiling is a Raspberry Pi catalog
 limit rather than a physical one** — 120° is the widest CSI lens they sell, and
 UVC modules go far wider for less money. So the interesting alternatives are
 all USB.

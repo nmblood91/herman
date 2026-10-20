@@ -8,8 +8,8 @@ const APPLY_DEBOUNCE_MS = 250
 // Three of the rows below are built from a list the API supplies, so when the
 // API does not answer they render as a heading with nothing under it -- which
 // reads as a UI that has lost those controls rather than a planter that has
-// not answered yet. The jog buttons above have the better behaviour: they stay
-// where they are and grey out. These do the same, with a disabled placeholder
+// not answered yet. The jog buttons above have the better behavior: they stay
+// where they are and gray out. These do the same, with a disabled placeholder
 // holding the row open and a hint saying what is missing.
 const WAITING_HINT =
   'Waiting on the planter for this list. If the bar at the top says the ' +
@@ -51,7 +51,7 @@ const describeCycle = (speed) => {
   return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)} s a cycle`
 }
 
-// A zone's manual brightness and colour as the controls hold them.
+// A zone's manual brightness and color as the controls hold them.
 const lookFrom = (zone) => ({
   brightness: zone.manual_brightness ?? 75,
   color: toHexColor(zone.manual_color),
@@ -176,7 +176,7 @@ export function ControlsPanel({
     }
   }
 
-  // Keyed so a brightness drag and a colour drag do not cancel each other.
+  // Keyed so a brightness drag and a color drag do not cancel each other.
   const postDebounced = (key, path, body) => {
     clearTimeout(timers.current[key])
     timers.current[key] = setTimeout(() => post(path, body), APPLY_DEBOUNCE_MS)
@@ -261,11 +261,11 @@ export function ControlsPanel({
   }
 
   useEffect(() => {
-    let cancelled = false
+    let canceled = false
     async function loadDances() {
       try {
         const response = await fetch(`${API_BASE}/dances`)
-        if (!response.ok || cancelled) return
+        if (!response.ok || canceled) return
         const data = await response.json()
         setDances(data.dances || [])
       } catch {
@@ -274,7 +274,7 @@ export function ControlsPanel({
     }
     loadDances()
     return () => {
-      cancelled = true
+      canceled = true
     }
   }, [])
 
@@ -414,10 +414,10 @@ export function ControlsPanel({
           </div>
 
           {/* In Zone Schedule each pot's stretch of strip runs in its own
-              colour, at the brightness in its plant profile, so one slider for
+              color, at the brightness in its plant profile, so one slider for
               the whole strip would do nothing there. */}
           {ledMode === 'schedule' && (
-            <p className="field-hint">Each pot&apos;s colour is set on its card.</p>
+            <p className="field-hint">Each pot&apos;s color is set on its card.</p>
           )}
 
           {ledMode === 'manual' && (

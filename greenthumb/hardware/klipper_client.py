@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 QUERY_TIMEOUT = 5.0
 # gcode/script replies once a script's commands have been *queued*, not run: a
 # G1 or G4 goes into Klipper's motion queue and the reply comes back while the
-# carriage is still travelling. Measured on the planter -- "Home gantry: ok"
+# carriage is still traveling. Measured on the planter -- "Home gantry: ok"
 # arrived before the return trip to X0 had finished -- which let the hardware
 # lock go while the carriage was still moving. So every script that moves, or
 # dwells, ends with M400 (wait for the queue to drain), and the reply then means

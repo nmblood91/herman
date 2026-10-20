@@ -10,7 +10,7 @@ and its settings to /etc/greenthumb, so an upgrade can replace the code without
 touching any of it, and a read-only system image can later put just those on a
 writable partition.
 
-Packaged mode is recognised by BUILD_INFO.json, which only CI writes, rather
+Packaged mode is recognized by BUILD_INFO.json, which only CI writes, rather
 than by an environment variable. A command run by hand over SSH -- a
 calibration pass, say -- has no service environment, and must still find the
 same state.json the service uses rather than quietly starting a new one.

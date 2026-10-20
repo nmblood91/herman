@@ -26,8 +26,8 @@ class PlantSpec:
     light_start_time: time = time(8, 0)
     light_hours: int = care.DEFAULT_LIGHT_HOURS
     light_brightness: int = care.DEFAULT_LIGHT_BRIGHTNESS
-    # Whole millimetres, like the sweep bounds below. The carriage cannot be
-    # placed over a pot to a fraction of a millimetre by eye, so a decimal
+    # Whole millimeters, like the sweep bounds below. The carriage cannot be
+    # placed over a pot to a fraction of a millimeter by eye, so a decimal
     # here would only be noise on the card.
     position_mm: int = 0
     # Which soil library entry this pot is filled with. Empty means not set,

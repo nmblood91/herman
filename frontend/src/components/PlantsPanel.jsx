@@ -78,14 +78,14 @@ const reasonToHold = (draft, plant) => {
   if (String(draft.position_mm).trim() === '' || !Number.isFinite(Number(draft.position_mm))) {
     return 'Watering position is blank, so nothing has been saved.'
   }
-  // Positions are whole millimetres. Held rather than rounded quietly, so the
+  // Positions are whole millimeters. Held rather than rounded quietly, so the
   // card never saves a different number from the one on screen.
   const fractional = POSITION_FIELDS.find(
     (field) => (field === 'position_mm' || draft.watering_mode === 'sweep') &&
       !Number.isInteger(Number(draft[field])),
   )
   if (fractional) {
-    return `Use whole millimetres — ${draft[fractional]} has a decimal. Not saved.`
+    return `Use whole millimeters — ${draft[fractional]} has a decimal. Not saved.`
   }
   // The planter refuses these too. Held here so a half-typed number reads as
   // "not yet" under the field rather than a red failure in the status bar.
@@ -218,7 +218,7 @@ const describeSoak = (soak) => {
 }
 
 // How close two plants have to be before capturing one looks like a mix-up.
-// Pots on a metre of rail sit hundreds of millimetres apart, so anything this
+// Pots on a meter of rail sit hundreds of millimeters apart, so anything this
 // near an already-configured plant almost certainly means the carriage was
 // parked over that plant and the button pressed on the wrong card.
 const CONFUSION_MARGIN_MM = 50
@@ -344,7 +344,7 @@ export function PlantsPanel({
     // different plant's card. The captured value then lands on top of a plant
     // that is already configured there.
     // Only for the watering spot. Two pots' spots landing on top of each
-    // other is a mistake; a sweep edge sitting close to the neighbouring pot
+    // other is a mistake; a sweep edge sitting close to the neighboring pot
     // is not, because a wide pot's span can reasonably reach most of the way
     // there -- warning about it would train the warning away.
     const clash =
@@ -630,7 +630,7 @@ export function PlantsPanel({
                           />
                           {/* No field argument: this one captures the watering
                               position, and that is also the only field whose
-                              capture checks for a neighbouring pot. */}
+                              capture checks for a neighboring pot. */}
                           <button type="button" onClick={() => capturePosition(plant)}>
                             Use current position
                           </button>

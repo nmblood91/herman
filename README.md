@@ -74,7 +74,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | Group | What it covers |
 |---|---|
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
-| `/plants/...` | per-plant name, light window and scheduled light colour, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
+| `/plants/...` | per-plant name, light window and scheduled light color, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
 | `/plant-profiles`, `/plants/{id}/profile` | the plant profile library: list, read one, write one from a body, snapshot a pot, load onto a pot, delete |
 | `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
 | `/water/{plant_id}` | move to a plant and dose it |
@@ -84,7 +84,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/dances`, `/dances/run/{name}` | the routines, run by hand |
 | `/patrol/auto`, `/gantry/home-on-startup` | the hourly auto-patrol and the startup home, each on or off |
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
-| `/lights/...` | mode (Zone Schedule, Manual, Rainbow, Off), brightness, colour, Manual for all zones or each zone (`/lights/manual-scope`, `/lights/zones/{plant_id}`), rainbow speed, strip type, colour order |
+| `/lights/...` | mode (Zone Schedule, Manual, Rainbow, Off), brightness, color, Manual for all zones or each zone (`/lights/manual-scope`, `/lights/zones/{plant_id}`), rainbow speed, strip type, color order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |
 | `/system/restore-defaults` | back to a fresh install; the plant profile and soil libraries and the history are kept |
 | `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame. No UI — reach these directly |
@@ -156,7 +156,7 @@ What a plant profile carries:
 | Preferred soil | The soil profile the plant wants. Loading the profile switches the pot to it. |
 | Water at (% soil water) | The pot is watered once its soil water drops to this, from 10 to 90%. See *Watering targets* below. |
 | Water level | The target in words, from Ultra Dry to Ultra Wet. Worked out from the target, never stored; see *Watering targets*. |
-| Watering volume | Millilitres per dose. |
+| Watering volume | Milliliters per dose. |
 | Lights on at, hours | When this plant's stretch of strip comes on, and for how long. The card and editor show when it goes off; nothing stores a stop time. |
 | Brightness | 0–100% for this plant's stretch of strip. Low 25%, Medium 50%, High 75%, Intense 100%. |
 
@@ -187,7 +187,7 @@ recipes are carried this way.
 
 **Nothing describing the pot's placement is part of a plant profile** -- not
 the watering position, the watering mode or its sweep bounds. If the position
-travelled, loading one plant onto a second pot would give both the same rail
+traveled, loading one plant onto a second pot would give both the same rail
 coordinate and watering one would dribble into the other.
 
 The soil is different: a plant profile names the soil profile the plant
@@ -211,7 +211,7 @@ curl -X POST http://herman.local/api/v1/plants/plant_1/watering-mode -H 'Content
 
 The span goes first, because switching a pot to `sweep` is refused while its
 span is narrower than 10 mm. The two are separate settings, so the alternative
-is a pot labelled "sweep" that waters as a point for ever — configured for
+is a pot labeled "sweep" that waters as a point for ever — configured for
 something it never does.
 
 **The sweep's passes replace the pump's dwell, and that is forced rather than
@@ -234,7 +234,7 @@ until the plan fits, rather than inferred from the arithmetic, since the
 feedrate has to go out as a whole number of mm/min and that rounding can land
 below the speed that was solved for.
 
-A sweep that cannot honour the dose falls back to watering at the pot's point
+A sweep that cannot honor the dose falls back to watering at the pot's point
 position, with the reason logged — a dose too small to cross the span, a span
 that has fallen off a re-measured rail, or Klipper not reporting its motion
 limits. The plant still drinks either way: the sweep decides how the water is
@@ -514,7 +514,7 @@ converts a requested volume into a pump run time.
 ### Measuring the pump flow rate
 
 Calibration → Pump. Press **Run calibration**, weigh what comes out, and type
-the millilitres in; the planter divides by the run it timed itself. This is the
+the milliliters in; the planter divides by the run it timed itself. This is the
 only control in the app that runs the pump directly -- watering a plant asks for
 a measured volume, so it stays on the Controls tab.
 

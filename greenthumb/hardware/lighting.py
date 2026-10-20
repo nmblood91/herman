@@ -40,7 +40,7 @@ FRAME_INTERVAL = 1 / 30
 IDLE_INTERVAL = 0.5
 
 
-def colour_wheel(position: int) -> tuple[int, int, int]:
+def color_wheel(position: int) -> tuple[int, int, int]:
     position %= 256
     if position < 85:
         return (position * 3, 255 - position * 3, 0)
@@ -52,7 +52,7 @@ def colour_wheel(position: int) -> tuple[int, int, int]:
 
 
 # Rainbow speed is 0-100. 0 holds the rainbow still where it is; 1-100 is
-# mapped onto the time one full trip round the colour wheel takes: two minutes
+# mapped onto the time one full trip round the color wheel takes: two minutes
 # at 1, two seconds at 100. Exponential, so each step of the slider feels like
 # the same change whether it is slow or fast.
 SLOWEST_CYCLE_SECONDS = 120.0
@@ -67,7 +67,7 @@ def clamp_rainbow_speed(speed: object) -> int:
 
 
 def rainbow_cycle_seconds(speed: int) -> float | None:
-    """Seconds for one trip round the colour wheel, or None when paused."""
+    """Seconds for one trip round the color wheel, or None when paused."""
     speed = clamp_rainbow_speed(speed)
     if speed == PAUSED_RAINBOW_SPEED:
         return None
@@ -82,7 +82,7 @@ def _dim(pixel: tuple[int, int, int], brightness: int) -> tuple[int, int, int]:
 
 
 # What a new controller starts with, and what Restore to Defaults returns to.
-# Chip and colour order are not here: those come from .env.
+# Chip and color order are not here: those come from .env.
 DEFAULT_MODE = "schedule"
 DEFAULT_COLOR = DEFAULT_LIGHT_COLOR
 DEFAULT_BRIGHTNESS = DEFAULT_LIGHT_BRIGHTNESS
@@ -104,7 +104,7 @@ class LedController:
         spi_device: int = 0,
     ) -> None:
         # A count given here is fixed (LED_COUNT in .env, or a test). Without
-        # one, the count follows the chip on the standard one-metre strip, and
+        # one, the count follows the chip on the standard one-meter strip, and
         # changes when the chip does.
         self._fixed_count = max(int(led_count), 1) if led_count else None
         self.mode: Mode = DEFAULT_MODE
@@ -159,7 +159,7 @@ class LedController:
                 self._wake.clear()
 
     def _advance_rainbow(self) -> None:
-        """One frame's turn of the colour wheel at the current speed."""
+        """One frame's turn of the color wheel at the current speed."""
         cycle = rainbow_cycle_seconds(self.rainbow_speed)
         if cycle is None:
             return
@@ -184,7 +184,7 @@ class LedController:
             pixels = [self.color] * self.led_count
         else:
             pixels = [
-                colour_wheel(index * 256 // self.led_count + int(self._rainbow_offset))
+                color_wheel(index * 256 // self.led_count + int(self._rainbow_offset))
                 for index in range(self.led_count)
             ]
         return [_dim(pixel, self.brightness) for pixel in pixels]
@@ -192,19 +192,19 @@ class LedController:
     def _zone_frame(self, look) -> list[tuple[int, int, int]]:
         """Each pot's stretch of strip lit its own way.
 
-        look(zone) gives (colour, brightness %), or None to leave that zone
-        dark. LEDs outside every zone stay dark. Neither the strip-wide colour
+        look(zone) gives (color, brightness %), or None to leave that zone
+        dark. LEDs outside every zone stay dark. Neither the strip-wide color
         nor the strip-wide brightness is applied on top: until this was split
-        out, schedule mode lit every pot in the colour last picked for manual.
+        out, schedule mode lit every pot in the color last picked for manual.
         """
         pixels = [(0, 0, 0)] * self.led_count
         for zone in self._zones:
             chosen = look(zone)
             if chosen is None:
                 continue
-            colour = _dim(*chosen)
+            color = _dim(*chosen)
             for index in range(max(zone.start, 0), min(zone.end, self.led_count - 1) + 1):
-                pixels[index] = colour
+                pixels[index] = color
         return pixels
 
     def set_plant_segments(self, zones: list[Zone]) -> None:
@@ -215,12 +215,12 @@ class LedController:
             self._wake.set()
 
     def set_manual_scope(self, scope: str) -> dict[str, object]:
-        normalised = str(scope).strip().lower()
-        if normalised not in VALID_MANUAL_SCOPES:
+        normalized = str(scope).strip().lower()
+        if normalized not in VALID_MANUAL_SCOPES:
             raise ValueError(f"Manual lighting covers all zones or each zone separately, not {scope!r}")
-        self.manual_scope = normalised
+        self.manual_scope = normalized
         self._wake.set()
-        return {"status": "ok", "manual_scope": normalised}
+        return {"status": "ok", "manual_scope": normalized}
 
     def set_mode(self, mode: str) -> dict[str, str]:
         if mode not in VALID_MODES:
@@ -252,15 +252,15 @@ class LedController:
         }
 
     def set_color_order(self, order: str) -> dict[str, object]:
-        normalised = str(order).strip().upper()
-        if normalised not in VALID_COLOR_ORDERS:
+        normalized = str(order).strip().upper()
+        if normalized not in VALID_COLOR_ORDERS:
             raise ValueError(f"Unsupported LED color order: {order}")
-        self.strip.color_order = normalised
+        self.strip.color_order = normalized
         # Only the wire encoding changes, not the pixel values, so the
         # unchanged-frame check would otherwise skip sending the new order.
         self._last_frame = None
         self._wake.set()
-        return {"status": "ok", "color_order": normalised}
+        return {"status": "ok", "color_order": normalized}
 
     def _count_for(self, chip: str) -> int:
         return self._fixed_count or pixel_count(chip)

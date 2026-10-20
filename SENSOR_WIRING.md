@@ -51,7 +51,7 @@ Two things to check once they are hanging, both consequences of putting a
 bare board above a pot that gets watered:
 
 - **Keep them out of the splash line.** The nozzle dribbles into the pot from
-  the travelling carriage, and these hubs are unsealed PCBs with open JST
+  the traveling carriage, and these hubs are unsealed PCBs with open JST
   sockets facing whichever way they are hung. Sitting over the rim or the gap
   between pots keeps the drop just as short as sitting over the soil, without
   putting the board under the water. Point the connectors sideways or down so

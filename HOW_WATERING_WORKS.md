@@ -143,7 +143,7 @@ Only then does the pump run.
 
 Each pot chooses one, on its card under **Watering mode**.
 
-**Fixed Position** is the original behaviour: the arm goes to the pot's
+**Fixed Position** is the original behavior: the arm goes to the pot's
 watering position and the whole dose goes in there.
 
 **Sweep Range** walks the nozzle between a left edge and a right edge
@@ -151,7 +151,7 @@ for as long as the pump runs, so the same volume arrives spread across the pot
 instead of into one place. This is for a wide pot, where a dose landing on one
 spot runs straight down through one column of soil and out of the bottom while
 the rest of the root ball stays dry. You can see that happen: the moisture
-reading barely moves after watering, and the top of the pot is dry a centimetre
+reading barely moves after watering, and the top of the pot is dry a centimeter
 away from the wet patch.
 
 Set the edges by jogging the arm to each side of the pot and pressing the
@@ -182,7 +182,7 @@ anywhere in the zone once the pots are placed.
 | Plant 3 | 445–690 mm | 567 mm | 517–617 mm |
 | Plant 4 | 690–890 mm | 790 mm | 740–840 mm |
 
-Positions are whole millimetres; a middle that falls on a half is rounded
+Positions are whole millimeters; a middle that falls on a half is rounded
 down. The card shows the plant's range, and a value outside it, or one with a
 decimal, is not saved. A
 "Use current position" press with the arm over a different plant is refused
@@ -195,14 +195,14 @@ drops back to the spot), so set it again on the card. The zones are defined in
 
 Four cases make a pot water at its spot instead, and the log says which:
 
-* **The dose is too small to cross the span.** A few millilitres over 400 mm
+* **The dose is too small to cross the span.** A few milliliters over 400 mm
   would mean running the pump longer to fit the motion, which would over-water
   the pot. The dose wins and the sweep is dropped.
 * **The span has fallen off the rail.** If the rail is re-measured shorter than
   a saved span, the arm would be sent somewhere it cannot go and the whole
   dose would fail. Watering at the spot is better than not watering.
 * **The span reaches outside the plant's zone**, from a setting saved before
-  the zones existed. It would water the neighbouring pot.
+  the zones existed. It would water the neighboring pot.
 * **The motion board has not said how fast it can move.** A sweep is timed
   against the board's own speed and acceleration figures, because a pass costs
   the time it spends speeding up and slowing down at each end. Guessing those

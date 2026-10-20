@@ -264,7 +264,7 @@ export function SoilPanel({ soils, plants, onRefresh }) {
   // cancelHold deliberately left out of the deps: it is a fresh closure every
   // render (the hook does not memoise it), so including it would re-fire this
   // effect on every render -- which, while a hold is in progress, is every
-  // animation frame, cancelling the hold the instant it ticks.
+  // animation frame, canceling the hold the instant it ticks.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => cancelHold, [picked])
 

@@ -30,13 +30,13 @@ export function CalibrationPanel() {
     // Guarded rather than a bare load(): a response landing after the tab is
     // switched away would set state on a gone component, and setting state
     // straight from an effect body is what the hooks lint objects to.
-    let cancelled = false
+    let canceled = false
     async function loadOnMount() {
-      if (!cancelled) await load()
+      if (!canceled) await load()
     }
     loadOnMount()
     return () => {
-      cancelled = true
+      canceled = true
     }
   }, [load])
 

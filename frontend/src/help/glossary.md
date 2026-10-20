@@ -1,27 +1,27 @@
 ## Glossary
 
 ### Field capacity
-The wettest a soil stays once extra water has drained away. It's 100% on the
-moisture reading.
+The wettest a soil stays once extra water has drained away. It's 100%
+[soil water](#soil-water).
 
 ### Gantry (arm)
 The part that carries the nozzle along the rail.
 
 ### Homing
-The arm moving to the end of the rail to find out where it is.
+The arm moving to the end of the rail to establish position.
 
 ### Moisture probe
-The sensor in each pot that measures how wet the soil is.
+The sensor in each pot that measures how wet and how warm its soil is.
 
 ### Plant profile
-The saved settings for a kind of plant: when to water, how much, and its light
-hours.
+The saved settings for a kind of plant: when to water, how much, its light
+hours and its preferred soil.
 
 ### Quiet hours
-A daily window when automatic watering waits.
+A daily window when automatic watering and the hourly patrol pause.
 
 ### Reservoir
-The water tank the pump draws from.
+The water tank the pump draws from. You supply your own.
 
 ### Snooze
 A one-off pause in automatic watering.
@@ -42,8 +42,8 @@ Watering while moving back and forth across a pot.
 Volumetric water content: how much of the soil is water, as a percentage.
 
 ### Wilting point
-The driest a soil can be before a plant can't draw water from it. It's 0% on the
-moisture reading.
+The point where the soil is so dry a plant can't draw any more water from it.
+It's 0% [soil water](#soil-water).
 
 ### Zone
-Each pot's own stretch of rail and of the light strip.
+Each pot's own stretch of rail and of the light strip. Herman has 4 zones.
