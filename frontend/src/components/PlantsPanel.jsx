@@ -54,7 +54,9 @@ const describeSweep = (draft) => {
       warn: true,
     }
   }
-  return { text: `Sweeping ${Math.round(span)} mm.` }
+  // Nothing to say about a good span: a problem reaches the card through the
+  // held-save note, so a line stating the width would only add clutter.
+  return { text: '', warn: false }
 }
 
 // How long to wait after the last edit before writing a pot field. Three of
@@ -682,14 +684,6 @@ export function PlantsPanel({
                             Use current position
                           </button>
                         </label>
-                        {(() => {
-                          const summary = describeSweep(draft)
-                          return (
-                            <p className={`field-hint${summary.warn ? ' warning' : ''}`}>
-                              {summary.text}
-                            </p>
-                          )
-                        })()}
                       </div>
                     )}
 
