@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Marked } from 'marked'
 import { HELP_PAGES } from '../help/pages'
 import { makeSlugger } from '../help/slug'
@@ -28,7 +27,7 @@ const GUIDE = (() => {
       token.id = slug(token.text)
       if (token.depth <= 3) headings.push({ id: token.id, text: token.text, depth: token.depth })
     }
-    return { tab: page.tab, headings, html: markdown.parser(tokens) }
+    return { headings, html: markdown.parser(tokens) }
   })
 })()
 
@@ -61,13 +60,10 @@ function Contents() {
   )
 }
 
-// One long page, opened at the section for the tab you were on.
-export function HelpPanel({ fromTab }) {
-  useEffect(() => {
-    const id = GUIDE.find((entry) => entry.tab === fromTab)?.headings[0]?.id
-    if (id) document.getElementById(id)?.scrollIntoView()
-  }, [fromTab])
-
+// One long page, opened at the top like any other tab. It used to jump to
+// the section for the tab you came from, which turned out more annoying than
+// helpful.
+export function HelpPanel() {
   // In-page links scroll rather than change the address, so the browser's
   // back button still means "the tab before Help".
   const jump = (event) => {

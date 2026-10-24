@@ -43,12 +43,6 @@ const GANTRY_POLL_MS = 1000
 
 function App() {
   const [activeTab, setActiveTab] = useState('plants')
-  // The tab Help was opened from, so it can open at that tab's section.
-  const [helpFrom, setHelpFrom] = useState('plants')
-  const changeTab = (tab) => {
-    if (tab === 'help' && activeTab !== 'help') setHelpFrom(activeTab)
-    setActiveTab(tab)
-  }
   const [overview, setOverview] = useState(null)
   const [plants, setPlants] = useState([])
   // The plant profile library. Fetched alongside the dashboard because saving a
@@ -320,7 +314,7 @@ function App() {
   return (
     <div className="app-shell">
       <TopBar />
-      <TabBar activeTab={activeTab} onChange={changeTab} />
+      <TabBar activeTab={activeTab} onChange={setActiveTab} />
       {/* One line, and it answers "what is my planter doing". Shows feedback
           from something you just did while that is fresh, otherwise the
           planter's own computed state -- never the log, which is a record of
@@ -393,7 +387,7 @@ function App() {
           carries the soil library and the cards themselves, and the chart is
           the thing you consult afterwards rather than act on. */}
       {activeTab === 'history' && <HistoryPanel />}
-      {activeTab === 'help' && <HelpPanel fromTab={helpFrom} />}
+      {activeTab === 'help' && <HelpPanel />}
     </div>
   )
 }

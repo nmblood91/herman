@@ -1,6 +1,6 @@
 // The Help tab, in page order. Each entry is one Markdown file in this folder,
-// and the tab it explains, so Help can open on the section for the tab you
-// came from. To add a section, write the file and add a line here.
+// and the tab it explains, which tests/test_help.py uses to check every tab has
+// a section. To add a section, write the file and add a line here.
 //
 // tests/test_help.py reads this list, so keep the one-import-per-line form.
 import plantsAndSoil from './plants-and-soil.md?raw'
