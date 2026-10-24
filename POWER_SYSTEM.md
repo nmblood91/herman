@@ -169,11 +169,15 @@ joints have to open for service without a soldering iron.
 | Run | Current | Fuse | Gauge |
 |---|---|---|---|
 | Charger → Wago busbar | 2.4 A peak | 5 A | **14 AWG** |
-| Wago → SKR | 0.6 A | (5 A main) | **14 AWG** |
-| Wago → DC-DC converter | 0.25 A | (5 A main) | **14 AWG** |
+| Wago → SKR | 0.6 A | none | **14 AWG** |
+| Wago → DC-DC converter | 0.25 A | none | **14 AWG** |
 | Wago → LED strip, ~750 mm | 1.5 A peak | 2 A | **18 AWG** |
-| HB → pump, ~500 mm | 0.3 A | 1 A | **18 AWG** |
+| SKR HB pin → pump, ~500 mm | 0.3 A | 1 A | **18 AWG** |
 | LED data, Pi ground reference | signal | — | 22 AWG |
+
+There are three fuses in all: the 5 A main, the 2 A LED fuse and the 1 A pump
+fuse. A run marked "none" has no fuse of its own, but the 5 A main still sits
+upstream of it.
 
 **Gauge here is set by the fuse, not by the length.** Nothing in this machine
 is long enough or hungry enough for voltage drop to matter: the worst case is
