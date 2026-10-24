@@ -6,29 +6,42 @@ This folder contains the deployment files needed to run Herman on a Raspberry Pi
 
 - `systemd/greenthumb-api.service` — runs the FastAPI backend on `127.0.0.1:8000`, reached through nginx
 - `nginx/greenthumb.conf` — serves the built React app and proxies `/api` to the backend
-- `klipper/firmware.bin` — pre-built Klipper MCU firmware for SKR Mini E3 V2 (flash via SD card)
+- `klipper/skr-mini-e3-v2/firmware.bin` and `klipper/skr-mini-e3-v3/firmware.bin` — pre-built Klipper MCU firmware, one per supported SKR board (flash via SD card)
 - `klipper/printer.cfg.example` — bare-bones single-axis gantry Klipper template
 - `pi/install-green-thumb.sh` — install script for the Pi
 - `pi/send-gcode.py` — sends one gcode command to Klipper and prints the reply
 
-## Flashing the SKR Mini E3 V2 Board
+## Flashing the SKR Mini E3 Board
 
-The SKR Mini E3 V2 board comes with an onboard micro-SD card reader that contains the bootloader. The Klipper MCU firmware is flashed via this SD card.
+Herman runs on either the **SKR Mini E3 V2** or the **SKR Mini E3 V3**. They use
+different chips (STM32F103 and STM32G0B1), so each has its own firmware, and
+flashing the wrong one leaves the board silent. Check the version printed on
+the board itself.
 
-**Pre-flashed firmware location:** `deploy/klipper/firmware.bin`
+| Board | Firmware |
+|---|---|
+| SKR Mini E3 V2 | `deploy/klipper/skr-mini-e3-v2/firmware.bin` |
+| SKR Mini E3 V3 | `deploy/klipper/skr-mini-e3-v3/firmware.bin` |
+
+Both boards have an onboard micro-SD card reader with a bootloader, and the
+Klipper firmware is flashed through it. Every pin Herman uses is in the same
+place on both boards, so the wiring and `printer.cfg` do not change between
+them. After swapping one board for another, re-run the installer: each board
+has its own USB serial name, and the installer writes the new one into
+`printer.cfg`.
 
 ### Flashing steps (per unit):
 
 1. **Get the firmware file onto an SD card:**
    - On your laptop: Clone or download the GreenThumb repo (the software keeps its own name)
-   - Locate `deploy/klipper/firmware.bin`
+   - Locate your board's `firmware.bin` from the table above
    - Insert the SD card into your laptop's card reader
    - Copy `firmware.bin` to the root of the SD card (it must be named exactly `firmware.bin`)
 
 2. **Flash the board:**
    - Safely eject the SD card from your laptop
    - Turn off SKR
-   - Insert the SD card into the SKR Mini E3 V2
+   - Insert the SD card into the SKR
    - Turn on SKR
    - Watch for 2nd red light to begin flashing
    - Once that stops it is flashed
@@ -497,7 +510,10 @@ full traverse of the rail after every home, so raise the feedrate in
 
 *BigTreeTech's own pinout for the Mini E3 V2.0, kept here so the board can be
 read without going hunting. Every pin this project uses is on it, and the
-tables below are taken from it rather than from memory.*
+tables below are taken from it rather than from memory. The V3 uses the same
+pins for everything here (Klipper's stock configs for the two boards agree),
+but its connectors are not guaranteed to sit in the same places: wire a V3
+from BigTreeTech's V3 pinout.*
 
 Four blocks along the bottom edge, and three of them look alike:
 

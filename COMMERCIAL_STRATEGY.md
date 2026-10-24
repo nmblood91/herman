@@ -14,7 +14,7 @@ Herman is a smart indoor planter system built around:
 - addressable LED lighting for targeted plant lighting and ambient effects
 - 12V peristaltic pump feeding a tube carried on the gantry, for controlled fluid delivery
 - Raspberry Pi as the host controller
-- BTT SKR Mini E3 V2 with embedded TMC2209 drivers
+- BTT SKR Mini E3 V2 or V3 with embedded TMC2209 drivers
 - Pi Camera for monitoring and timelapses — an optional paid add-on rather than
   part of the base unit
 

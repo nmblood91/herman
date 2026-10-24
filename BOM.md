@@ -61,7 +61,7 @@ and the water-tube cable chain.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| BTT SKR Mini E3 V2 control board | 1 | $40.00 | $40.00 | TMC2209 drivers are **embedded**, not a separate purchase |
+| BTT SKR Mini E3 V2 or V3 control board | 1 | $40.00 | $40.00 | TMC2209 drivers are **embedded**, not a separate purchase; either version works, each with its own firmware |
 | Wiring harness and JST/XH connectors | TBD | TBD | TBD |  |
 | Mechanical limit switch, X homing | 1 | $3.00 | $3.00 | wired normally-closed |
 

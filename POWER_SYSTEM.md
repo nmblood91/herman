@@ -30,7 +30,7 @@ Herman uses a 12V primary bus with a DC-DC converter for 5V logic. All component
   Busbar (+12V / GND)
     ├─→ 12V-to-5V DC-DC Converter (3A output) ─→ Raspberry Pi
     ├─→ [2A Inline Fuse Holder] ─→ LED strip +12V
-    └─→ BTT SKR Mini E3 V2 (main power input)
+    └─→ BTT SKR Mini E3 V2/V3 (main power input)
              │
              └─→ HB connector ─→ [1A Inline Fuse Holder] ─→ 12V Peristaltic Pump
 ```
@@ -101,7 +101,7 @@ the Pi. A 5V strip needs its own 5V supply and its own fuse sized to it.
 
 | Component | Voltage | Current | Power |
 |-----------|---------|---------|-------|
-| SKR Mini E3 V2 | 12V | 0.3A | 3.6W |
+| SKR Mini E3 V2/V3 | 12V | 0.3A | 3.6W |
 | Raspberry Pi | 5V | 0.6A | 3W |
 | Pi Camera *(optional add-on)* | 5V | 0.1A | 0.5W |
 | Soil Moisture Sensors (4x) | 3.3V | 0.05A | 0.15W |

@@ -191,7 +191,7 @@ sudo -u pi git -C /opt/greenthumb checkout -- frontend/package-lock.json
 # Install Klipper host software (last, to avoid blocking on large clone)
 echo "Installing Klipper host software..."
 # Exactly the commit in deploy/klipper/KLIPPER_COMMIT, never the latest. The
-# firmware on the SKR (deploy/klipper/firmware.bin) was built from that commit,
+# firmware on the SKR (deploy/klipper/<board>/firmware.bin) was built from that commit,
 # and Klipper on the Pi has to match it: a newer one can refuse to talk to the
 # board until it is reflashed from an SD card. tests/test_firmware_pin.py
 # checks the firmware and the pin agree.

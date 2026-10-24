@@ -172,7 +172,8 @@ Only the parts with a constraint worth recording.
   are measured against the old geometry and need recapturing.
 
 - **Main electronics holder** (rear and front) has to take the BTT SKR Mini E3
-  V2 and the Pi, and [BOM.md](BOM.md) calls for **two Pi mounting patterns**,
+  (V2 or V3; check the V3's mounting holes against the V2's before printing)
+  and the Pi, and [BOM.md](BOM.md) calls for **two Pi mounting patterns**,
   not one: 85 × 56 mm for the Pi 4 / 3 B / 3 B+ development boards, and
   65 × 56 mm for the Pi 3 A+ that is the production target. Port faces differ
   too. It also sits inside the enclosure while the water path stays outside, so

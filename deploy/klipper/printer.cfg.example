@@ -114,7 +114,9 @@ position_endstop: 0
 [tmc2209 stepper_y]
 uart_pin: PC11
 tx_pin: PC10
-uart_address: 1
+# The board straps its drivers X=0, Y=2, Z=1, E=3 (Klipper's stock config for
+# both the V2 and V3), so Y and Z are not in order.
+uart_address: 2
 run_current: 0.7
 stealthchop_threshold: 999999
 
@@ -132,7 +134,7 @@ position_endstop: 0
 [tmc2209 stepper_z]
 uart_pin: PC11
 tx_pin: PC10
-uart_address: 2
+uart_address: 1
 run_current: 0.7
 stealthchop_threshold: 999999
 

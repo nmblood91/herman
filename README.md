@@ -6,7 +6,7 @@ none of it is shown to whoever owns the planter. If a string reaches a screen
 it says Herman.
 
 Herman is a smart indoor planter / grow frame that combines:
-- a motion system driven by a BTT SKR Mini E3 V2 and Klipper
+- a motion system driven by a BTT SKR Mini E3 (V2 or V3) and Klipper
 - a Raspberry Pi host running Klipper
 - four capacitive soil sensors on an I2C hub
 - per-plant watering and lighting control
@@ -419,7 +419,8 @@ either per plant in the Plant Profile Editor.
 
 The code is written to be easy to adapt to the actual hardware stack:
 
-- Klipper is the motion layer running on the BTT SKR Mini E3 V2
+- Klipper is the motion layer running on the BTT SKR Mini E3 V2 or V3, each
+  with its own firmware in `deploy/klipper/`
 - Raspberry Pi hosts the application, on 64-bit Pi OS. The
   **Pi 3 Model A+ is the floor** — 512 MB and ARMv8 is what the stack has to fit
   in. Any Pi 3 will run it; a Pi 4 or a 3 B is the easier board to develop on.

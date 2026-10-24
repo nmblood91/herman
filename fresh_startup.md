@@ -10,7 +10,7 @@ there where you need more.
 ## What you need first
 
 - A Raspberry Pi with a microSD card, on your network
-- The SKR Mini E3 V2 board, wired to the gantry motor and X endstop
+- An SKR Mini E3 V2 or V3 board, wired to the gantry motor and X endstop
 - The pump, wired to the SKR's HB connector with its fuse and flyback diode
 - The four soil sensors on their hub, each at its own address (see
   [SENSOR_WIRING.md](SENSOR_WIRING.md))
@@ -23,8 +23,11 @@ reads the sensors, and it reports what it cannot find. Re-running it later is sa
 
 Skip this if the board has already been flashed.
 
-1. Copy `deploy/klipper/firmware.bin` to the root of a micro-SD card. The file
-   must be named exactly `firmware.bin`.
+1. Copy your board's firmware to the root of a micro-SD card:
+   `deploy/klipper/skr-mini-e3-v2/firmware.bin` for a V2, or
+   `deploy/klipper/skr-mini-e3-v3/firmware.bin` for a V3. Check the version
+   printed on the board: the wrong one won't boot. The file must be named
+   exactly `firmware.bin`.
 2. Power the SKR off, put the card in the SKR's card slot, and power it on.
 3. Wait for the second red light to start and then stop. That is the flash.
 4. The bootloader renames the file to `FIRMWARE.CUR` when it succeeds.
