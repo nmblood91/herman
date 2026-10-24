@@ -134,8 +134,9 @@ Three consequences follow from choosing it, and they are decisions rather than
 details:
 
 - **The prebuilt frontend bundle moves onto the critical path.** On 1 GB it was
-  optional. On 512 MB it is how you stop caring what the build costs, and the
-  cold measurement below has not been taken yet.
+  optional. On 512 MB it is how you stop caring what the build costs. The
+  cold measurement below shows the A+ can build on the device, so this is
+  no longer forced by memory.
 - **WiFi onboarding becomes a product requirement.** The A+ has no Ethernet and
   one USB port, which the SKR occupies. A headless unit with a bad WiFi
   configuration cannot be recovered in the field without pulling the SD card.
@@ -154,16 +155,28 @@ Pi 4 (1 GB) with Klipper, the API and nginx all running:
 | `npm run build` | 1.7 s | 123 MB |
 | Peak system-wide used | | **371 MB** |
 
-**Caveat: that was a warm run** — `node_modules` was populated and npm's cache
-was primed, which is why `npm install` finished in seconds. A factory first boot
-is cold and will peak higher. Re-measure after `rm -rf node_modules` and
-`npm cache clean --force` before treating 371 MB as the real figure.
-`deploy/pi/measure-build-memory.sh` does exactly that and prints the numbers.
+That was a warm run: `node_modules` was populated and npm's cache was primed.
 
-Taken at face value those numbers suggest an A+ would cope, and the per-process
-ceilings are nowhere near the limit. Either way the A+ becomes viable as a side
-effect of shipping a prebuilt bundle rather than as separate work, so the
-cheapest path is to do that and stop caring what the build costs.
+**Measured cold on the Pi 3 A+ (2026-10-24)**, with `node_modules` deleted and
+npm's cache cleared by `deploy/pi/measure-build-memory.sh`, and Klipper, the
+API and nginx running:
+
+| | Wall time | Peak RSS |
+|---|---|---|
+| `npm install` (cold) | 32.4 s | 147 MB |
+| `npm run build` | 4.9 s | 126 MB |
+| Used before starting | | 154 MB |
+| Peak system-wide used | | **248 MB of 415 MB** |
+| Swap used, before → peak | | 83 → 88 MB |
+
+415 MB is what the kernel reports after the GPU's share of the 512 MB. **A cold
+on-device build fits**, finishes in under 40 seconds, and the supply did not
+throttle (`get_throttled` 0x0). The build added only 5 MB to swap: the 83 MB
+was already in use before it started. The per-process peaks match the Pi 4's
+within a few MB.
+
+A prebuilt bundle is still worth shipping, to take node and npm off the
+device altogether, but memory no longer forces it.
 
 **Nothing on this unit encodes video**, which is what makes 512 MB a
 comfortable budget rather than a tight one. The load is four I2C reads a minute,
@@ -172,9 +185,8 @@ usually looking at. The one thing that ever threatened the figure was a camera,
 and there is no camera.
 
 So the A+ is not a board chosen despite a constraint — the constraint is gone.
-The open question is narrower than it was: whether a **cold** on-device Vite
-build fits, which the measurement above does not answer. Shipping the frontend
-prebuilt removes even that, which is why it is on the critical path.
+The last open question, whether a **cold** on-device Vite build fits, is
+answered above: it does.
 
 **The A+ is in production until at least January 2030**, so staying on it is
 safe for the life of the product rather than a bet. See [BOM.md](BOM.md) for why
