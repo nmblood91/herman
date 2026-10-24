@@ -29,6 +29,8 @@ Skip this if the board has already been flashed.
    printed on the board: the wrong one won't boot. The file must be named
    exactly `firmware.bin`.
 2. Power the SKR off, put the card in the SKR's card slot, and power it on.
+   On 12V, or for a V3, from a laptop's USB with a jumper across the two
+   **SW_USB** pins. Remove that jumper before the board goes into the planter.
 3. Wait for the second red light to start and then stop. That is the flash.
 4. The bootloader renames the file to `FIRMWARE.CUR` when it succeeds.
 

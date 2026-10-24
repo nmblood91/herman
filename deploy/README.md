@@ -26,7 +26,8 @@ the board itself.
 Both boards have an onboard micro-SD card reader with a bootloader, and the
 Klipper firmware is flashed through it. Every pin Herman uses is in the same
 place on both boards, so the wiring and `printer.cfg` do not change between
-them. After swapping one board for another, re-run the installer: each board
+them, and they share a mounting hole pattern, so one electronics holder takes
+either. After swapping one board for another, re-run the installer: each board
 has its own USB serial name, and the installer writes the new one into
 `printer.cfg`.
 
@@ -38,7 +39,16 @@ has its own USB serial name, and the installer writes the new one into
    - Insert the SD card into your laptop's card reader
    - Copy `firmware.bin` to the root of the SD card (it must be named exactly `firmware.bin`)
 
-2. **Flash the board:**
+2. **Power the board for flashing**, either way:
+   - **12V**, on the board's power input, as it runs in the planter. Check the
+     polarity before switching on. Nothing else needs to be connected.
+   - **USB from a laptop (V3).** Fit a jumper across the two **SW_USB** pins
+     and the board runs from USB alone, with no 12V supply. The motor drivers
+     and the pump output stay unpowered, which flashing does not need.
+     **Take the jumper off again before the board goes into the planter**:
+     left on, the SKR and the Pi feed each other 5V through the USB cable.
+
+3. **Flash the board:**
    - Safely eject the SD card from your laptop
    - Turn off SKR
    - Insert the SD card into the SKR
