@@ -158,6 +158,7 @@ Pi 4 (1 GB) with Klipper, the API and nginx all running:
 was primed, which is why `npm install` finished in seconds. A factory first boot
 is cold and will peak higher. Re-measure after `rm -rf node_modules` and
 `npm cache clean --force` before treating 371 MB as the real figure.
+`deploy/pi/measure-build-memory.sh` does exactly that and prints the numbers.
 
 Taken at face value those numbers suggest an A+ would cope, and the per-process
 ceilings are nowhere near the limit. Either way the A+ becomes viable as a side
