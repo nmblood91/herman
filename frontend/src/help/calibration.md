@@ -13,6 +13,18 @@ if you have more than one planter at home. After renaming, use the new address.
 Tests the switch the arm touches when it homes. Press **Watch for 20s**, then
 press the switch with your finger. The reading should change while you hold it.
 
+### Motor direction
+Checks the motor turns the right way before the arm homes for the first time.
+If it turned the wrong way, homing would drive the arm into the far end of the
+rail. Until this test passes, the arm won't home or move.
+1. Slide the arm by hand to the middle of the rail. If it won't slide, press
+   **Release motors**.
+2. Press **Turn motor**. The arm moves 10 mm.
+3. Say which way it went. **Toward the switch** passes the test. **Away from
+   the switch** reverses the motor's direction, then asks you to test again.
+
+Test again after rewiring the motor or replacing it.
+
 ### Pump
 Measures how much water the pump moves, so each watering is the right amount.
 1. Put the nozzle over a cup on a kitchen scale.

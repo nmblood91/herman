@@ -40,6 +40,7 @@ running can damage its memory card. Press and keep holding
 | What you see | What to do |
 |---|---|
 | The move buttons are grayed out | Press **Home Gantry** first. |
+| **Home Gantry** is grayed out | Test the motor direction on the Calibration tab first. See [Motor direction](#motor-direction). |
 | "The motion board is not responding" | The arm's control board can't be reached. Switch the planter off and on again. If that doesn't help, contact support. |
 | The lights don't come on in Zone Schedule | Check the **System Time** on the Calibration tab, and the light hours in that pot's plant profile. |
 | The lights are the wrong colors | Set the color order on the Calibration tab. |

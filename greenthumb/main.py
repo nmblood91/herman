@@ -884,6 +884,36 @@ def move_gantry(payload: dict[str, float] = Body(default_factory=dict)) -> dict[
     )
 
 
+@app.post(f"{settings.api_prefix}/gantry/direction/test")
+def test_motor_direction() -> dict[str, object]:
+    """Turn the X motor 10 mm toward the switch, homed or not."""
+    return log_motion(automation.test_motor_direction(), "Motor direction test")
+
+
+@app.post(f"{settings.api_prefix}/gantry/direction/answer")
+def answer_motor_direction(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Which way the test went: {"toward_switch": true} passes, false flips it."""
+    toward = payload.get("toward_switch")
+    # Refused rather than read as False, so a malformed request cannot flip
+    # the motor's direction.
+    if not isinstance(toward, bool):
+        raise ValueError("toward_switch must be true or false")
+    result = automation.answer_motor_direction(toward)
+    if not result.get("ok"):
+        log_event(f"Motor direction not changed: {result.get('error')}", level=logging.WARNING)
+    elif toward:
+        log_event("Motor direction test passed")
+    else:
+        log_event("Motor direction reversed; Klipper restarting. Test it again.")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/gantry/release")
+def release_motors() -> dict[str, object]:
+    """Switch the motors off, so the carriage slides by hand."""
+    return log_motion(automation.release_motors(), "Release motors")
+
+
 # --- Camera -----------------------------------------------------------------
 #
 # Kept together at the bottom so it is one block to lift out or to build on.

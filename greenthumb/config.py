@@ -145,6 +145,18 @@ class Settings(BaseSettings):
     # Only the value a planter starts life with; the stored choice wins.
     home_on_startup: bool = False
 
+    # Whether the motor direction test on the Calibration tab has passed. Until
+    # it has, nothing homes: a reversed motor homes away from the switch and
+    # drives the carriage into the far end of the rail at homing speed, and
+    # every planter is wired by hand. Only the value a planter starts life with;
+    # passing the test stores the answer in data/state.json, which wins.
+    motor_direction_checked: bool = False
+    # Klipper's config folder. A failed direction test writes the flipped
+    # dir_pin to motor-direction.cfg here, which printer.cfg includes last so
+    # it overrides the template's -- and which the installer never rewrites,
+    # so the fix survives a reinstall.
+    klipper_config_dir: str = "/home/pi/printer_data/config"
+
     quiet_hours_enabled: bool = False
     quiet_hours_start: str = "21:00"
     quiet_hours_stop: str = "08:00"

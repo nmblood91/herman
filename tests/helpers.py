@@ -8,8 +8,14 @@ with tests/run_all.py putting the repo root on PYTHONPATH.
 import tempfile
 from pathlib import Path
 
+from greenthumb.config import settings
 from greenthumb.hardware.soil_sensors import SoilSensorHub
 from greenthumb.history import HistoryStore
+
+# A real planter refuses to home until its motor direction test has passed.
+# The fakes here have no motor to test, so every script starts with it passed;
+# tests/test_motor_direction.py turns it back off to test the gate itself.
+settings.motor_direction_checked = True
 
 
 class CalibrationSurface:

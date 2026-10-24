@@ -50,6 +50,18 @@ NEAR_SWITCH_MM = 15.0
 PATROL_BUSY_WAIT_SECONDS = 300.0
 PATROL_BUSY_POLL_SECONDS = 5.0
 
+# The motor direction test turns the motor this far toward the switch: enough
+# to see clearly, little enough that a reversed motor near the far end cannot
+# hurt anything.
+DIRECTION_TEST_MM = 10.0
+DIRECTION_UNCHECKED = (
+    "Test the motor direction on the Calibration tab before the arm can home."
+)
+# Written into Klipper's config folder and included last by printer.cfg, so it
+# overrides the template's dir_pin. The installer creates it empty and never
+# rewrites it; only the direction test does.
+DIRECTION_FILE = "motor-direction.cfg"
+
 
 # "Not given" for optional fields where None means "clear it". See save_soil.
 UNCHANGED = object()
@@ -185,6 +197,9 @@ class GreenThumbAutomation:
         self._startup_homed = False
         self._startup_home_attempts = 0
         self._startup_home_error: str | None = None
+        # Nothing homes until the motor direction test has passed. See
+        # settings.motor_direction_checked and the motor direction section.
+        self.motor_direction_checked = settings.motor_direction_checked
         self._pump_timer: threading.Timer | None = None
         self._pump_lock_held = False
         # How long the last manual run actually lasted, which is the
@@ -426,6 +441,10 @@ class GreenThumbAutomation:
         if isinstance(startup_home, dict) and isinstance(startup_home.get("enabled"), bool):
             self.home_on_startup = startup_home["enabled"]
 
+        direction = stored.get("motor_direction")
+        if isinstance(direction, dict) and isinstance(direction.get("checked"), bool):
+            self.motor_direction_checked = direction["checked"]
+
         watering = stored.get("watering")
         if isinstance(watering, dict):
             if isinstance(watering.get("auto_enabled"), bool):
@@ -555,6 +574,9 @@ class GreenThumbAutomation:
             },
             "auto_patrol": {"enabled": self.auto_patrol_enabled},
             "startup_home": {"enabled": self.home_on_startup},
+            # A fact about how this unit is wired, not a preference, so a
+            # restore to defaults keeps it.
+            "motor_direction": {"checked": self.motor_direction_checked},
             "quiet": {
                 "enabled": self.quiet_hours_enabled,
                 "start": self.quiet_hours_start.isoformat(timespec="minutes"),
@@ -661,7 +683,14 @@ class GreenThumbAutomation:
         The caller holds the hardware lock. G28 blocks until the switch trips
         and Klipper resets the coordinate, so clearing the flag when it returns
         is exactly when the position starts meaning something again.
+
+        Refused until the motor direction test has passed. Every home goes
+        through here -- the button, the startup home, the patrol, a dance --
+        and Klipper refuses any move before a home, so this one check holds
+        the whole gantry still on a unit nobody has checked.
         """
+        if not self.motor_direction_checked:
+            return {"ok": False, "error": DIRECTION_UNCHECKED}
         self._homing = True
         try:
             result = self.klipper.home_gantry()
@@ -1275,6 +1304,8 @@ class GreenThumbAutomation:
             return state("attention", f"No reading from {', '.join(dead)}. Check the probe.")
 
         # 4. Able to water, but not yet allowed to.
+        if not self.motor_direction_checked:
+            return state("attention", DIRECTION_UNCHECKED)
         if not movement.get("homed"):
             return state("attention", "The arm has not been homed, so watering is held.")
 
@@ -1824,6 +1855,7 @@ class GreenThumbAutomation:
             "watering": self.watering_status(),
             "auto_patrol": self.auto_patrol_status(),
             "startup_home": self.startup_home_status(),
+            "motor_direction": self.motor_direction_status(),
             "quiet": self.quiet_status(),
             # What the status bar shows. Computed rather than echoed from the
             # log, so it says what is true now instead of what was last written.
@@ -2111,9 +2143,12 @@ class GreenThumbAutomation:
 
     # What Restore to Defaults keeps from the state file: the two libraries,
     # which are reference data built up over time rather than this planter's
-    # configuration. Everything else in the file goes, as on a fresh install.
-    # History lives in its own database and is not touched either.
-    KEPT_STATE_KEYS = (state.PROFILES_KEY, state.SOILS_KEY)
+    # configuration, and the motor direction test, which is a fact about how
+    # this unit is wired -- motor-direction.cfg stays as it is, so forgetting
+    # the pass would only lock the gantry for no reason. Everything else in the
+    # file goes, as on a fresh install. History lives in its own database and
+    # is not touched either.
+    KEPT_STATE_KEYS = (state.PROFILES_KEY, state.SOILS_KEY, "motor_direction")
 
     def restore_system_defaults(self) -> dict[str, object]:
         """Put the planter back as it was freshly installed, live.
@@ -2487,6 +2522,122 @@ class GreenThumbAutomation:
 
         with self._exclusive(f"Move to {plant_id}"):
             return self.klipper.move_gantry_absolute(plant.position_mm)
+
+    # --- motor direction ---------------------------------------------------
+    #
+    # Which way the X motor turns depends on how its coil pairs are wired and
+    # how the belt runs, so it is a property of each hand-built unit. Wrong, it
+    # homes away from the switch and into the far end of the rail at homing
+    # speed. So nothing homes until somebody has watched it turn: the test
+    # turns the motor 10 mm toward the switch, and they say which way it went.
+    # "Away" flips dir_pin in motor-direction.cfg and restarts Klipper, and the
+    # test has to pass again before anything moves.
+
+    def _direction_file(self) -> Path:
+        return Path(settings.klipper_config_dir) / DIRECTION_FILE
+
+    def _direction_reversed(self) -> bool:
+        """Whether motor-direction.cfg overrides the template's dir_pin."""
+        try:
+            text = self._direction_file().read_text(encoding="utf-8")
+        except OSError:
+            return False
+        return any(line.strip().startswith("dir_pin") for line in text.splitlines())
+
+    def motor_direction_status(self) -> dict[str, object]:
+        """Cheap enough for /overview -- asks Klipper nothing."""
+        return {
+            "checked": self.motor_direction_checked,
+            "reversed": self._direction_reversed(),
+            "test_mm": DIRECTION_TEST_MM,
+        }
+
+    def test_motor_direction(self) -> dict[str, object]:
+        """Turn the motor DIRECTION_TEST_MM toward the switch, then let it go.
+
+        Works unhomed, which is the point: it is the check that has to come
+        before the first home. Unhomed, the carriage's place is unknown, so the
+        Calibration tab asks for it to be slid to mid-rail by hand first.
+        Homed, the place is known, and a carriage that close to the switch is
+        refused rather than run into it.
+        """
+        with self._exclusive("Motor direction test"):
+            status = self.klipper.status()
+            if not status.get("ok"):
+                return {"ok": False, "error": status.get("error") or "Klipper is not responding"}
+            position, switch_end = status.get("position"), status.get("max_x")
+            if (
+                status.get("homed")
+                and position is not None
+                and switch_end is not None
+                and float(position) > float(switch_end) - 2 * DIRECTION_TEST_MM
+            ):
+                return {
+                    "ok": False,
+                    "error": "The arm is too close to the home switch for the test. "
+                    "Move it toward the middle of the rail first.",
+                }
+            result = self.klipper.test_direction(DIRECTION_TEST_MM)
+        if not result.get("ok"):
+            return {"ok": False, "error": result.get("error")}
+        return {"ok": True, **self.motor_direction_status()}
+
+    def release_motors(self) -> dict[str, object]:
+        """Switch the motors off so the carriage slides by hand. Unhomes it."""
+        with self._exclusive("Release motors"):
+            return self.klipper.release_motors()
+
+    def answer_motor_direction(self, toward_switch: bool) -> dict[str, object]:
+        """Record which way the test turned the motor.
+
+        Toward the switch passes the test. Away flips the direction and
+        restarts Klipper so it takes effect, and leaves the test failed: the
+        flip is a correction nobody has watched yet, and the answer could have
+        been a mistake.
+
+        The flip undoes an existing override rather than stacking another on
+        it. With motor-direction.cfg overriding, the template's dir_pin is
+        already the opposite of what Klipper is running, so emptying the file
+        is the flip -- and "reversed" keeps meaning "differs from printer.cfg".
+        """
+        if toward_switch:
+            self.motor_direction_checked = True
+            self._persist()
+            return {"ok": True, **self.motor_direction_status()}
+
+        with self._exclusive("Reverse motor direction"):
+            if self._direction_reversed():
+                pin = None
+            else:
+                current = self.klipper.dir_pin()
+                if current is None:
+                    return {
+                        "ok": False,
+                        "error": "Could not read the motor's direction setting from Klipper.",
+                    }
+                pin = current[1:] if current.startswith("!") else f"!{current}"
+            try:
+                self._write_direction_file(pin)
+            except OSError as exc:
+                return {"ok": False, "error": f"Could not save the new direction: {exc}"}
+            self.motor_direction_checked = False
+            self._persist()
+            restart = self.klipper.restart()
+        if not restart.get("ok"):
+            # Expected more often than not; see KlipperClient.restart.
+            logger.info("Klipper restart after a direction flip: %s", restart.get("error"))
+        return {"ok": True, **self.motor_direction_status()}
+
+    def _write_direction_file(self, pin: str | None) -> None:
+        """Write motor-direction.cfg: overriding dir_pin, or with no override."""
+        lines = [
+            "# Written by Herman's motor direction test, on the Calibration tab.",
+            "# printer.cfg includes this file last, so a dir_pin here overrides the",
+            "# one in printer.cfg. Run the test again rather than editing it.",
+        ]
+        if pin is not None:
+            lines += ["[stepper_x]", f"dir_pin: {pin}"]
+        self._direction_file().write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     # --- plant profiles ----------------------------------------------------
     #

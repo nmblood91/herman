@@ -96,6 +96,10 @@ export function ControlsPanel({
   const movement = overview?.movement
   const boardDown = movement?.ok === false
   const motionReady = !boardDown && movement?.homed === true
+  // Nothing homes until the motor direction test on the Calibration tab has
+  // passed, so the button is locked rather than left to fail. Undefined counts
+  // as untested, like movement above.
+  const directionChecked = overview?.motor_direction?.checked === true
 
   // Defaulted here rather than at each use: a failed dashboard load leaves the
   // prop an empty array today, but a crash on undefined would take the whole
@@ -303,8 +307,17 @@ export function ControlsPanel({
         <div className="position-readout">Position: {gantryPosition}</div>
 
         <div className="motion-grid">
-          <button className="primary" onClick={onHome}>Home Gantry</button>
+          <button className="primary" disabled={!directionChecked} onClick={onHome}>
+            Home Gantry
+          </button>
         </div>
+
+        {overview && !directionChecked && (
+          <p className="field-hint warning">
+            Test the motor direction on the Calibration tab first. Until then the
+            arm won&apos;t home or move.
+          </p>
+        )}
 
         {boardDown && (
           <p className="field-hint warning">

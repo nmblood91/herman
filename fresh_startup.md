@@ -156,15 +156,14 @@ carriage into the end of the rail at full homing speed.
 
    Y and Z read `TRIGGERED`. Ignore them.
 
-2. **Motor direction.** With the carriage mid-rail, this must move it 10 mm
-   toward the switch:
-
-   ```bash
-   python3 /opt/greenthumb/deploy/pi/send-gcode.py "FORCE_MOVE STEPPER=stepper_x DISTANCE=10 VELOCITY=20"
-   ```
-
-   If it goes the other way, invert `dir_pin` in `deploy/klipper/printer.cfg.example`
-   and run the installer again, so the fix survives future installs.
+2. **Motor direction.** On the **Calibration** tab, under **Motor direction**:
+   slide the carriage to mid-rail by hand, press **Turn motor**, and say which
+   way it went. If it moved away from the switch, the app reverses the
+   direction and restarts Klipper; test again until it moves toward the
+   switch. Nothing homes until this passes, so the Home button stays grayed
+   out until then. The correction is saved in
+   `~/printer_data/config/motor-direction.cfg`, which the installer never
+   rewrites, so it survives reinstalls.
 
 3. **Home.** Use the app's home control. The carriage parks at X0.
 

@@ -216,6 +216,59 @@ class KlipperClient:
             + ", ".join(sorted(query)),
         }
 
+    def dir_pin(self) -> str | None:
+        """The X motor's dir_pin as Klipper loaded it, e.g. "!PB12".
+
+        Asked of Klipper rather than read out of printer.cfg, because the value
+        in force is the template's overridden by motor-direction.cfg, and only
+        Klipper has done that merge. None when Klipper does not say.
+        """
+        response = self._send_command(
+            "objects/query", {"objects": {"configfile": ["settings"]}}
+        )
+        if not response.get("ok"):
+            return None
+        found = (
+            response.get("result", {})
+            .get("status", {})
+            .get("configfile", {})
+            .get("settings", {})
+            .get("stepper_x", {})
+            .get("dir_pin")
+        )
+        return found.strip() if isinstance(found, str) and found.strip() else None
+
+    def test_direction(self, distance_mm: float) -> dict[str, Any]:
+        """Turn the X motor by distance_mm, homed or not, then let it go.
+
+        FORCE_MOVE drives the stepper directly, which is what makes it usable
+        before the first home -- the one time a direction test is safe, because
+        nothing has trusted the direction yet. Positive is the way homing goes.
+
+        M84 afterwards switches the motor off. That leaves the carriage free to
+        slide by hand for another try, and clears any homed state, since
+        FORCE_MOVE moves the carriage without telling the toolhead where it
+        went.
+        """
+        return self.send_gcode(
+            f"FORCE_MOVE STEPPER=stepper_x DISTANCE={distance_mm} VELOCITY=20\n"
+            f"{WAIT_FOR_MOVES}\nM84",
+            timeout=MOTION_TIMEOUT,
+        )
+
+    def release_motors(self) -> dict[str, Any]:
+        """Switch the motors off, so the carriage slides by hand."""
+        return self.send_gcode(f"{WAIT_FOR_MOVES}\nM84", timeout=MOTION_TIMEOUT)
+
+    def restart(self) -> dict[str, Any]:
+        """Restart Klipper on the Pi, so it rereads printer.cfg.
+
+        The reply often never arrives: Klipper is tearing down the very socket
+        it would answer on. So a failure here is not a failed restart, and the
+        caller only reports it.
+        """
+        return self.send_gcode("RESTART")
+
     def home_gantry(self) -> dict[str, Any]:
         # G28 itself blocks until the switch trips, but homing_override follows
         # it with a G1 back to X0, which only queues.

@@ -10,6 +10,7 @@ import { LibraryBackupPanel } from './components/LibraryBackupPanel'
 import { HelpPanel } from './components/HelpPanel'
 import { HistoryPanel } from './components/HistoryPanel'
 import { HomeSwitchPanel } from './components/HomeSwitchPanel'
+import { MotorDirectionPanel } from './components/MotorDirectionPanel'
 import { ClockPanel } from './components/ClockPanel'
 import { HostnamePanel } from './components/HostnamePanel'
 import { VersionPanel } from './components/VersionPanel'
@@ -374,6 +375,7 @@ function App() {
           <ClockPanel />
           <HostnamePanel />
           <HomeSwitchPanel />
+          <MotorDirectionPanel overview={overview} onRefresh={loadDashboard} />
           <PumpPanel />
           <CalibrationPanel />
           <LedStripPanel overview={overview} />

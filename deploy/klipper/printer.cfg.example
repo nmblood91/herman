@@ -24,10 +24,11 @@ step_pin: PB13
 # Negated to match this build. Which way a stepper turns depends on the order
 # of its coil pairs in the connector and on how the belt is routed, so this is
 # a property of the machine rather than of the board -- a differently wired
-# motor may need the plain PB12. Check it with FORCE_MOVE before ever running
-# G28, because homing_positive_dir sends homing toward the switch at 40 mm/s
-# and the wrong sign drives into the far end of the rail instead. The procedure
-# is in deploy/README.md.
+# motor may need the plain PB12. Don't edit it here: the motor direction test
+# on the Calibration tab checks it before anything homes, and if the motor
+# turns the wrong way it writes the flipped pin to motor-direction.cfg, included
+# at the end of this file. homing_positive_dir sends homing toward the switch
+# at 40 mm/s, and the wrong sign drives into the far end of the rail instead.
 dir_pin: !PB12
 enable_pin: !PB14
 microsteps: 16
@@ -181,3 +182,9 @@ gcode:
     G91
     G1 X10 F6000
     G90
+
+# Last, so its [stepper_x] dir_pin overrides the one above: Klipper merges a
+# repeated section and the later value wins. Written by the motor direction test
+# on the Calibration tab, and created empty by the installer, which never
+# rewrites it -- so a corrected direction survives regenerating this file.
+[include motor-direction.cfg]

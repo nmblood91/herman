@@ -439,23 +439,26 @@ it turns depends on the order of the coil pairs in the connector and on how
 the belt is routed, so it is a property of the machine, not something the
 board decides.
 
-Park the carriage mid-rail, then nudge it:
+**Use the motor direction test on the Calibration tab.** Slide the carriage
+to mid-rail by hand, press **Turn motor**, and answer which way it went. It
+must move **10 mm toward the switch**. Nothing homes until the test has passed:
+the app refuses every home, including the startup home and the hourly patrol,
+so a reversed unit can never home the wrong way.
 
-```bash
-python3 /opt/greenthumb/deploy/pi/send-gcode.py   "FORCE_MOVE STEPPER=stepper_x DISTANCE=10 VELOCITY=20"
-```
+The test is `FORCE_MOVE STEPPER=stepper_x DISTANCE=10 VELOCITY=20` followed by
+`M84`. `FORCE_MOVE` ignores endstops and soft limits entirely, which is what
+makes it usable before homing and also why the distance is small. `M84` turns
+the motor off afterwards, so the carriage slides by hand for another try.
 
-It must move **10 mm toward the switch**. If it moves away, invert `dir_pin`
-in `[stepper_x]` — `PB12` becomes `!PB12` or back again — and restart Klipper.
-This build needs `!PB12`.
-
-`FORCE_MOVE` ignores endstops and soft limits entirely, which is what makes it
-usable before homing and also why the distances here are small.
-
-**Put the value in `printer.cfg.example`, not just in the live config.**
-Re-running the install script regenerates `printer.cfg` from the template, so
-a direction fixed only on the Pi is backed up and then lost on the next
-install.
+**Answering "away from the switch"** flips `dir_pin` (`PB12` becomes `!PB12`
+or back again) and restarts Klipper, then asks for the test again. The flipped
+pin goes in `~/printer_data/config/motor-direction.cfg`, not in
+`printer.cfg`. `printer.cfg` includes that file as its last section, and Klipper
+merges a repeated `[stepper_x]` with the later value winning, so the file
+overrides the template's `!PB12`. The installer creates the file empty and
+never rewrites it, which is why the fix survives the installer regenerating
+`printer.cfg`. Don't edit `dir_pin` in `printer.cfg.example` to fix one unit;
+that changes it for every unit.
 
 ### Do not jog to X0 until the rail is measured
 

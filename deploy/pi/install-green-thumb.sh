@@ -121,6 +121,22 @@ else
   fi
 fi
 
+# The motor direction override. printer.cfg includes it last, and Klipper
+# refuses to start over a missing include, so it has to exist -- empty until the
+# direction test on the Calibration tab finds the motor turning the wrong way
+# and writes a flipped dir_pin into it. Created only when absent and never
+# rewritten here: that is what lets a corrected direction survive this script
+# regenerating printer.cfg above.
+DIRECTION_CFG=/home/pi/printer_data/config/motor-direction.cfg
+if [ ! -f "$DIRECTION_CFG" ]; then
+  printf '%s\n' \
+    "# Written by Herman's motor direction test, on the Calibration tab." \
+    "# printer.cfg includes this file last, so a dir_pin here overrides the" \
+    "# one in printer.cfg. Run the test again rather than editing it." \
+    | sudo -u pi tee "$DIRECTION_CFG" >/dev/null
+  echo "✓ Created motor-direction.cfg (no override yet)"
+fi
+
 if ! command -v node >/dev/null 2>&1; then
   echo "Installing Node.js 20 LTS..."
   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
