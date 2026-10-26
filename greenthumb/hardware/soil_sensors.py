@@ -431,7 +431,21 @@ def measure_endpoint(
     and with hundreds of samples there is no reason to be sensitive to one.
     """
     stats = _collect(hub, seconds, interval, progress=False, addresses=[address])
-    entry = stats[address]
+    return judge_endpoint(stats[address], address, opposite, expect, opposite_label)
+
+
+def judge_endpoint(
+    entry: dict,
+    address: int,
+    opposite: int | None = None,
+    expect: str = "above",
+    opposite_label: str = "the other end of the scale",
+) -> dict[str, object]:
+    """Decide whether one probe's samples, from _collect, are worth keeping.
+
+    The judging half of measure_endpoint, apart so a run that sampled every
+    probe in one window can judge each of them. See measure_endpoint.
+    """
     values = entry["values"]
     outcome: dict[str, object] = {
         "address": address,
@@ -530,16 +544,20 @@ def calibrate(
     measured_at = datetime.utcnow().isoformat(timespec="seconds")
     results: dict[int, dict[str, object]] = {}
 
+    # One window for every probe, not one window each. They were measured in
+    # turn, which made a 20 s calibration take 80 s on four probes -- holding
+    # the hardware lock throughout, so every other button said busy while the
+    # page's countdown sat at zero.
+    stats = _collect(hub, seconds, interval, progress=False)
+
     for address in hub.addresses:
         # The opposite end comes from the hub's field-capacity map, which the
         # automation layer syncs from the pots. Absent for a pot that has not
         # been measured, in which case the span check is skipped -- the same
         # shape as the old "wet not measured yet" path.
-        outcome = measure_endpoint(
-            hub,
+        outcome = judge_endpoint(
+            stats[address],
             address,
-            seconds=seconds,
-            interval=interval,
             opposite=hub.field_capacity.get(address),
             expect="below",
             opposite_label="this pot's field capacity",

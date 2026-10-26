@@ -169,6 +169,16 @@ class GreenThumbAutomation:
         # a time, and a watering cycle holds them for minutes. A single lock for
         # all three is what keeps the control loop and manual commands apart.
         self._hardware_lock = threading.Lock()
+        # What holds the lock, for the busy message: "busy" alone left nobody
+        # able to tell a dry calibration from a stuck dose. And whether that
+        # holder only reads sensors, which a shutdown may cut short.
+        self._lock_holder: str | None = None
+        self._holder_reads_only = False
+        # Set once a shutdown or reboot is scheduled: nothing new may take the
+        # hardware in the seconds before the Pi goes down, because the pump is
+        # switched through Klipper and nothing turns it off once the host has
+        # gone.
+        self._powering_down = False
         # True for the length of a G28. See _home.
         self._homing = False
         self._history: dict[int, deque[float]] = {
@@ -1004,17 +1014,41 @@ class GreenThumbAutomation:
             # visiting it would show a stop the planter will never water at.
         return stops
 
-    @contextmanager
-    def _exclusive(self, what: str) -> Iterator[None]:
+    def _busy_error(self, what: str) -> HardwareBusyError:
+        holder = self._lock_holder
+        return HardwareBusyError(
+            f"{what} rejected: hardware is busy ({holder})." if holder
+            else f"{what} rejected: hardware is busy."
+        )
+
+    def _take_lock(self, what: str, reads_only: bool = False) -> None:
+        """Take the hardware lock without waiting, or raise HardwareBusyError.
+
+        `reads_only` marks a holder that only reads sensors and moves nothing,
+        such as a calibration. A shutdown may go ahead over one of those.
+        """
         # Fail fast rather than queue: a manual command that waited its turn
         # behind a watering cycle would run minutes after the button was pressed,
         # and a backed-up control loop would water the same plant repeatedly.
+        if self._powering_down:
+            raise HardwareBusyError(f"{what} rejected: the planter is shutting down.")
         if not self._hardware_lock.acquire(blocking=False):
-            raise HardwareBusyError(f"{what} rejected: hardware is busy")
+            raise self._busy_error(what)
+        self._lock_holder = what
+        self._holder_reads_only = reads_only
+
+    def _drop_lock(self) -> None:
+        self._lock_holder = None
+        self._holder_reads_only = False
+        self._hardware_lock.release()
+
+    @contextmanager
+    def _exclusive(self, what: str, reads_only: bool = False) -> Iterator[None]:
+        self._take_lock(what, reads_only)
         try:
             yield
         finally:
-            self._hardware_lock.release()
+            self._drop_lock()
 
     def tick(self) -> None:
         """One pass of the control loop: read every sensor, then water what needs it."""
@@ -1026,7 +1060,7 @@ class GreenThumbAutomation:
             logger.exception("Failed to apply lighting schedule")
 
         try:
-            with self._exclusive("Control loop tick"):
+            with self._exclusive("Checking the plants"):
                 self._poll_sensors()
                 # After the poll, so a verdict sees this tick's reading, and
                 # before deciding to water, so a dose just confirmed releases
@@ -1398,7 +1432,7 @@ class GreenThumbAutomation:
         guessing, since pressing the switch does separate them -- a NO contact
         closes and the reading flips, a broken wire does not change at all.
         """
-        with self._exclusive("Endstop diagnostic"):
+        with self._exclusive("Reading the home switch", reads_only=True):
             movement = self.klipper.status()
             reading = self.klipper.endstop_state()
 
@@ -1482,16 +1516,34 @@ class GreenThumbAutomation:
         switched through Klipper and nothing turns it off once the host has
         gone. It is handed back only if the command is refused or fails, so a
         planter that stays up does not stay locked.
+
+        A holder that only reads sensors -- a calibration, a switch check -- is
+        no reason to refuse: stopping one partway loses nothing but the
+        reading. Then the lock stays with it, and _powering_down keeps anything
+        new from starting once it lets go.
         """
-        if not self._hardware_lock.acquire(blocking=False):
+        label = action.capitalize() or "Power action"
+        if self._powering_down:
+            raise HardwareBusyError(f"{label} rejected: the planter is already shutting down.")
+        acquired = self._hardware_lock.acquire(blocking=False)
+        if acquired:
+            self._lock_holder = label
+        elif not self._holder_reads_only:
             raise HardwareBusyError(
-                f"{action.capitalize() or 'Power action'} rejected: hardware is busy. "
-                "Wait for the watering or move to finish."
+                f"{label} rejected: hardware is busy ({self._lock_holder or 'in use'}). "
+                "Wait for it to finish."
             )
+        self._powering_down = True
+
+        def stay_up() -> None:
+            self._powering_down = False
+            if acquired:
+                self._drop_lock()
+
         try:
-            return system_power.request(action, on_failure=self._hardware_lock.release)
+            return system_power.request(action, on_failure=stay_up)
         except Exception:
-            self._hardware_lock.release()
+            stay_up()
             raise
 
     def pump_status(self) -> dict[str, object]:
@@ -1696,8 +1748,7 @@ class GreenThumbAutomation:
         """Start the pump and leave it running, for bench testing."""
         # Held across requests rather than through _exclusive, so the control
         # loop cannot start a watering cycle while the pump is manually on.
-        if not self._hardware_lock.acquire(blocking=False):
-            raise HardwareBusyError("Pump run rejected: hardware is busy")
+        self._take_lock("Running the pump")
         self._pump_lock_held = True
 
         result = self.pump.start()
@@ -1745,7 +1796,7 @@ class GreenThumbAutomation:
         # manual command run the hardware at the same time.
         if self._pump_lock_held:
             self._pump_lock_held = False
-            self._hardware_lock.release()
+            self._drop_lock()
 
     def _move_and_water(
         self, plant: PlantSpec, volume_ml: int | None = None, trigger: str = "auto"
@@ -1911,7 +1962,7 @@ class GreenThumbAutomation:
 
         # Moves first, like the automatic path. Pumping without moving waters
         # whatever the nozzle happens to be parked over.
-        with self._exclusive(f"Watering {plant_id}"):
+        with self._exclusive(f"Watering {plant.name}"):
             return self._move_and_water(plant, volume_ml, trigger="manual")
 
     def calibrate_moisture(self, endpoint: str, seconds: int = 20) -> dict[str, object]:
@@ -1928,7 +1979,7 @@ class GreenThumbAutomation:
             )
         bounded = max(5, min(int(seconds), 120))
 
-        with self._exclusive(f"Calibrating {endpoint} point"):
+        with self._exclusive("Calibrating the dry point", reads_only=True):
             results = calibrate(self.sensor_hub, endpoint, bounded, state_path=self._state_path)
         # A new air reading moves every estimated wilting point.
         self._sync_scales()
@@ -2006,7 +2057,7 @@ class GreenThumbAutomation:
         always runs rather than being skipped.
         """
         bounded = max(5, min(int(seconds), 120))
-        with self._exclusive(f"Measuring field capacity on {plant.name}"):
+        with self._exclusive(f"Measuring field capacity on {plant.name}", reads_only=True):
             return measure_endpoint(
                 self.sensor_hub,
                 plant.sensor_address,
@@ -2090,7 +2141,7 @@ class GreenThumbAutomation:
             raise ValueError(f"No soil profile called {str(soil_name).strip()!r}")
 
         bounded = max(5, min(int(seconds), 120))
-        with self._exclusive(f"Measuring wilting point on {plant.name}"):
+        with self._exclusive(f"Measuring wilting point on {plant.name}", reads_only=True):
             outcome = measure_endpoint(
                 self.sensor_hub,
                 plant.sensor_address,
