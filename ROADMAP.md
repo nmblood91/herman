@@ -142,9 +142,10 @@ details:
   configuration cannot be recovered in the field without pulling the SD card.
   Written up under *Getting onto the customer's WiFi* above, including why
   `herman.local` does not solve it.
-- **32-bit versus 64-bit reopens.** A 1 GB floor had settled this on arm64. At
-  512 MB, armhf is meaningfully lighter, and a release artifact has to target
-  one or build both. Decide before the packaging work, not after.
+- **64-bit only (decided 2026-10-26).** The 512 MB floor reopened this, since
+  armhf is lighter, but the cold build measured below settled it: on 64-bit
+  Pi OS the A+ peaked at 248 of 415 MB with every service running. So release
+  artifacts are arm64 only, and nothing is built or tested for armhf.
 
 The question is whether 512 MB survives an on-device Vite build. Measured on a
 Pi 4 (1 GB) with Klipper, the API and nginx all running:
