@@ -10,6 +10,12 @@ const SAMPLE_SECONDS = 20
 // click, which it used to be.
 const RESET_HOLD_MS = 3000
 
+// The live check reads every probe this often, and switches itself off after
+// LIVE_LIMIT_MS: each read briefly takes the hardware, and a check left
+// running in a forgotten tab would keep nudging the watering loop aside.
+const LIVE_POLL_MS = 2000
+const LIVE_LIMIT_MS = 5 * 60 * 1000
+
 // The probes' dry points, in open air: each probe's 0% water point, which an
 // estimated wilting point is placed up from. The moisture scale itself runs
 // from wilting point to a soil profile's field capacity reading, set in the
@@ -22,6 +28,9 @@ export function CalibrationPanel() {
   const [message, setMessage] = useState(null)
   const [deadline, setDeadline] = useState(null)
   const [remaining, setRemaining] = useState(0)
+  const [live, setLive] = useState(false)
+  // {sensors} from the last read, or {error} when the planter refused it.
+  const [liveReading, setLiveReading] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -58,6 +67,40 @@ export function CalibrationPanel() {
     }, 250)
     return () => clearInterval(id)
   }, [deadline])
+
+  // Paused while a calibration or reset runs: those hold the hardware, and
+  // every read in the meantime would only come back busy.
+  useEffect(() => {
+    if (!live || busy) return undefined
+    let canceled = false
+    async function readNow() {
+      try {
+        const response = await fetch(`${API_BASE}/sensors/live`)
+        const data = await response.json().catch(() => ({}))
+        if (canceled) return
+        setLiveReading(
+          response.ok
+            ? { sensors: data.sensors ?? [] }
+            : { error: data.error || data.detail || `HTTP ${response.status}` },
+        )
+      } catch (error) {
+        if (!canceled) setLiveReading({ error: error.message })
+      }
+    }
+    readNow()
+    const poll = setInterval(readNow, LIVE_POLL_MS)
+    const limit = setTimeout(() => setLive(false), LIVE_LIMIT_MS)
+    return () => {
+      canceled = true
+      clearInterval(poll)
+      clearTimeout(limit)
+    }
+  }, [live, busy])
+
+  const toggleLive = () => {
+    setLiveReading(null)
+    setLive((current) => !current)
+  }
 
   const runCalibration = async () => {
     setBusy('dry')
@@ -189,6 +232,35 @@ export function CalibrationPanel() {
             Samples every sensor for {SAMPLE_SECONDS} seconds and takes the
             median. Watering is blocked while it runs.
           </p>
+        </div>
+
+        <div className="field-row">
+          <button type="button" onClick={toggleLive}>
+            {live ? 'Stop live readings' : 'Show live readings'}
+          </button>
+          <p className="field-hint">
+            Reads every probe every {LIVE_POLL_MS / 1000} seconds, to check one
+            responds: hold it or dip it in water and its number should rise.
+            Stops by itself after {LIVE_LIMIT_MS / 60000} minutes.
+          </p>
+          {live && busy && <p className="field-hint">Paused while the calibration runs.</p>}
+          {live && liveReading?.error && (
+            <p className="field-hint warning">Could not read the probes: {liveReading.error}</p>
+          )}
+          {live &&
+            liveReading?.sensors?.map((sensor) => (
+              <p
+                className={sensor.raw < 0 ? 'field-hint warning' : 'field-hint'}
+                key={sensor.address}
+              >
+                <strong>{sensor.label || sensor.address}</strong>{' '}
+                {sensor.raw < 0
+                  ? 'not answering'
+                  : `reads ${Math.round(sensor.raw)} (air ${sensor.dry})` +
+                    (sensor.percent >= 0 ? ` · soil water ${sensor.percent}%` : '') +
+                    ` · ${sensor.temperature_c}°C`}
+              </p>
+            ))}
         </div>
 
         {message && (

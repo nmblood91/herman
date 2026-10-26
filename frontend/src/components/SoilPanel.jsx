@@ -49,6 +49,18 @@ export function SoilPanel({ soils, plants, onRefresh }) {
   // on a pot's own card does.
   const [probe, setProbe] = useState('')
   const [measuring, setMeasuring] = useState('')
+  const [deadline, setDeadline] = useState(null)
+  const [remaining, setRemaining] = useState(0)
+
+  // Counts down against a wall-clock deadline, same as the dry calibration: a
+  // background tab throttles timers, and a plain decrement would fall behind.
+  useEffect(() => {
+    if (!deadline) return undefined
+    const id = setInterval(() => {
+      setRemaining(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
+    }, 250)
+    return () => clearInterval(id)
+  }, [deadline])
 
   const list = soils ?? []
   const pots = plants ?? []
@@ -149,6 +161,9 @@ export function SoilPanel({ soils, plants, onRefresh }) {
     const label = kind === 'wilting-point' ? 'wilting point' : 'field capacity'
     setMessage('')
     setMeasuring(kind)
+    // Seeded here so the first value is on screen before the first tick.
+    setRemaining(SAMPLE_SECONDS)
+    setDeadline(Date.now() + SAMPLE_SECONDS * 1000)
     try {
       const response = await fetch(
         `${API_BASE}/soils/${encodeURIComponent(picked)}/${kind}`,
@@ -187,7 +202,15 @@ export function SoilPanel({ soils, plants, onRefresh }) {
       setMessage(`Could not measure: ${error.message}`)
     } finally {
       setMeasuring('')
+      setDeadline(null)
     }
+  }
+
+  // The request outlives the sampling window by a little, so the countdown
+  // hands over to "Finishing" instead of sitting on 0s.
+  const measureLabel = (kind, idle) => {
+    if (measuring !== kind) return idle
+    return remaining > 0 ? `Sampling… ${remaining}s` : 'Finishing…'
   }
 
   const save = async () => {
@@ -475,14 +498,14 @@ export function SoilPanel({ soils, plants, onRefresh }) {
                 disabled={Boolean(measuring) || !pots.length}
                 onClick={() => measure('field-capacity')}
               >
-                {measuring === 'field-capacity' ? 'Measuring…' : 'Measure field capacity'}
+                {measureLabel('field-capacity', 'Measure field capacity')}
               </button>
               <button
                 type="button"
                 disabled={Boolean(measuring) || !pots.length}
                 onClick={() => measure('wilting-point')}
               >
-                {measuring === 'wilting-point' ? 'Measuring…' : 'Measure wilting point'}
+                {measureLabel('wilting-point', 'Measure wilting point')}
               </button>
               <select
                 aria-label={`Probe to measure ${picked} with`}

@@ -144,7 +144,7 @@ and Soil tab, or over the API:
 
 ```bash
 curl -X POST http://herman.local/api/v1/plant-profiles -H 'Content-Type: application/json' \
-  -d '{"name":"Basil","category":"Culinary Herbs & Leafy Greens","preferred_soil":"Rich & Retentive Mix","target_available":32,"watering_volume_ml":120,"light_start_time":"07:30","light_hours":13,"light_brightness":75,"notes":"South window, dries fast in summer."}'
+  -d '{"name":"Basil","category":"Culinary Herbs & Kitchen Greens","preferred_soil":"Rich & Retentive Mix","target_available":32,"watering_volume_ml":120,"light_start_time":"07:30","light_hours":13,"light_brightness":75,"notes":"South window, dries fast in summer."}'
 curl http://herman.local/api/v1/plant-profiles/Basil
 ```
 
@@ -397,10 +397,11 @@ card and status bar say what is missing. Manual watering is unaffected.
 
 ### The plant library
 
-70 plant profiles ship in four categories: indoor vegetables and fruiting
-crops, culinary herbs and leafy greens, common houseplants, and succulents,
-cacti and epiphytes. Each names its preferred soil profile, watering target, water
-level, hours of light and light intensity. The dropdowns group them by
+99 plant profiles ship in five categories: culinary herbs and kitchen
+greens, indoor vegetables and crops, flowering bulbs and ornamentals, common
+houseplants, and succulents, cacti and epiphytes. Each
+names its preferred soil profile, watering target, water level, hours of light
+and light intensity. The dropdowns group them by
 category.
 
 ```bash

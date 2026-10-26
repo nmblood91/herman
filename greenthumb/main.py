@@ -343,6 +343,12 @@ def get_moisture_calibration() -> dict[str, object]:
     return automation.moisture_calibration()
 
 
+@app.get(f"{settings.api_prefix}/sensors/live")
+def read_live_moisture() -> dict[str, object]:
+    """A fresh reading from every probe, for the Calibration tab's live check."""
+    return automation.live_moisture()
+
+
 # Registered before the {endpoint} route below, which would otherwise match
 # "reset" as an endpoint name and reject it as invalid.
 @app.post(f"{settings.api_prefix}/sensors/calibration/reset")

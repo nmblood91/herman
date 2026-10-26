@@ -62,7 +62,7 @@ state.save_soil(RICH, {
     "field_capacity_address": 0x37,
 }, source_path)
 source.write_plant_profile("My Basil", {
-    "category": "Culinary Herbs & Leafy Greens", "preferred_soil": RICH, "target_available": 31,
+    "category": "Culinary Herbs & Kitchen Greens", "preferred_soil": RICH, "target_available": 31,
     "watering_volume_ml": 140, "light_start_time": "06:30", "light_hours": 14,
     "light_brightness": 80, "notes": "south window cutting",
 })

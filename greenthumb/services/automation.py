@@ -2005,6 +2005,31 @@ class GreenThumbAutomation:
             ],
         }
 
+    def live_moisture(self) -> dict[str, object]:
+        """One fresh reading per probe, for watching a probe respond by hand.
+
+        Read now rather than taken from the last poll, which can be a minute
+        old: the point is to see the number move as a probe goes from air into
+        a hand or a cup of water. Not recorded to history, which keeps its
+        once-a-minute cadence. Reads only, so a shutdown can go ahead over it.
+        """
+        names = self.plant_names()
+        with self._exclusive("Reading the moisture probes", reads_only=True):
+            samples = [self.sensor_hub.read_one(address) for address in self.sensor_hub.addresses]
+        return {
+            "sensors": [
+                {
+                    "address": f"0x{sample.sensor_address:02x}",
+                    "label": label_for(sample.sensor_address, names),
+                    "raw": sample.moisture_raw,
+                    "dry": self.sensor_hub.dry_for(sample.sensor_address),
+                    "percent": sample.moisture_percent,
+                    "temperature_c": sample.temperature_c,
+                }
+                for sample in samples
+            ],
+        }
+
     def plant_names(self) -> dict[int, str]:
         """Address to the name currently shown for that plant."""
         return {plant.sensor_address: plant.name for plant in self.plants}

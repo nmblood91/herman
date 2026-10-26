@@ -65,7 +65,7 @@ SOILS_KEY = "soil_profiles"
 # profile does switch the pot to its preferred soil -- you pot a plant in the
 # mix it wants -- and the card warns if the pot is later given another.
 PROFILE_FIELDS = (
-    # Grouping for the library, e.g. "Culinary Herbs & Leafy Greens".
+    # Grouping for the library, e.g. "Culinary Herbs & Kitchen Greens".
     "category",
     "preferred_soil",
     # The water level is not here: it is worked out from target_available, so a

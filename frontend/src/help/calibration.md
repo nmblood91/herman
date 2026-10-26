@@ -40,6 +40,11 @@ Take all four probes out of the soil, wipe them clean and dry, and press
 **Calibrate dry (air)**. A probe that reads very differently from the others may
 be faulty.
 
+To check a probe is working, press **Show live readings**. Every probe's
+number updates every 2 seconds. Hold a probe in your hand or dip it in water,
+and its number should rise. A probe whose number doesn't move, or that says
+"not answering", needs its plug and cable checked.
+
 ### LED strip
 Choose your strip type first. Then use the **Red**, **Green** and **Blue**
 buttons. If the color on the strip doesn't match the button, change the color

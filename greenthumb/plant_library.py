@@ -15,14 +15,26 @@ Not in the source table, and filled in here the same for every plant:
 
 Loading a profile onto a pot switches the pot to its preferred soil profile.
 
-**Where the targets came from.** The source table gives % VWC for each plant.
-Each was converted once, through its preferred soil's field capacity and
-wilting point %, so a plant waters at the same point in that soil as it did
-when targets were VWC. Those that came out under 10%, the lowest target
-allowed, were raised to 10%. Four sat outside their own soil entirely and were
-chosen instead: Peperomia Obtusifolia and the two desert cacti at 10%, and the
-Christmas cactus at 35%, whose 21% VWC was more than its soil holds, so it was
-never watered automatically.
+**Two source tables.** The herbs, vegetables and bulbs come from the newer
+table (2026-10-26), in its order, and it wins for any plant on both. After
+them come the plants only the older table had: tomatoes, strawberries,
+spinach and Swiss chard (filed with the vegetables, as the newer table files
+kale and lettuce), and the houseplants and succulents.
+
+**Where the targets came from.** Both tables give % VWC for each plant. Each
+was converted once, through its preferred soil's field capacity and wilting
+point %: round((vwc - WP) / (FC - WP) * 100). Those that came out under 10%,
+the lowest target allowed, were raised to 10%. Four from the older table sat
+outside their own soil entirely and were chosen instead: Peperomia
+Obtusifolia and the two desert cacti at 10%, and the Christmas cactus at 35%,
+whose 21% VWC was more than its soil holds, so it was never watered
+automatically.
+
+The tables' own water level words were not kept; the level comes from the
+target. They mostly agree, but not for the fast-draining bulbs: the newer
+table calls Hyacinth, Tulip and Daffodil Medium-Dry, yet their 18% VWC is most
+of what Fast-Draining Mix holds (25%), so they water at 59%, Medium-Wet. The
+number is the measured figure, so it was kept.
 """
 
 from __future__ import annotations
@@ -38,8 +50,9 @@ RICH = "Rich & Retentive Mix"
 FAST = "Fast-Draining Mix"
 COARSE = "Ultra-Coarse Epiphytic Mix"
 
-VEG = "Indoor Vegetables & Fruiting Crops"
-HERBS = "Culinary Herbs & Leafy Greens"
+HERBS = "Culinary Herbs & Kitchen Greens"
+VEG = "Indoor Vegetables & Crops"
+BULBS = "Flowering Bulbs & Ornamentals"
 HOUSE = "Common Indoor Houseplants & Foliage"
 SUCC = "Succulents, Cacti & Epiphytes"
 
@@ -73,37 +86,66 @@ def _p(name, category, soil, hours, light, available) -> LibraryPlant:
 
 # In the order of the source table.
 LIBRARY: tuple[LibraryPlant, ...] = (
-    _p("Cherry Tomato", VEG, RICH, 15, "Intense", 32),
-    _p("Beefsteak Tomato", VEG, RICH, 15, "Intense", 32),
+    _p("Sweet Basil", HERBS, RICH, 13, "High", 32),
+    _p("Thai Basil", HERBS, RICH, 13, "High", 32),
+    _p("Catnip", HERBS, RICH, 12, "Medium", 23),
+    _p("Chives", HERBS, RICH, 13, "High", 23),
+    _p("Cilantro", HERBS, RICH, 11, "Medium", 23),
+    _p("Dill", HERBS, RICH, 13, "High", 23),
+    _p("French Tarragon", HERBS, RICH, 13, "High", 11),
+    _p("Lavender", HERBS, FAST, 14, "Intense", 24),
+    _p("Lemon Balm", HERBS, RICH, 12, "Medium", 32),
+    _p("Oregano", HERBS, FAST, 13, "Intense", 35),
+    _p("Flat-Leaf Parsley", HERBS, RICH, 13, "Medium", 23),
+    _p("Spearmint / Peppermint", HERBS, RICH, 13, "Medium", 45),
+    _p("Rosemary", HERBS, FAST, 13, "Intense", 35),
+    _p("Sage", HERBS, FAST, 13, "Intense", 35),
+    _p("Thyme", HERBS, FAST, 13, "Intense", 35),
+    _p("Artichoke (Globe)", VEG, RICH, 14, "High", 32),
+    _p("Arugula", VEG, RICH, 11, "Medium", 23),
+    _p("Asparagus", VEG, RICH, 12, "High", 26),
+    _p("Yardlong Noodle Bean", VEG, RICH, 14, "Intense", 26),
+    _p("Green Bush Beans", VEG, RICH, 13, "High", 23),
+    _p("Beet (Dwarf)", VEG, RICH, 13, "High", 26),
+    _p("Bok Choy / Baby Pak Choi", VEG, RICH, 11, "Medium", 45),
+    _p("Broccoli (Dwarf/Sprouting)", VEG, RICH, 12, "High", 38),
+    _p("Brussels Sprouts (Dwarf)", VEG, RICH, 12, "High", 32),
+    _p("Cabbage (Mini)", VEG, RICH, 12, "High", 38),
+    _p("Cantaloupe / Sweet Melon", VEG, RICH, 15, "Intense", 45),
+    _p("Micro-Carrot", VEG, RICH, 13, "High", 23),
+    _p("Cauliflower (Dwarf)", VEG, RICH, 12, "High", 38),
+    _p("Celery (Container/Dwarf)", VEG, RICH, 12, "High", 57),
+    _p("Collard Greens", VEG, RICH, 11, "Medium", 32),
+    _p("Sweet Corn (Dwarf)", VEG, RICH, 15, "Intense", 32),
+    _p("Dwarf Cucumber", VEG, RICH, 15, "Intense", 54),
+    _p("Dwarf Eggplant", VEG, RICH, 15, "Intense", 32),
+    _p("Lacinato / Curly Kale", VEG, RICH, 11, "Low", 32),
+    _p("Kohlrabi", VEG, RICH, 12, "High", 32),
+    _p("Butterhead Lettuce", VEG, RICH, 11, "Low", 45),
+    _p("Romaine Lettuce", VEG, RICH, 11, "Low", 45),
+    _p("Microgreens (Mixed Greens)", VEG, RICH, 12, "Medium", 54),
+    _p("Mustard Greens", VEG, RICH, 11, "Medium", 32),
+    _p("Dwarf Okra", VEG, RICH, 14, "Intense", 26),
+    _p("Bulb / Spring Onions", VEG, RICH, 13, "Medium", 32),
+    _p("Dwarf Peas (Sugar Snap)", VEG, RICH, 13, "High", 32),
+    _p("Snow Peas (Dwarf)", VEG, RICH, 13, "High", 32),
     _p("Bell Pepper", VEG, RICH, 15, "Intense", 14),
     _p("Jalapeño Pepper", VEG, RICH, 15, "Intense", 14),
     _p("Habanero Pepper", VEG, RICH, 15, "Intense", 10),
-    _p("Bush Beans", VEG, RICH, 13, "High", 23),
-    _p("Dwarf Cucumber", VEG, RICH, 15, "Intense", 54),
-    _p("Strawberries", VEG, RICH, 13, "Intense", 32),
-    _p("Dwarf Eggplant", VEG, RICH, 15, "Intense", 32),
-    _p("Dwarf Zucchini / Squash", VEG, RICH, 15, "Intense", 45),
+    _p("Pumpkin (Bush/Dwarf)", VEG, RICH, 15, "Intense", 45),
     _p("Radish", VEG, RICH, 13, "High", 23),
-    _p("Micro-Carrot", VEG, RICH, 13, "High", 23),
-    _p("Spring Onion / Green Onion", VEG, RICH, 13, "Medium", 32),
-    _p("Dwarf Peas (Sugar Snap)", VEG, RICH, 13, "High", 32),
-    _p("Sweet Basil", HERBS, RICH, 13, "High", 32),
-    _p("Thai Basil", HERBS, RICH, 13, "High", 32),
-    _p("Butterhead Lettuce", HERBS, RICH, 11, "Low", 45),
-    _p("Romaine Lettuce", HERBS, RICH, 11, "Low", 45),
-    _p("Spinach", HERBS, RICH, 11, "Low", 32),
-    _p("Lacinato / Curly Kale", HERBS, RICH, 11, "Low", 32),
-    _p("Swiss Chard", HERBS, RICH, 11, "Medium", 32),
-    _p("Arugula", HERBS, RICH, 11, "Medium", 23),
-    _p("Spearmint / Peppermint", HERBS, RICH, 13, "Medium", 45),
-    _p("Flat-Leaf Parsley", HERBS, RICH, 13, "Medium", 23),
-    _p("Cilantro", HERBS, RICH, 11, "Medium", 23),
-    _p("Chives", HERBS, RICH, 13, "High", 23),
-    _p("Rosemary", HERBS, FAST, 13, "Intense", 35),
-    _p("Thyme", HERBS, FAST, 13, "Intense", 35),
-    _p("Oregano", HERBS, FAST, 13, "Intense", 35),
-    _p("Sage", HERBS, FAST, 13, "Intense", 35),
-    _p("French Tarragon", HERBS, RICH, 13, "High", 11),
+    _p("Dwarf Zucchini / Summer Squash", VEG, RICH, 15, "Intense", 45),
+    _p("Cherry Tomato", VEG, RICH, 15, "Intense", 32),
+    _p("Beefsteak Tomato", VEG, RICH, 15, "Intense", 32),
+    _p("Strawberries", VEG, RICH, 13, "Intense", 32),
+    _p("Spinach", VEG, RICH, 11, "Low", 32),
+    _p("Swiss Chard", VEG, RICH, 11, "Medium", 32),
+    _p("Hyacinth", BULBS, FAST, 12, "High", 59),
+    _p("Crocus", BULBS, FAST, 12, "High", 47),
+    _p("Tulip", BULBS, FAST, 12, "High", 59),
+    _p("Ranunculus (Buttercup)", BULBS, RICH, 12, "High", 14),
+    _p("Fritillaria", BULBS, FAST, 12, "High", 47),
+    _p("Daffodil (Narcissus)", BULBS, FAST, 12, "High", 59),
     _p("Golden Pothos", HOUSE, RICH, 10, "Low", 10),
     _p("Marble Queen Pothos", HOUSE, RICH, 11, "Medium", 10),
     _p("Monstera Deliciosa", HOUSE, RICH, 11, "High", 11),

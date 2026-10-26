@@ -29,31 +29,47 @@ for plant in LIBRARY:
 print(f"ok: all {len(LIBRARY)} plants have a usable target, light and soil profile")
 
 names = [plant.name for plant in LIBRARY]
-# 14 vegetables, 17 herbs and greens, 21 houseplants, 18 succulents and epiphytes.
+# The newer table's 15 herbs, 34 vegetables and 6 bulbs; the vegetables gain
+# the older table's tomatoes, strawberries, spinach and chard; then its 21
+# houseplants and 18 succulents and epiphytes.
 counts = {}
 for plant in LIBRARY:
     counts[plant.category] = counts.get(plant.category, 0) + 1
-assert list(counts.values()) == [14, 17, 21, 18], counts
+assert counts == {
+    "Culinary Herbs & Kitchen Greens": 15,
+    "Indoor Vegetables & Crops": 39,
+    "Flowering Bulbs & Ornamentals": 6,
+    "Common Indoor Houseplants & Foliage": 21,
+    "Succulents, Cacti & Epiphytes": 18,
+}, counts
 assert len(set(name.casefold() for name in names)) == len(names), names
-print(f"ok: {len(names)} plants in four categories, names distinct")
+print(f"ok: {len(names)} plants in five categories, names distinct")
 
-# Pinned, one per soil profile. The targets are the source table's % VWC
-# converted through each plant's preferred soil: Cherry Tomato's 28% VWC in
-# Rich & Retentive (FC 50, WP 17.5) is 32% available water, the Staghorn
-# Fern's 9% in Ultra-Coarse (FC 15, WP 4) is 45%, and the Snake Plant's 9% in
-# Fast-Draining (FC 25, WP 8) came out at 6% and was raised to the 10% floor.
+# A plant on both tables appears once, under the newer table's name.
+for old_name in ("Bush Beans", "Spring Onion / Green Onion", "Dwarf Zucchini / Squash"):
+    assert old_name not in names, old_name
+print("ok: plants renamed in the newer table are not listed twice")
+
+# Pinned, one per soil profile. The targets are the tables' % VWC converted
+# through each plant's preferred soil: Sweet Basil's 28% VWC in Rich &
+# Retentive (FC 50, WP 17.5) is 32% available water, Lavender's 12% in
+# Fast-Draining (FC 25, WP 8) is 24%, the Staghorn Fern's 9% in Ultra-Coarse
+# (FC 15, WP 4) is 45%, and the Snake Plant's 9% in Fast-Draining came out at
+# 6% and was raised to the 10% floor.
 by_name = {plant.name: plant for plant in LIBRARY}
 for name, expected in (
-    ("Cherry Tomato", (soil_library.LIBRARY[0].name, 15, "Intense", "Dry", 32)),
+    ("Sweet Basil", ("Rich & Retentive Mix", 13, "High", "Dry", 32)),
+    ("Lavender", ("Fast-Draining Mix", 14, "Intense", "Very Dry", 24)),
     ("Snake Plant (Sansevieria Trifasciata)", ("Fast-Draining Mix", 8, "Low", "Ultra Dry", 10)),
     ("Staghorn Fern (Platycerium)", ("Ultra-Coarse Epiphytic Mix", 11, "Medium", "Medium-Dry", 45)),
 ):
     plant = by_name[name]
     got = (plant.preferred_soil, plant.light_hours, plant.light_level, plant.water_level, plant.target_available)
     assert got == expected, (name, got)
-assert by_name["Cherry Tomato"].light_brightness == 100
+assert by_name["Sweet Corn (Dwarf)"].light_brightness == 100
 assert by_name["Peace Lily (Spathiphyllum)"].light_brightness == 25
-print("ok: spot checks match the source table, and intensities map to brightness")
+assert by_name["Spinach"].category == "Indoor Vegetables & Crops"
+print("ok: spot checks match the source tables, and intensities map to brightness")
 
 # The four whose VWC targets sat outside their own soil were chosen by hand.
 # The Christmas cactus's 21% VWC was more than its 15% soil holds, so it was
@@ -61,7 +77,15 @@ print("ok: spot checks match the source table, and intensities map to brightness
 assert by_name["Christmas / Thanksgiving Cactus (Schlumbergera)"].target_available == 35
 for name in ("Peperomia Obtusifolia", "Desert Cactus (Mammillaria)", "Prickly Pear Cactus (Opuntia)"):
     assert by_name[name].target_available == 10, (name, by_name[name].target_available)
-print("ok: the four targets that never fitted their soil now have chosen values")
+print("ok: the four targets that never fitted their soil keep their chosen values")
+
+# Habanero's 20% VWC converts to 8%, under the lowest target allowed.
+assert by_name["Habanero Pepper"].target_available == 10
+# The fast-draining bulbs keep their converted figure even though the table's
+# words call them Medium-Dry: 18% VWC is most of what that soil holds.
+assert by_name["Hyacinth"].target_available == 59
+assert by_name["Hyacinth"].water_level == "Medium-Wet"
+print("ok: Habanero is raised to the floor, and the bulbs keep their measured figure")
 
 
 # --- installing ---
@@ -73,7 +97,7 @@ stored = state.load_profiles(path)
 assert set(stored) == set(names), sorted(stored)
 entry = {k: v for k, v in stored["Sweet Basil"].items() if k != "saved_at"}
 assert entry == {
-    "category": "Culinary Herbs & Leafy Greens",
+    "category": "Culinary Herbs & Kitchen Greens",
     "preferred_soil": "Rich & Retentive Mix",
     "target_available": 32,
     "watering_volume_ml": 100,
@@ -97,9 +121,9 @@ assert state.load_profiles(path)["Sweet Basil"]["target_available"] == 33, (
 )
 print("ok: re-installing keeps your own numbers rather than replacing them")
 
-state.save_profile("aloe vera", {"target_available": 12}, path)
+state.save_profile("sweet corn (dwarf)", {"target_available": 12}, path)
 outcome = plant_library.install(path=path)
-assert outcome["Aloe Vera"] == "kept", outcome
+assert outcome["Sweet Corn (Dwarf)"] == "kept", outcome
 assert len(state.load_profiles(path)) == len(names), sorted(state.load_profiles(path))
 print("ok: a differently capitalised entry still counts as yours")
 
