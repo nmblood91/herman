@@ -34,6 +34,40 @@ fi
 echo "Enabling SPI interface..."
 sudo raspi-config nonint do_spi 0
 
+# Pin the core clock. The SPI peripheral divides its clock down from the VPU
+# core clock, and the firmware raises and lowers that clock with load unless
+# it is fixed. A change in the middle of a frame stretches the LED waveform and
+# the strip shows a glitch -- seen as an occasional flicker in Rainbow, the one
+# mode that sends 30 frames a second. The value depends on the board, so it is
+# chosen from the model the firmware reports. A board not listed is left alone.
+MODEL=$(tr -d '\0' </proc/device-tree/model 2>/dev/null || true)
+case "$MODEL" in
+  *"Pi 4"*) CORE_CLOCK_SETTINGS="core_freq=500 core_freq_min=500" ;;
+  *"Pi 3"*) CORE_CLOCK_SETTINGS="core_freq=250" ;;
+  *) CORE_CLOCK_SETTINGS="" ;;
+esac
+CORE_CLOCK_CHANGED=0
+if [ -n "$CORE_CLOCK_SETTINGS" ] && [ -f "$BOOT_CONFIG" ]; then
+  for SETTING in $CORE_CLOCK_SETTINGS; do
+    KEY=${SETTING%%=*}
+    if grep -q "^$SETTING$" "$BOOT_CONFIG"; then
+      continue
+    elif grep -q "^$KEY=" "$BOOT_CONFIG"; then
+      sudo sed -i "s/^$KEY=.*/$SETTING/" "$BOOT_CONFIG"
+    else
+      echo "$SETTING" | sudo tee -a "$BOOT_CONFIG" >/dev/null
+    fi
+    CORE_CLOCK_CHANGED=1
+  done
+  if [ "$CORE_CLOCK_CHANGED" -eq 1 ]; then
+    echo "✓ Pinned the core clock for the LED strip ($MODEL: $CORE_CLOCK_SETTINGS, applies after reboot)"
+  else
+    echo "✓ Core clock already pinned for the LED strip"
+  fi
+elif [ -z "$CORE_CLOCK_SETTINGS" ]; then
+  echo "⚠️  Unrecognized board ($MODEL); leaving the core clock as it is"
+fi
+
 # The API runs as pi, so it needs these groups to reach /dev/i2c-1 and
 # /dev/spidev0.0. Raspberry Pi OS usually grants them to the first user, but not
 # to one created later, and the failure looks like a wiring fault.
@@ -393,6 +427,6 @@ printf "API docs: http://$(hostname -I | awk '{print $1}')/docs\n"
 
 if [ "$REBOOT_NEEDED" -eq 1 ]; then
   printf "\n⚠️  Reboot required to finish enabling I2C/SPI, then re-run this script.\n"
-elif [ "$I2C_CLOCK_CHANGED" -eq 1 ]; then
-  printf "\n⚠️  Reboot to apply the new I2C clock speed.\n"
+elif [ "$I2C_CLOCK_CHANGED" -eq 1 ] || [ "$CORE_CLOCK_CHANGED" -eq 1 ]; then
+  printf "\n⚠️  Reboot to apply the new clock settings.\n"
 fi

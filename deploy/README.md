@@ -950,6 +950,13 @@ taking down the Pi and the motion board with it. Sizing and the 5V case are in
 out of the SPI peripheral, which only exists on that pin. This avoids needing
 root, which the usual PWM/DMA approach requires.
 
+**The installer pins the Pi's core clock**, because the SPI clock is divided
+down from it and the firmware otherwise changes it with load. A change in the
+middle of a frame shows as an occasional flicker, mostly in Rainbow, the only
+mode that sends frames nonstop. It reads the board model and sets
+`core_freq=250` on a Pi 3, or `core_freq=500` and `core_freq_min=500` on a
+Pi 4, in `/boot/firmware/config.txt`. It takes effect after a reboot.
+
 **Take the Pi's ground from pin 20**, right beside it in the same row of the
 header, so data and ground can share one 2-pin connector:
 
