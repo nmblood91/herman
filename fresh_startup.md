@@ -81,21 +81,12 @@ Plug the SKR into the Pi by USB first, so the installer can find it.
 sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
 ```
 
-It takes 10 to 15 minutes, sometimes longer. It enables I2C and SPI, installs
+It takes 6 mins on pi 4, 15 min on pi 3A+. It enables I2C and SPI, installs
 Klipper, installs the starter soil and plant libraries, builds the web app, and
 starts three services: `klipper`, `greenthumb-api` and `nginx`.
 
 Use `bash` and `sudo` exactly as written. The script is not marked executable
 and it needs root.
-
-**It goes quiet for several minutes after the plant list**
-("Load any of them onto a pot under Plants and Soil."). That is `npm install`
-and the web app build, which print nothing and are slow on a Pi. It is not
-stuck. To check, open a second SSH session and run `top`: `node` near the top
-means it is working. If it really has stalled, the cause is usually running out
-of memory (`free -h`, `dmesg | tail`) or no internet (`ping -c2 registry.npmjs.org`).
-To see the output, press Ctrl+C, run `cd /opt/greenthumb/frontend && npm install && npm run build`
-by hand, then run the installer again.
 
 It ends with "GreenThumb install complete" and prints the address to open.
 
@@ -109,11 +100,15 @@ sudo reboot
 ssh pi@herman.local
 sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
 ```
-
+It will not take nearly as long as before.
 **If it says no Klipper device was found**, the SKR is not visible. Check the USB
 cable and that the board is powered, then run the installer again.
 
 ## 6. Check it came up
+
+go to herman.local
+
+for a more detailed look and/or possible trouble shooting see below:
 
 ```bash
 sudo systemctl status klipper
