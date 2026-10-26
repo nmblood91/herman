@@ -56,7 +56,7 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 | Right STEMMA QT sub hub, fronts | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Cable chain for water tube | 50 links | 150 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Cable chain anchor | 1 | 3 g | 0 | 0 | 2 | 0 | 0 | 0 |
-| Camera module mount | 1 | — | — | — | — | — | — | — |
+| Camera mount | 1 | — | — | — | — | — | — | — |
 
 ## Fastener totals
 
@@ -208,26 +208,20 @@ Only the parts with a constraint worth recording.
 
 ## Still to come
 
-- **Camera module mount.** An optional paid add-on, not part of the base build.
-  It takes the standard 15-pin CSI ribbon, which the Pi 3 A+ and every
-  development board share — the narrow 22-pin connector on the Pi Zero 2 W is
-  the reason that board is deferred until after launch.
+- **Camera mount.** An optional paid add-on, not part of the base build. It
+  holds a USB webcam, so its shape waits on the camera chosen.
 
-What it can see follows from where it sits. The 120° lens on the Camera
-  Module 3 Wide covers roughly **3.5 times its standoff**, so framing all
-  890 mm would take 260 mm of depth — which this frame does not have. A fixed
-  mount therefore sees part of the rail, and the mount decides which part:
+  What it can see follows from where it sits. Coverage is
+  `2 · standoff · tan(HFOV/2)`: a 120° lens needs 260 mm of depth to frame all
+  890 mm, which this frame does not have. A fixed mount therefore sees part of
+  the rail unless the lens is very wide, and the mount decides which part:
 
   - **Centered on the rail**, for the widest symmetric view of the middle.
   - **Or deliberately off-center**, trading the far end for a closer look at
     one or two plants.
 
-  Worth measuring the standoff actually available before committing, since it
-  sets the coverage: 3.5 times that number is the span in shot.
-
-  The module is 25 × 24 mm with four M2 holes on a 21 × 12.5 mm pattern, and
-  the ribbon wants a gentle radius rather than a fold. See [BOM.md](BOM.md) and
-  [ROADMAP.md](ROADMAP.md).
+  Worth measuring the standoff actually available before committing. See
+  [BOM.md](BOM.md) and [ROADMAP.md](ROADMAP.md).
 
 ## Worth capturing later
 

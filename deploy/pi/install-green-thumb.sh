@@ -34,10 +34,11 @@ fi
 echo "Enabling SPI interface..."
 sudo raspi-config nonint do_spi 0
 
-# The API runs as pi, so it needs these groups to reach /dev/i2c-1 and
-# /dev/spidev0.0. Raspberry Pi OS usually grants them to the first user, but not
-# to one created later, and the failure looks like a wiring fault.
-sudo usermod -aG i2c,spi,gpio pi
+# The API runs as pi, so it needs these groups to reach /dev/i2c-1,
+# /dev/spidev0.0 and a USB camera's /dev/video*. Raspberry Pi OS usually grants
+# them to the first user, but not to one created later, and the failure looks
+# like a wiring fault.
+sudo usermod -aG i2c,spi,gpio,video pi
 
 # raspi-config normally applies these live, but on a first boot the device nodes
 # can be absent until the modules load.
@@ -46,6 +47,16 @@ sudo modprobe spi-bcm2835 2>/dev/null || true
 
 sudo apt update
 sudo apt install -y git python3-venv python3-pip nginx curl
+
+# The camera is an add-on: a USB webcam, read through ffmpeg. ffmpeg is large,
+# so it is installed only when a camera is plugged in. Plug one in later and
+# re-run this script to add it.
+if ls /dev/v4l/by-id/*-video-index0 >/dev/null 2>&1; then
+  echo "USB camera found, installing ffmpeg to read it..."
+  sudo apt install -y ffmpeg v4l-utils
+else
+  echo "No USB camera plugged in; skipping ffmpeg"
+fi
 
 # Install core dependencies
 echo "Installing build dependencies..."

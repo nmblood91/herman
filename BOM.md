@@ -78,16 +78,15 @@ being duplicated here; there is one 12 V supply for the whole machine.
 |---|---|---|---|---|
 | Raspberry Pi 3 Model A+ | 1 | $30.00 | $30.00 | production target; allow +$20 for a larger board or a price rise |
 | MicroSD card | 1 | $10.00 | $10.00 |  |
-| Raspberry Pi Camera Module 3 Wide | 1 | $35.00 | $35.00 | **paid add-on, not base build**; 120° lens, and still short of seeing all four plants at once |
+| USB webcam with on-board MJPEG (UVC) | 1 | TBD | TBD | **paid add-on, not base build**; under test: Innomaker U20CAM 1080p. Needs a free USB port, so a camera unit carries a Pi 4 |
 
 **Base subtotal $40.00**, the camera excluded as an add-on. The 12 V to 5 V
 step-down that feeds the Pi is priced under *Power and electronics* with the
 rest of the supply chain, so it is not counted twice here.
 
 **Production target: Raspberry Pi 3 Model A+.** Chosen on cost. Same BCM2837B0
-and 1.4 GHz quad A53 as the 3 B+, dual-band WiFi, the standard 15-pin CSI
-camera connector, and the same 40-pin pinout — so nothing about the wiring or
-the camera ribbon changes. What differs: 512 MB RAM, a single USB-A port
+and 1.4 GHz quad A53 as the 3 B+, dual-band WiFi, and the same 40-pin
+pinout — so nothing about the wiring changes. What differs: 512 MB RAM, a single USB-A port
 (the SKR takes it), no Ethernet, and a smaller 65 × 56 mm board with its own
 mounting pattern. See the hardware notes in [ROADMAP.md](ROADMAP.md) for the
 two things still to validate before this is locked.
@@ -161,26 +160,24 @@ The enclosure needs to carry both the A+ and a development board — different
 outlines and different port faces, so plan for two mounting patterns rather
 than one.
 
-The camera add-on is scoped to timelapse; the standard 15-pin ribbon fits both
-the A+ and the development boards. The API can also serve a live MJPEG view,
-which is a local tool for aiming and checking rather than something sold — see
-[ROADMAP.md](ROADMAP.md).
+The camera add-on is scoped to timelapse, and it is a USB webcam. The A+ has
+one USB port and the SKR takes it, so a camera unit carries a Pi 4. The API
+can also serve a live MJPEG view, which is a local tool for aiming and
+checking rather than something sold — see [ROADMAP.md](ROADMAP.md).
 
-**Which lens matters more than which sensor, and neither is enough for one
-fixed shot of everything.** What a lens covers scales with how far back it
-sits:
+**The lens's field of view decides what a fixed camera sees.** Coverage is
+`2 · standoff · tan(HFOV/2)`, so framing all 890 mm of rail needs:
 
-| Lens | Covers | To reach 890 mm |
-|---|---|---|
-| Wide, 120° | **~3.5× its standoff** | 260 mm |
-| Standard, 75° | ~1.5× its standoff | 590 mm |
+| Horizontal FOV | Standoff to frame 890 mm |
+|---|---|
+| 120° | 260 mm |
+| 130° | 200 mm |
+| 143° | 120 mm |
+| 170°+ fisheye | effectively none |
 
-The Wide is still the one to order — it needs less than half the depth — but
-**this frame does not give even 260 mm**, so a fixed camera sees a subset of
-the rail rather than all four plants. Either accept the partial view, put the
-camera on the gantry so it carries to each plant in turn, or treat the rail as
-needing two cameras. The 120° lens also bows the rail and stretches whatever
-is at the edges, which is the lens and not a mounting error.
+Listings usually quote *diagonal* FOV, and the rail cares about horizontal;
+see [ROADMAP.md](ROADMAP.md). This frame has little depth, so either a very
+wide lens, a camera on the gantry carried to each plant, or a partial view.
 
 ## Sensing
 

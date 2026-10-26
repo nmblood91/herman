@@ -103,7 +103,7 @@ the Pi. A 5V strip needs its own 5V supply and its own fuse sized to it.
 |-----------|---------|---------|-------|
 | SKR Mini E3 V2/V3 | 12V | 0.3A | 3.6W |
 | Raspberry Pi | 5V | 0.6A | 3W |
-| Pi Camera *(optional add-on)* | 5V | 0.1A | 0.5W |
+| USB camera *(optional add-on)* | 5V | 0.1A | 0.5W |
 | Soil Moisture Sensors (4x) | 3.3V | 0.05A | 0.15W |
 | Addressable LEDs (60 LEDs, 12V) | 12V | ~1.2-1.5A (peak full white) | ~14-18W |
 | Peristaltic Pump (12V, 100 mL/min) | 12V | 0.2-0.3A | ~3.6W |

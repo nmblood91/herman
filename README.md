@@ -10,7 +10,7 @@ Herman is a smart indoor planter / grow frame that combines:
 - a Raspberry Pi host running Klipper
 - four capacitive soil sensors on an I2C hub
 - per-plant watering and lighting control
-- an optional Pi camera add-on for monitoring and timelapse capture
+- an optional USB camera add-on for monitoring and timelapse capture
 
 This repository is intentionally structured as a product-ready foundation for a future commercial offering, not just a one-off prototype.
 
@@ -502,7 +502,7 @@ and `spidev`, so they run on a development machine with no hardware attached.
 | Pump | Real — Klipper `output_pin` on the SKR's HB MOSFET |
 | LEDs | Real — WS2811 (default), WS2815 or GS8208 over SPI, 12V only, strip type selectable in Settings |
 | Watering check | Real — each dose is confirmed from the pot's own moisture probe; see HOW_WATERING_WORKS.md |
-| Camera | API only — Camera Module 3 Wide via rpicam-vid, MJPEG over HTTP. An optional add-on, with no UI and no timelapse |
+| Camera | API only — a USB webcam read through ffmpeg, MJPEG over HTTP. An optional add-on, with no UI and no timelapse |
 
 Automatic watering is disabled by default. Turn it on with **Water plants
 automatically** in the Automation tab; the choice persists across restarts.

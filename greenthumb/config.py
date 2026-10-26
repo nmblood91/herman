@@ -56,18 +56,24 @@ class Settings(BaseSettings):
     gantry_travel_mm: float = 890.0
     debug: bool = False
 
-    # Camera, an optional add-on. Nothing here assumes one is plugged in: with
-    # no capture tool installed the Camera tab says so instead of failing.
+    # Camera, an optional add-on: a USB (UVC) webcam. Nothing here assumes one
+    # is plugged in: with no camera the API says so instead of failing.
     #
-    # 640x480 at 10 fps is sized for the smallest board this targets, a Pi 3 A+
-    # with 512 MB of RAM. Camera Module 3 captures far larger than this and the
-    # ISP scales it down, so a bigger number here spends WiFi bandwidth and
-    # JPEG encoding rather than buying detail the lens did not resolve.
+    # The camera has to support this size and rate in the format below, or
+    # ffmpeg refuses to start; `v4l2-ctl --list-formats-ext` lists what it
+    # offers. 640x480 at 10 fps keeps the stream light on WiFi.
     camera_width: int = 640
     camera_height: int = 480
     camera_fps: int = 10
-    # MJPEG sends a whole frame every frame, with no delta between them, so
-    # this is the main control over how much data crosses the WiFi.
+    # The camera's /dev node. Empty finds the first USB camera by itself.
+    camera_device: str = ""
+    # What to ask the camera for. "mjpeg" is copied through untouched and
+    # costs the Pi almost nothing; a camera without it needs e.g. "yuyv422",
+    # which ffmpeg then compresses on the CPU.
+    camera_input_format: str = "mjpeg"
+    # Only used when ffmpeg does the compressing (camera_input_format other
+    # than mjpeg). MJPEG sends a whole frame every frame, so this is then the
+    # main control over how much data crosses the WiFi.
     camera_jpeg_quality: int = 70
 
     # Control loop

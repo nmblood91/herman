@@ -41,7 +41,7 @@ buffer += b"-rest" + cam.EOI
 assert take_frames(buffer) == [jpeg(b"half-rest")], "a frame split across reads was lost"
 print("ok: a frame split across two reads is rejoined rather than dropped")
 
-# rpicam-vid writes nothing before the first frame, but a restart or a garbled
+# ffmpeg writes nothing before the first frame, but a restart or a garbled
 # first read can leave bytes with no start marker in front of them.
 buffer = bytearray(b"\x00\x01noise" + jpeg(b"real"))
 assert take_frames(buffer) == [jpeg(b"real")], "leading noise was not skipped"
@@ -83,7 +83,7 @@ print("ok: with no capture tool the status answers plainly instead of raising")
 started = time.monotonic()
 assert absent.snapshot(timeout=0.3) is None
 assert time.monotonic() - started < 3.0, "a missing camera blocked for the full timeout"
-assert "ribbon" in (absent.status()["error"] or ""), absent.status()
+assert "ffmpeg" in (absent.status()["error"] or ""), absent.status()
 print("ok: a missing camera fails fast and says what to check")
 
 # Stopping something that never started is what shutdown does on a base unit.
@@ -261,5 +261,36 @@ assert concurrent_ticks > 10, (
 print(f"ok: the loop served {concurrent_ticks} other turns while a frame was pending")
 
 assert threading.active_count() < 30, f"{threading.active_count()} threads still running"
+
+
+# --- a 30 fps camera reaches viewers at the configured rate ---
+
+# Many UVC cameras only offer 30 fps. Thirty frames in one second must reach
+# viewers as about ten, by dropping copied frames rather than re-encoding.
+BURST = (
+    "import sys, time\n"
+    "for i in range(30):\n"
+    "    sys.stdout.buffer.write(b'\\xff\\xd8f\\xff\\xd9')\n"
+    "    sys.stdout.buffer.flush()\n"
+    "    time.sleep(1 / 30)\n"
+    "time.sleep(30)\n"
+)
+paced = CameraStream(fps=10, capture_command=[sys.executable, "-c", BURST])
+with paced.viewer():
+    time.sleep(1.6)
+    published = paced.status()["frames"]
+paced.stop()
+assert 7 <= published <= 13, f"30 frames in a second reached viewers as {published}"
+print(f"ok: a 30 fps camera reaches viewers at about 10 fps ({published} frames)")
+
+# And the command never asks the camera for a rate it may not offer.
+command = CameraStream(fps=10)._capture_command.__func__(
+    type("C", (), {"_command": None, "_binary": "ffmpeg", "_device": lambda self: "/dev/video0",
+                   "input_format": "mjpeg", "width": 640, "height": 480, "quality": 70})()
+)
+assert "-framerate" not in command, command
+assert command[command.index("-c:v") + 1] == "copy", "MJPEG must be copied, not re-encoded"
+assert command[command.index("-i") + 1] == "/dev/video0", command
+print("ok: the camera's own MJPEG is copied through, at whatever rate it runs")
 
 print("\nall camera checks passed")

@@ -1,10 +1,10 @@
 """The camera, as a single shared MJPEG source.
 
-Capture goes through rpicam-vid rather than picamera2. Camera Module 3 is an
-imx708 and only the libcamera stack drives it, so the capture is a libcamera
-tool either way; reaching it as a subprocess keeps python3-picamera2 out of the
-picture, since that is an apt package the venv cannot see without being rebuilt
-with --system-site-packages.
+The camera is a USB (UVC) webcam, which Linux exposes through V4L2 as
+/dev/video*. Capture goes through ffmpeg as a subprocess. A camera that
+compresses to MJPEG on board -- the kind to buy -- has its frames copied
+through untouched, so the Pi does no image work at all; one that only gives
+raw video is compressed by ffmpeg instead, which costs real CPU.
 
 One process holds the camera and only one can -- a second open fails -- so this
 is a single capture whose latest frame is handed to every viewer, rather than a
@@ -19,7 +19,9 @@ capture tool installed every call answers "not fitted" rather than raising.
 from __future__ import annotations
 
 import asyncio
+import glob
 import logging
+import os
 import shutil
 import subprocess
 import threading
@@ -36,8 +38,13 @@ logger = logging.getLogger(__name__)
 SOI = b"\xff\xd8"
 EOI = b"\xff\xd9"
 
-# Bookworm ships rpicam-*; Bullseye called the same tools libcamera-*.
-CAPTURE_BINARIES = ("rpicam-vid", "libcamera-vid")
+CAPTURE_BINARY = "ffmpeg"
+
+# Where udev lists USB cameras by name. A UVC camera usually registers two
+# nodes: index0 delivers the picture and index1 only metadata, so index0 is the
+# one to open. Named rather than /dev/video0, whose number depends on what else
+# was plugged in first.
+USB_CAMERA_GLOB = "/dev/v4l/by-id/*-video-index0"
 
 # Read in chunks rather than per frame: a 640x480 JPEG is tens of kilobytes and
 # arrives across several pipe reads.
@@ -48,8 +55,8 @@ READ_CHUNK = 65536
 # real stall trips it.
 FRAME_WAIT_SECONDS = 5.0
 
-# rpicam-vid takes a second or two to configure the sensor and focus, so the
-# wait for frame one is longer than the wait for frame two.
+# A USB camera takes a second or two to negotiate its mode and settle its
+# exposure, so the wait for frame one is longer than the wait for frame two.
 START_WAIT_SECONDS = 10.0
 
 # Keep the capture alive this long after the last viewer leaves. A page refresh
@@ -99,8 +106,18 @@ def take_frames(buffer: bytearray) -> list[bytes]:
     return frames
 
 
+def find_usb_camera() -> str | None:
+    """The first USB camera's picture node, or None if none is plugged in."""
+    found = sorted(glob.glob(USB_CAMERA_GLOB))
+    if found:
+        return found[0]
+    # Some cameras do not register under by-id. video0 is then the best guess,
+    # and nothing else in this build claims it.
+    return "/dev/video0" if os.path.exists("/dev/video0") else None
+
+
 class CameraStream:
-    """A libcamera capture, started on demand, broadcast to every viewer."""
+    """A USB camera capture, started on demand, broadcast to every viewer."""
 
     def __init__(
         self,
@@ -108,12 +125,20 @@ class CameraStream:
         height: int = 480,
         fps: int = 10,
         quality: int = 70,
+        device: str = "",
+        input_format: str = "mjpeg",
         capture_command: list[str] | None = None,
     ) -> None:
         self.width = width
         self.height = height
         self.fps = fps
         self.quality = quality
+        # "" finds the camera when the capture starts, so one plugged in after
+        # the service came up is picked up without a restart.
+        self.device = device
+        # What to ask the camera for. "mjpeg" is passed through as it is;
+        # anything else (yuyv422, say) is compressed to JPEG by ffmpeg.
+        self.input_format = input_format
 
         # Injectable so the tests can exercise the pipe, the frame splitting
         # and the start/stop lifecycle against a stand-in process, with no
@@ -138,7 +163,14 @@ class CameraStream:
 
     @property
     def fitted(self) -> bool:
-        return self._command is not None or self._binary is not None
+        if self._command is not None:
+            return True
+        return self._binary is not None and self._device() is not None
+
+    def _device(self) -> str | None:
+        if self.device:
+            return self.device if os.path.exists(self.device) else None
+        return find_usb_camera()
 
     def status(self) -> dict[str, object]:
         with self._frames:
@@ -150,6 +182,7 @@ class CameraStream:
                 "width": self.width,
                 "height": self.height,
                 "fps": self.fps,
+                "device": self._device() if self._command is None else None,
                 "error": self._error,
             }
 
@@ -209,42 +242,55 @@ class CameraStream:
     # --- the capture process ---
 
     def _find_binary(self) -> str | None:
-        for name in CAPTURE_BINARIES:
-            found = shutil.which(name)
-            if found:
-                return found
-        return None
+        return shutil.which(CAPTURE_BINARY)
 
     def _capture_command(self) -> list[str]:
         if self._command is not None:
             return list(self._command)
+        device = self._device()
+        if self.input_format == "mjpeg":
+            # The camera's own JPEGs, copied through: no decoding, no
+            # re-encoding, and the quality setting does not apply.
+            output = ["-c:v", "copy"]
+        else:
+            # ffmpeg's JPEG quality runs 2 (best) to 31 (worst), the other way
+            # round from the 1-100 everyone else uses.
+            qscale = round(2 + (100 - self.quality) * 29 / 100)
+            output = ["-c:v", "mjpeg", "-q:v", str(min(max(qscale, 2), 31))]
         return [
             str(self._binary),
-            # Run until we close it, rather than for a fixed recording length.
-            "--timeout", "0",
-            "--codec", "mjpeg",
-            "--width", str(self.width),
-            "--height", str(self.height),
-            "--framerate", str(self.fps),
-            "--quality", str(self.quality),
-            # Focus once at startup and hold it. The scene is static but the
-            # gantry crosses it, and continuous autofocus would hunt every time
-            # the carriage passes through the shot.
-            "--autofocus-mode", "auto",
-            # No display is attached, and without this it looks for one.
-            "--nopreview",
-            # Push each frame down the pipe as it is encoded. Without it the
-            # picture arrives in batches, seconds behind the plant.
-            "--flush",
-            "--output", "-",
+            "-hide_banner",
+            "-loglevel", "error",
+            # Hand frames on as they arrive rather than buffering a few, which
+            # is what keeps the picture from lagging behind the plant.
+            "-fflags", "nobuffer",
+            "-f", "v4l2",
+            "-input_format", self.input_format,
+            "-video_size", f"{self.width}x{self.height}",
+            # No -framerate: many UVC cameras offer only 30 fps, and asking
+            # for 10 is refused or quietly ignored. The camera runs at its own
+            # rate and _read_frames passes on only every frame self.fps needs.
+            "-i", str(device),
+            *output,
+            "-f", "mjpeg",
+            # Push each frame down the pipe as soon as it is written. Without
+            # it the picture arrives in batches.
+            "-flush_packets", "1",
+            "-",
         ]
 
     def _start(self) -> None:
         """Start the capture. Caller holds the condition."""
+        if self._command is None and self._binary is None:
+            self._error = (
+                "ffmpeg is not installed, so the camera cannot be read. Re-run "
+                "the installer with the camera plugged in, which installs it."
+            )
+            return
         if not self.fitted:
             self._error = (
-                "No camera capture tool found. Install rpicam-apps, and check that "
-                "the ribbon cable is seated and the camera is detected."
+                "No USB camera found. Check it is plugged into the Pi, then "
+                "reload this page."
             )
             return
         if self._process is not None and self._process.poll() is None:
@@ -330,6 +376,13 @@ class CameraStream:
         stdout = process.stdout
         if stdout is None:
             return
+        # Frames closer together than this are dropped, so a camera running
+        # at 30 fps reaches viewers at self.fps. Dropping a copied JPEG costs
+        # nothing; slowing ffmpeg's output instead would mean re-encoding.
+        # A little under the full gap, so jitter in arrival does not drop a
+        # frame that was due.
+        gap = 0.9 / self.fps if self.fps > 0 else 0.0
+        last = float("-inf")
         try:
             while True:
                 chunk = stdout.read(READ_CHUNK)
@@ -337,6 +390,10 @@ class CameraStream:
                     break
                 buffer += chunk
                 for frame in take_frames(buffer):
+                    now = time.monotonic()
+                    if now - last < gap:
+                        continue
+                    last = now
                     self._publish(frame)
                 if len(buffer) > MAX_BUFFER_BYTES:
                     logger.warning(
@@ -356,8 +413,8 @@ class CameraStream:
     def _drain_stderr(self, process: subprocess.Popen[bytes]) -> None:
         """Keep the last few lines, and keep the pipe from filling.
 
-        rpicam-vid is chatty: it reports the sensor mode it chose and a line per
-        dropped frame. Left unread the pipe fills and the capture blocks trying
+        ffmpeg runs at -loglevel error, but a failing camera can still write a
+        line per frame. Left unread the pipe fills and the capture blocks trying
         to write to it, which looks exactly like a camera that has stopped
         producing frames.
         """

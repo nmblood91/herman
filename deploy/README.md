@@ -982,21 +982,35 @@ choose the type first and adjust the order afterwards.
 
 ## Connecting the Camera
 
-Optional, and an add-on rather than part of a base unit. A **Camera Module 3
-Wide** on the standard 15-pin CSI ribbon, into the Pi's camera connector.
+Optional, and an add-on rather than part of a base unit: a **USB webcam** that
+compresses to MJPEG on board (UVC), plugged into one of the Pi 4's USB ports.
+The A+ has one USB port and the SKR takes it, so a camera unit carries a Pi 4.
 
 There is no UI for this. The API serves the stream and nothing else consumes
 it, so reach it with a browser or curl.
 
-The Wide covers roughly 3.5 times its standoff, against 1.5 times for the
-75-degree version, so it is the one to fit. Even so, **this frame does not have
-the 260 mm of standoff that 890 mm of rail would need**, so a fixed camera sees
-part of the rail rather than all four plants. Aim it at whatever matters most
-and expect the ends to fall outside the shot.
+**Plug the camera in before running the installer.** It installs ffmpeg, which
+reads the camera, only when it finds one, and adds `pi` to the `video` group
+the camera's `/dev/video*` nodes belong to.
 
-Lift the latch on the Pi's camera connector, slide the ribbon in with the
-**silver contacts facing away from the Ethernet/USB end**, and press the latch
-down. The ribbon wants a gentle curve; a sharp fold cracks the traces.
+**Check the camera offers MJPEG** before relying on it:
+
+```bash
+v4l2-ctl --list-devices
+v4l2-ctl -d /dev/video0 --list-formats-ext
+```
+
+`MJPG` in the list means frames are copied through with no work on the Pi. A
+camera with only `YUYV` works too, with `CAMERA_INPUT_FORMAT=yuyv422` in
+`.env`, but then the Pi compresses every frame. The size in `.env`
+(`CAMERA_WIDTH` and `CAMERA_HEIGHT`, 640x480 by default) has to be one the
+camera lists for that format. Many cameras offer only 30 fps; that is fine,
+since frames beyond `CAMERA_FPS` (10) are dropped before they reach a viewer.
+
+The app finds the camera by itself, as the first entry under
+`/dev/v4l/by-id/` ending `-video-index0`. A USB camera usually registers two
+nodes, and only index0 gives a picture. Set `CAMERA_DEVICE` in `.env` to pick
+a different one.
 
 Check what it actually sees by fetching one frame, which is cheaper than
 holding a stream open:
@@ -1011,34 +1025,25 @@ player.
 
 **Only one process can hold the camera at a time.** The API takes it while
 somebody is reading the stream and releases it about fifteen seconds after the
-last reader disconnects. So `rpicam-hello` run by hand while a stream is open
-will fail to acquire the camera - that is the two of them competing, not a
-fault. Close the stream, wait, and try again.
+last reader disconnects. So ffmpeg run by hand while a stream is open will fail
+to open the camera - that is the two of them competing, not a fault. Close the
+stream, wait, and try again.
 
 Bringing it up, in order, so a failure points at one thing:
 
 ```bash
-rpicam-hello --list-cameras     # the sensor is detected at all
-rpicam-vid -t 2000 --codec mjpeg -o /tmp/test.mjpeg   # capture works
-curl -s localhost:8000/api/v1/camera                  # the API agrees
+ls /dev/v4l/by-id/                    # the camera is detected at all
+ffmpeg -f v4l2 -input_format mjpeg -video_size 640x480 \
+  -i /dev/video0 -frames:v 1 /tmp/test.jpg   # capture works
+curl -s localhost:8000/api/v1/camera  # the API agrees
 ```
 
-If `--list-cameras` finds nothing, it is the ribbon or its seating, and nothing
-further along can work. If capture works but the API says `fitted: false`,
-`rpicam-vid` is not on the service's PATH. If the picture is live but lags in
-jerky batches, nginx is buffering it - check that the
+If nothing is listed, it is the cable or the port, and nothing further along
+can work. If capture works but the API says `fitted: false`, ffmpeg is not
+installed: re-run the installer with the camera plugged in. If the picture is
+live but lags in jerky batches, nginx is buffering it - check that the
 `/api/v1/camera/stream` location in `deploy/nginx/greenthumb.conf` carries
 `proxy_buffering off`.
-
-**The service account needs the `video` group**, and the installer does not
-add it. libcamera reaches the sensor through `/dev/video*` and `/dev/media*`,
-both owned by that group, and the API runs as `pi`. Without it the capture
-fails in a way that looks like no camera at all:
-
-```bash
-sudo usermod -aG video pi
-sudo systemctl restart greenthumb-api
-```
 
 The live view is local only. Nothing is recorded and nothing leaves the
 network - see [PRIVACY_SECURITY_SPEC.md](../PRIVACY_SECURITY_SPEC.md).
@@ -1052,7 +1057,7 @@ Dress the wiring as **two groups that do not run alongside each other**:
   ────────────────────────────────────        ──────────────────────────
   stepper motor leads                         I2C soil sensor tree
   pump power (HB pair)                       LED data line to GPIO10
-  X endstop pair (X-STOP)                     camera ribbon
+  X endstop pair (X-STOP)                     camera USB lead
 ```
 
 Crossing between groups at right angles is fine. Running parallel for any

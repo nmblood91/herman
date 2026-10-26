@@ -125,8 +125,8 @@ See [BOM.md](BOM.md) for the boards being tested and in what order.
 
 **The intended production target is the Pi 3 Model A+**, chosen on cost. Most of
 the objections to it do not apply: same BCM2837B0 and same 1.4 GHz quad A53 as
-the B+, same dual-band WiFi, same 40-pin pinout, and the same standard 15-pin
-CSI connector, so neither the wiring nor the camera ribbon changes. Its smaller
+the B+, same dual-band WiFi and same 40-pin pinout, so the wiring does not
+change. Its smaller
 outline means a different mounting pattern, which is a chassis change rather
 than a blocker.
 
@@ -257,23 +257,22 @@ distribution collapsed into a single PCB. That is where the cost actually
 falls, and it is a five-figure tooling decision rather than a parts
 substitution. Not near.
 
-### If the camera comes back, USB is the way
+### The camera is USB
 
-The CSI camera was dropped because the frame has nowhere to put it, not because
-the camera was wrong. Coverage is `2 · standoff · tan(HFOV/2)`, so framing
-890 mm of rail needs:
+The camera is a USB (UVC) webcam. A Raspberry Pi ribbon camera was dropped:
+the frame has nowhere to put one, a ribbon flexing through the cable chain
+would crack, and 120° is the widest lens Raspberry Pi sells. Coverage is
+`2 · standoff · tan(HFOV/2)`, so framing 890 mm of rail needs:
 
 | Horizontal FOV | Standoff |
 |---|---|
-| 120° — Camera Module 3 Wide, the widest CSI option | **260 mm** |
+| 120° | **260 mm** |
 | 130° | 200 mm |
 | 143° | 120 mm |
 | 170°+ fisheye | effectively none |
 
-This frame does not give 260 mm. **That ceiling is a Raspberry Pi catalog
-limit rather than a physical one** — 120° is the widest CSI lens they sell, and
-UVC modules go far wider for less money. So the interesting alternatives are
-all USB.
+This frame does not give 260 mm, and UVC modules go far wider than 120° for
+less money.
 
 **Read the FOV spec carefully.** Listings almost always quote *diagonal* FOV,
 and a rail cares about horizontal. On a 4:3 sensor a "140°" part is roughly
@@ -287,7 +286,7 @@ implies. Check for `140°D` before believing it.
   camera can sit almost against the glass. Heavy barrel distortion, which is
   acceptable for looking at plants and not for measuring them.
 - **A USB endoscope on the gantry.** Worth taking seriously because it removes
-  the objection that made a gantry mount unattractive: a CSI ribbon flexing
+  the objection that made a gantry mount unattractive: a ribbon flexing
   through the cable chain on every move will eventually crack, whereas an
   endoscope cable is thin and flexible by design and the chain already carries
   the water tube. The camera then travels to each plant and framing stops
@@ -327,18 +326,20 @@ The development Pi 4 has four ports, so a camera can be proven out without
 deciding any of this.
 
 **Insist on hardware MJPEG.** A UVC camera that compresses on-board means the
-host only copies frames, which is *lighter* than the CSI path and its libcamera
-ISP plus JPEG encode — worth having on a 512 MB board. Cheap endoscopes often
+host only copies frames, with no JPEG encoding on the Pi at all. Cheap endoscopes often
 emit raw YUV only, pushing compression onto the CPU and capping out around
 640x480. Confirm with `v4l2-ctl --list-formats-ext` before buying.
 
-**What this costs in software.** `greenthumb/hardware/camera.py` shells out to
-`rpicam-vid`, which is libcamera and **cannot see a UVC device at all** — those
-are V4L2 on `/dev/video*`. Capture would move to ffmpeg or V4L2 directly.
-Everything else in that module survives untouched: the single shared capture,
-the viewer reference counting, the JPEG frame splitting, the multipart
-generator and the tests. Only `_capture_command` and the binary detection
-change, which is the reason the capture command was made injectable.
+**In software.** `greenthumb/hardware/camera.py` captures with ffmpeg from the
+first `/dev/v4l/by-id/*-video-index0`, copying the camera's own MJPEG through
+untouched. Many cameras offer only 30 fps, so ffmpeg runs at the camera's rate
+and frames beyond `camera_fps` are dropped before they reach a viewer. The
+installer adds ffmpeg only when a camera is plugged in. Everything else in that
+module carried over: the single shared capture, the viewer reference counting,
+the JPEG frame splitting and the multipart generator.
+
+The first camera tried is an Innomaker U20CAM 1080p: MJPEG at 640x480 and up
+to 1920x1080, all at 30 fps.
 
 Prerequisites whenever this starts: there is no CI yet, and the two version
 strings (`pyproject.toml`, `frontend/package.json`) are unmanaged — a release

@@ -38,6 +38,8 @@ camera = CameraStream(
     height=settings.camera_height,
     fps=settings.camera_fps,
     quality=settings.camera_jpeg_quality,
+    device=settings.camera_device,
+    input_format=settings.camera_input_format,
 )
 
 

@@ -235,8 +235,8 @@ measured. Then enable it in the **Settings** tab. The switch persists in
 Optional extras, each covered in [deploy/README.md](deploy/README.md):
 
 - **LED strip:** pick the chip type in the app before the color order.
-- **Camera:** the service account needs the `video` group:
-  `sudo usermod -aG video pi`.
+- **Camera:** a USB webcam. Plug it in before running the installer, which
+  then installs ffmpeg to read it.
 - **Homing:** once the endstop is confirmed and the rail is clear, switch on
   *Home after startup* and *Hourly auto-patrol* in the Automation tab. Both
   start off so the arm never moves before you are ready for it.
