@@ -20,12 +20,12 @@ cannot be subtotalled yet.
 | Sensing | $69.00 | complete |
 | Watering system | $35.00 | 1 — intake weight |
 | Lighting | $10.00 | 2 — hook-up wire, connectors |
-| Power and electronics | $27.00 | 9 — fuses, fuse holders, level shifter, wire, heat shrink |
-| **Running total** | **~$431–437** | **13 lines outstanding** |
+| Power and electronics | $27.00 | 8 — fuses, fuse holders, wire, heat shrink |
+| **Running total** | **~$431–437** | **12 lines outstanding** |
 
 Close to final. The frame, motion, compute and sensing are all fully costed.
-What is left is small electrical hardware — three fuses and their holders, the
-level shifter, wire, connectors and heat shrink — plus the intake weight. Call
+What is left is small electrical hardware — three fuses and their holders,
+wire, connectors and heat shrink — plus the intake weight. Call
 it another $25, which puts a finished prototype
 around **$457**.
 
@@ -245,21 +245,20 @@ pixel, so it is 20 pixels. WS2815 and GS8208 are also supported and are one
 pixel per LED, so 60. All three are 12 V; no 5 V chip is
 offered, since sixty 5 V pixels would pull about 3.6 A on top of the Pi.
 
-Strip power comes off the same 12 V supply, and the level shifter for its data
-line is in *Power and electronics*.
+Strip power comes off the same 12 V supply, and its data line runs straight
+from the Pi with no level shifter.
 
 ## Power and electronics
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | 12 V power supply, 5 A min (7 A recommended) | 1 | $15.00 | $15.00 | the only supply in the build |
-| DC-DC converter, 12 V to 5 V @ 3 A | 1 | $10.00 | $10.00 | Yipin hexa; this is what powers the Pi |
+| DC-DC converter, 12 V to 5 V @ 3 A | 1 | $10.00 | $10.00 | Yipin hexa; this is what powers the Pi. Buy the version whose output plug fits the board: **micro-USB** for a Pi 3 A+ / 3 B+, **USB-C** for a Pi 4 |
 | Fuse, 5 A fast-blow | 1 | TBD | TBD | charger output into the busbar |
 | Fuse, 1 A fast-blow | 1 | TBD | TBD | SKR HB to pump positive |
 | Fuse, 2 A fast-blow | 1 | TBD | TBD | busbar to strip +12 V |
 | Inline fuse holder, 16 AWG leads | 3 | TBD | TBD | one per fuse above |
 | 1N5822 flyback diode, 3 A Schottky | 1 | $2.00 | $2.00 | **required**, see [POWER_SYSTEM.md](POWER_SYSTEM.md) |
-| 74AHCT125 level shifter | 1 | TBD | TBD | LED data line |
 | Wire, 14 AWG | TBD | TBD | TBD | charger to busbar, busbar to SKR and DC-DC |
 | Wire, 18 AWG | TBD | TBD | TBD | LED strip and pump runs |
 | Wire, 22 AWG | TBD | TBD | TBD | LED data and the Pi ground reference |

@@ -271,7 +271,7 @@ carry. They are short runs, so this costs nothing but stiffness.
 | Strip dead but everything else fine | Blown 2A LED fuse | Inspect the strip's input end for a solder bridge |
 | LEDs flicker or dim | Voltage sag under LED draw | Upgrade charger or add capacitor |
 | LEDs do nothing at all | Pi and strip grounds not tied together | Run a ground wire from a Pi GND pin to the busbar ground |
-| LEDs flicker or show junk on the first pixels | 3.3V data is marginal for WS2811 | Add a 74AHCT125 level shifter on the data line |
+| LEDs flicker or show junk on the first pixels | Noise on the data line | Check the Pi ground reaches the busbar, and run the data wire alongside it, twisted if you can |
 | Red and green are swapped | Strip uses a different channel order | Press Red/Green/Blue under LED strip on the Calibration tab to see which is which, then change the color order there |
 | Charger warm/hot | Overload or internal short | Reduce load; check for shorts; consider larger PSU |
 | Fuses blow immediately | Direct short somewhere | Inspect all wiring for damage before replacing |

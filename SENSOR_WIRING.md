@@ -10,10 +10,10 @@ The master hub connects to the Raspberry Pi's I2C Bus 1 using four wires:
 
 | Wire Color | Function | Raspberry Pi Pin |
 |-----------|----------|------------------|
-| Black | Ground (GND) | Pin 6, 9, 14, 20, 25, 30, 34, or 39 |
-| Red | 3.3V Power | Pin 1 or Pin 17 |
-| Blue | SDA (Serial Data) | GPIO 2, Pin 3 |
-| Yellow | SCL (Serial Clock) | GPIO 3, Pin 5 |
+| Red | 3.3V Power | Pin 1 |
+| Blue | SDA (Serial Data) | Pin 3 (GPIO 2)|
+| Yellow | SCL (Serial Clock) | Pin 5 (GPIO 3)|
+| Black | Ground (GND) | Pin 9 |
 
 ## Sensor Addressing
 

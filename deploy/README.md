@@ -523,19 +523,22 @@ full traverse of the rail after every home, so raise the feedrate in
 
 *BigTreeTech's own pinout for the Mini E3 V2.0, kept here so the board can be
 read without going hunting. Every pin this project uses is on it, and the
-tables below are taken from it rather than from memory. The V3 uses the same
-pins for everything here (Klipper's stock configs for the two boards agree),
-but its connectors are not guaranteed to sit in the same places: wire a V3
-from BigTreeTech's V3 pinout.*
+tables below are taken from it rather than from memory.*
 
-Four blocks along the bottom edge, and three of them look alike:
+![BTT SKR Mini E3 V3.0 pinout](images/skr-mini-e3-v3-pinout.png)
+
+*The same for the V3.0. Every pin Herman uses is the same on both boards: X
+motor PB13/PB12/PB14, X-STOP PC0, the driver UART on PC11/PC10, and HB on PC9.*
+
+Along the bottom edge, the V2 has four screw blocks and the V3 three. Several
+look alike:
 
 | Block | Silkscreen | Pins | What it is |
 |---|---|---|---|
 | Corner | POWER | 12/24V, GND | power **in** |
-| 2nd | +POWER- | VIN, GND | power **in**, parallel with the corner |
-| 3rd | - HB + | PC9, 12/24V | bed output — **the pump** |
-| 4th | - E0 + | PC8, 12/24V | hotend output — **spare** |
+| 2nd, V2 only | +POWER- | VIN, GND | power **in**, parallel with the corner |
+| Next | - HB + | PC9, 12/24V | bed output — **the pump** |
+| Last | - E0 + | PC8, 12/24V | hotend output — **spare** |
 
 Two things to take from that table.
 
@@ -552,14 +555,15 @@ goes to the `+` screw through the fuse; pump negative goes to `-`.
 
 ### Spare switched outputs
 
-Three MOSFET outputs go unused, all low-side like HB and all usable the same
-way with an `[output_pin]` section:
+Three MOSFET outputs go unused (four on a V3), all low-side like HB and all
+usable the same way with an `[output_pin]` section:
 
 | Output | Pin | Connector |
 |---|---|---|
 | E0 (hotend) | PC8 | screw terminal |
 | FAN0 | PC6 | 2-pin header |
 | FAN1 | PC7 | 2-pin header |
+| FAN2, V3 only | PB15 | 2-pin header |
 
 E0 is the one to reach for if anything else ever needs switching — a second
 pump, a solenoid, a box fan — because like HB it takes real wire without a
@@ -931,9 +935,11 @@ cut marks.** Cuttable between every LED means one pixel per LED (WS2815 /
 GS8208); cuttable only every third LED means WS2811.
 
 ```
-12V Busbar (+) --[2A Fuse]--> Strip +V     (12V strips; a 5V strip needs its
-Busbar GND -----> Strip GND --+-- Pi GND    own 5V supply, not the DC-DC)
-Pi GPIO10 (pin 19, MOSI) -----+-> [74AHCT125 level shifter] --> Strip DIN
+12V Busbar (+) --[2A Fuse]--> Strip +V
+Busbar GND -----> Strip GND --+-- Pi GND (pin 20)
+Pi GPIO10 (pin 19, MOSI) -----+---------------------------> Strip DIN
+
+(12V strips. A 5V strip needs its own 5V supply, not the DC-DC.)
 ```
 
 The 2A fuse is what keeps a shorted solder joint at the strip's input end from
@@ -944,13 +950,26 @@ taking down the Pi and the motion board with it. Sizing and the 5V case are in
 out of the SPI peripheral, which only exists on that pin. This avoids needing
 root, which the usual PWM/DMA approach requires.
 
-Two things that look like software faults but are not:
+**Take the Pi's ground from pin 20**, right beside it in the same row of the
+header, so data and ground can share one 2-pin connector:
 
-- **Pi ground must tie to the supply ground.** The data line is measured against
-  ground; without a shared reference the strip sees nothing. Most common failure.
-- **Use a level shifter.** These chips want logic high at roughly 70% of their
-  supply, and the Pi only swings to 3.3V. Some strips tolerate it; flicker or junk
-  on the first few pixels is this, not a bug.
+```
+         3.3V  (17) (18)  GPIO24
+LED data  GPIO10 (19) (20)  GND   to busbar GND
+         GPIO9 (21) (22)  GPIO25
+```
+
+Run the two wires side by side, twisted together if you can, all the way to
+the strip end. A data line with its ground return right next to it picks up
+far less interference than one routed on its own. The header is the same on
+every supported Pi (3 A+, 3 B+ and 4).
+
+The data line runs straight from pin 19 to the strip, with no level shifter;
+the reference build's strip reads the Pi's 3.3V signal fine.
+
+**Pi ground must tie to the supply ground.** It looks like a software fault but
+is not: the data line is measured against ground, and without a shared
+reference the strip sees nothing. It is the most common failure.
 
 **Do not power the strip from the Pi.** The supported 12V strips draw around
 1.2-1.5A at 60 LEDs full white, and a 5V strip of the same length would pull
