@@ -221,8 +221,26 @@ if [ "$(sudo -u pi git -C /home/pi/klipper rev-parse HEAD 2>/dev/null)" != "$KLI
   sudo -u pi git -C /home/pi/klipper checkout -q --force FETCH_HEAD
 fi
 echo "✓ Klipper at ${KLIPPER_COMMIT:0:7}"
-# Always install/update Klipper dependencies
-sudo -u pi bash -c 'pip install --break-system-packages cffi greenlet jinja2 markupsafe pyserial'
+# Klipper's Python libraries go in its own virtualenv, built from Klipper's own
+# requirements list -- the way Klipper's installer does it. They used to be a
+# `pip install --break-system-packages` into pi's user site, where a broken or
+# half-finished cffi (seen on a Pi 3 A+) shadowed everything and Klipper died
+# on every start with "module 'cffi' has no attribute 'FFI'". A venv does not
+# see the user site at all, so nothing left there can break it.
+KLIPPY_ENV=/home/pi/klippy-env
+if [ ! -x "$KLIPPY_ENV/bin/python" ]; then
+  echo "Creating Klipper's Python environment..."
+  sudo -u pi python3 -m venv "$KLIPPY_ENV"
+fi
+sudo -u pi "$KLIPPY_ENV/bin/pip" install -q --upgrade pip
+sudo -u pi "$KLIPPY_ENV/bin/pip" install -q -r /home/pi/klipper/scripts/klippy-requirements.txt
+# Fail here, with the reason, rather than leave a Klipper that dies on start.
+if ! sudo -u pi "$KLIPPY_ENV/bin/python" -c "import cffi, greenlet, jinja2, serial; cffi.FFI()"; then
+  echo "⚠️  Klipper's Python environment is broken. Remove it and re-run:"
+  echo "    rm -rf $KLIPPY_ENV"
+  exit 1
+fi
+echo "✓ Klipper's Python environment is ready"
 
 # Always create/update the systemd service (even if Klipper was already cloned)
 cat > /tmp/klipper.service << 'EOF'
@@ -238,9 +256,8 @@ WantedBy=multi-user.target
 [Service]
 Type=simple
 User=pi
-RemainAfterExit=yes
 RuntimeDirectory=klipper
-ExecStart=/usr/bin/python3 /home/pi/klipper/klippy/klippy.py /home/pi/printer_data/config/printer.cfg -l /home/pi/klipper_logs/klippy.log -a /run/klipper/uds
+ExecStart=/home/pi/klippy-env/bin/python /home/pi/klipper/klippy/klippy.py /home/pi/printer_data/config/printer.cfg -l /home/pi/klipper_logs/klippy.log -a /run/klipper/uds
 Restart=always
 RestartSec=10
 EOF
@@ -257,18 +274,29 @@ sudo systemctl daemon-reload
 echo "Starting Klipper..."
 sudo systemctl enable klipper
 sudo systemctl restart klipper
-sleep 3
 
-# Check if Klipper connected to MCU
+# Wait for Klipper to reach the board, rather than trusting systemd's word for
+# it: "active" only means the process started, and a Klipper that crashes on
+# start is restarted every 10 s and looks active in between. The socket the API
+# talks to answers only once Klipper is up, and the log says when the board is.
+# Up to 60 s, which a Pi 3 A+ compiling Klipper's C helper on first start needs.
 echo "Verifying Klipper connection..."
-if sudo -u pi grep -q "MCU 'mcu' is ready" /home/pi/klipper_logs/klippy.log 2>/dev/null; then
-  echo "✓ Klipper connected to MCU successfully"
-elif sudo systemctl is-active --quiet klipper; then
-  echo "✓ Klipper service is running"
+KLIPPER_OK=0
+for i in $(seq 1 30); do
+  sleep 2
+  if sudo -u pi grep -q "MCU 'mcu' is ready" /home/pi/klipper_logs/klippy.log 2>/dev/null; then
+    KLIPPER_OK=1
+    break
+  fi
+done
+if [ "$KLIPPER_OK" -eq 1 ]; then
+  echo "✓ Klipper connected to the motion board"
+elif [ -S /run/klipper/uds ]; then
+  echo "⚠️  Klipper is running but has not reached the motion board."
+  echo "    Check the SKR's USB cable and power, then: tail -30 ~/klipper_logs/klippy.log"
 else
-  echo "⚠️  Klipper service failed to start"
-  echo "Check logs with: tail -50 ~/klipper_logs/klippy.log"
-  echo "Or systemd status: sudo systemctl status klipper"
+  echo "⚠️  Klipper is not running. The last thing it said:"
+  sudo journalctl -u klipper -n 15 --no-pager
 fi
 
 # Let the API set the timezone, and nothing else. The lighting schedule runs on
