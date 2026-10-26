@@ -900,3 +900,15 @@ input[type='color'] {
     overflow-x: auto;
   }
 }
+
+/* The camera's live picture: as wide as the panel, never taller than the
+   screen, and the camera's own shape rather than stretched. */
+.camera-feed {
+  display: block;
+  width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #000;
+  margin-bottom: 12px;
+}

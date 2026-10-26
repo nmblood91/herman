@@ -13,6 +13,7 @@ export function TabBar({ activeTab, onChange }) {
     { key: 'automation', label: 'Automation' },
     { key: 'calibration', label: 'Calibration' },
     { key: 'history', label: 'History' },
+    { key: 'camera', label: 'Camera' },
     { key: 'help', label: 'Help' },
   ]
 

@@ -21,6 +21,7 @@ of its groups now sits with the thing it governs.
 | Automation | `AutomationPanel.jsx` — automatic watering, homing (startup home, hourly auto-patrol), quiet hours |
 | Calibration | `HomeSwitchPanel.jsx` (endstop test), `MotorDirectionPanel.jsx` (motor direction test, which unlocks homing), `PumpPanel.jsx` (pump flow rate), `CalibrationPanel.jsx` (the probes’ air reading, a health check), `LedStripPanel.jsx` (strip type and color order), `ClockPanel.jsx` (planter clock and time zone), `VersionPanel.jsx` (running and built commits), `LogsPanel.jsx`, mounted side by side |
 | History | `HistoryPanel.jsx` + `Chart.jsx` |
+| Camera | `CameraPanel.jsx` — the USB camera's live picture |
 | Help | `HelpPanel.jsx` — the owner's guide, one long page with a contents box |
 
 ### Editing the Help guide

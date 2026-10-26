@@ -9,6 +9,7 @@ import { SoilPanel } from './components/SoilPanel'
 import { LibraryBackupPanel } from './components/LibraryBackupPanel'
 import { HelpPanel } from './components/HelpPanel'
 import { HistoryPanel } from './components/HistoryPanel'
+import { CameraPanel } from './components/CameraPanel'
 import { HomeSwitchPanel } from './components/HomeSwitchPanel'
 import { MotorDirectionPanel } from './components/MotorDirectionPanel'
 import { ClockPanel } from './components/ClockPanel'
@@ -389,6 +390,7 @@ function App() {
           carries the soil library and the cards themselves, and the chart is
           the thing you consult afterwards rather than act on. */}
       {activeTab === 'history' && <HistoryPanel />}
+      {activeTab === 'camera' && <CameraPanel />}
       {activeTab === 'help' && <HelpPanel />}
     </div>
   )

@@ -986,8 +986,8 @@ Optional, and an add-on rather than part of a base unit: a **USB webcam** that
 compresses to MJPEG on board (UVC), plugged into one of the Pi 4's USB ports.
 The A+ has one USB port and the SKR takes it, so a camera unit carries a Pi 4.
 
-There is no UI for this. The API serves the stream and nothing else consumes
-it, so reach it with a browser or curl.
+The **Camera** tab in the app shows the live picture. The API endpoints below
+also work on their own, from a browser or curl.
 
 **Plug the camera in before running the installer.** It installs ffmpeg, which
 reads the camera, only when it finds one, and adds `pi` to the `video` group

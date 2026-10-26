@@ -8,6 +8,7 @@ import controls from './controls.md?raw'
 import automation from './automation.md?raw'
 import calibration from './calibration.md?raw'
 import history from './history.md?raw'
+import camera from './camera.md?raw'
 import glossary from './glossary.md?raw'
 
 export const HELP_PAGES = [
@@ -16,5 +17,6 @@ export const HELP_PAGES = [
   { tab: 'automation', text: automation },
   { tab: 'calibration', text: calibration },
   { tab: 'history', text: history },
+  { tab: 'camera', text: camera },
   { tab: null, text: glossary },
 ]
