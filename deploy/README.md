@@ -954,8 +954,9 @@ root, which the usual PWM/DMA approach requires.
 down from it and the firmware otherwise changes it with load. A change in the
 middle of a frame shows as an occasional flicker, mostly in Rainbow, the only
 mode that sends frames nonstop. It reads the board model and sets
-`core_freq=250` on a Pi 3, or `core_freq=500` and `core_freq_min=500` on a
-Pi 4, in `/boot/firmware/config.txt`. It takes effect after a reboot.
+`core_freq=400` and `core_freq_min=400` on a Pi 3, or `core_freq=500` and
+`core_freq_min=500` on a Pi 4, in `/boot/firmware/config.txt`. Each is the
+board's normal top core speed, held there instead of dropping when idle. It takes effect after a reboot.
 
 **Take the Pi's ground from pin 20**, right beside it in the same row of the
 header, so data and ground can share one 2-pin connector:

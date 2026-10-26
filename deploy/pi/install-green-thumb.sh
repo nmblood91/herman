@@ -43,7 +43,10 @@ sudo raspi-config nonint do_spi 0
 MODEL=$(tr -d '\0' </proc/device-tree/model 2>/dev/null || true)
 case "$MODEL" in
   *"Pi 4"*) CORE_CLOCK_SETTINGS="core_freq=500 core_freq_min=500" ;;
-  *"Pi 3"*) CORE_CLOCK_SETTINGS="core_freq=250" ;;
+  # 400 is the Pi 3's own top core speed; the minimum holds it there. A 250 pin
+  # (the low end) was tried first and the A+ lost its network after a reboot.
+  # Not proven to be the cause, but 400 keeps the clock where it runs anyway.
+  *"Pi 3"*) CORE_CLOCK_SETTINGS="core_freq=400 core_freq_min=400" ;;
   *) CORE_CLOCK_SETTINGS="" ;;
 esac
 CORE_CLOCK_CHANGED=0
