@@ -14,6 +14,11 @@ pot up, and choose that soil profile on the pot's card.
 "Parts" are by volume — use the same scoop or container for every part. Mix
 everything dry, then moisten it before potting.
 
+**For a 1.75-gallon pot**, make each part 1½ quarts. That is 7½ quarts of mix,
+half a quart more than the pot holds, because a fresh mix settles by about a
+tenth once it's watered: it settles to about 6¾ quarts, which fills the pot.
+Each recipe below gives the quarts.
+
 ---
 
 ## Recipe 1: Rich & Retentive Mix
@@ -22,12 +27,12 @@ everything dry, then moisten it before potting.
 vermiculite create strong capillary suction, so the mix holds on to water and
 nutrients and fast-growing plants never dry out.
 
-| Ingredient | Parts |
-| --- | --- |
-| Potting mix | 2 |
-| Peat or coir | 1 |
-| Perlite | 1 |
-| Vermiculite | 1 |
+| Ingredient | Parts | 1.75-gal pot |
+| --- | --- | --- |
+| Potting mix | 2 | 3 qt |
+| Peat or coir | 1 | 1½ qt |
+| Perlite | 1 | 1½ qt |
+| Vermiculite | 1 | 1½ qt |
 
 | Property | Value |
 | --- | --- |
@@ -51,11 +56,11 @@ nutrients and fast-growing plants never dry out.
 (perlite and sand) makes large pores that let water drain almost at once,
 protecting dryland plants from root rot.
 
-| Ingredient | Parts |
-| --- | --- |
-| Potting mix | 2 |
-| Perlite | 2 |
-| Coarse sand (or fine orchid bark) | 1 |
+| Ingredient | Parts | 1.75-gal pot |
+| --- | --- | --- |
+| Potting mix | 2 | 3 qt |
+| Perlite | 2 | 3 qt |
+| Coarse sand (or fine orchid bark) | 1 | 1½ qt |
 
 | Property | Value |
 | --- | --- |
@@ -79,11 +84,11 @@ protecting dryland plants from root rot.
 the rain forest. This mix works like a porous wooden scaffold with as much air
 as possible, so thick, fleshy roots never sit in standing water or fine sludge.
 
-| Ingredient | Parts |
-| --- | --- |
-| Coarse bark | 3 |
-| Chunk coir or peat | 1 |
-| Coarse perlite (or pumice) | 1 |
+| Ingredient | Parts | 1.75-gal pot |
+| --- | --- | --- |
+| Coarse bark | 3 | 4½ qt |
+| Chunk coir or peat | 1 | 1½ qt |
+| Coarse perlite (or pumice) | 1 | 1½ qt |
 
 | Property | Value |
 | --- | --- |
