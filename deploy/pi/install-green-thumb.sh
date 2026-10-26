@@ -317,15 +317,18 @@ sudo systemctl restart klipper
 # start is restarted every 10 s and looks active in between. The socket the API
 # talks to answers only once Klipper is up, and the log says when the board is.
 # Up to 60 s, which a Pi 3 A+ compiling Klipper's C helper on first start needs.
-echo "Verifying Klipper connection..."
+# A dot per check, so a minute of waiting does not look like a hang.
+echo "Verifying Klipper connection (up to 60 s)..."
 KLIPPER_OK=0
 for i in $(seq 1 30); do
   sleep 2
+  printf "."
   if sudo -u pi grep -q "MCU 'mcu' is ready" /home/pi/klipper_logs/klippy.log 2>/dev/null; then
     KLIPPER_OK=1
     break
   fi
 done
+echo ""
 if [ "$KLIPPER_OK" -eq 1 ]; then
   echo "✓ Klipper connected to the motion board"
 elif [ -S /run/klipper/uds ]; then
