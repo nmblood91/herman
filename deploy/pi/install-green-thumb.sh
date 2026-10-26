@@ -314,16 +314,35 @@ sudo systemctl restart klipper
 
 # Wait for Klipper to reach the board, rather than trusting systemd's word for
 # it: "active" only means the process started, and a Klipper that crashes on
-# start is restarted every 10 s and looks active in between. The socket the API
-# talks to answers only once Klipper is up, and the log says when the board is.
+# start is restarted every 10 s and looks active in between. So Klipper itself
+# is asked, over the socket the API uses: its state is "ready" only once it has
+# configured the board. (Not the log: Klipper writes no line when it gets there,
+# and the line this used to wait for never appeared, so the check always ran
+# out and warned about a board that was fine.)
 # Up to 60 s, which a Pi 3 A+ compiling Klipper's C helper on first start needs.
 # A dot per check, so a minute of waiting does not look like a hang.
+klipper_ready() {
+  sudo -u pi "$KLIPPY_ENV/bin/python" - <<'PYEOF' 2>/dev/null
+import json, socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(2)
+s.connect("/run/klipper/uds")
+s.sendall(json.dumps({"id": 1, "method": "info", "params": {}}).encode() + b"\x03")
+data = b""
+while not data.endswith(b"\x03"):
+    chunk = s.recv(4096)
+    if not chunk:
+        break
+    data += chunk
+sys.exit(0 if json.loads(data.rstrip(b"\x03"))["result"]["state"] == "ready" else 1)
+PYEOF
+}
 echo "Verifying Klipper connection (up to 60 s)..."
 KLIPPER_OK=0
 for i in $(seq 1 30); do
   sleep 2
   printf "."
-  if sudo -u pi grep -q "MCU 'mcu' is ready" /home/pi/klipper_logs/klippy.log 2>/dev/null; then
+  if klipper_ready; then
     KLIPPER_OK=1
     break
   fi
