@@ -26,7 +26,7 @@ export function LibraryBackupPanel({ onRefresh }) {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `greenthumb-library-${data.exported_at.slice(0, 10)}.json`
+      link.download = `herman-profiles-${data.exported_at.slice(0, 10)}.json`
       link.click()
       URL.revokeObjectURL(url)
       const soils = Object.keys(data.soil_profiles ?? {}).length

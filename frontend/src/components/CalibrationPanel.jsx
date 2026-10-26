@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API_BASE } from '../api'
+import { useHoldToConfirm } from '../useHoldToConfirm'
+import { HoldRing } from './HoldRing'
 
 const SAMPLE_SECONDS = 20
+
+// Reset throws away all four air readings at once, which only a new
+// calibration run brings back. Held like the profile deletes rather than one
+// click, which it used to be.
+const RESET_HOLD_MS = 3000
 
 // The probes' dry points, in open air: each probe's 0% water point, which an
 // estimated wilting point is placed up from. The moisture scale itself runs
@@ -11,7 +18,8 @@ export function CalibrationPanel() {
   const [calibration, setCalibration] = useState(null)
   const [busy, setBusy] = useState('')
   const [results, setResults] = useState(null)
-  const [message, setMessage] = useState('')
+  // {text, warn}: a run that stored every probe is not a warning.
+  const [message, setMessage] = useState(null)
   const [deadline, setDeadline] = useState(null)
   const [remaining, setRemaining] = useState(0)
 
@@ -54,7 +62,7 @@ export function CalibrationPanel() {
   const runCalibration = async () => {
     setBusy('dry')
     setResults(null)
-    setMessage('')
+    setMessage(null)
     // Seeded here rather than in the effect: the first value has to be on
     // screen before the first tick, and setting state in an effect body is
     // what the hooks lint objects to.
@@ -75,24 +83,25 @@ export function CalibrationPanel() {
         // field, which otherwise shows as a bare "failed" and hides that the
         // API is running older code than the page.
         const detail = data.error || data.detail
-        setMessage(
-          detail
+        setMessage({
+          text: detail
             ? `Calibration failed (${response.status}): ${detail}`
             : `Calibration failed (HTTP ${response.status}). If this is a 404, ` +
               'the planter software is older than this page. Restart the ' +
               'greenthumb-api service on the Pi.',
-        )
+          warn: true,
+        })
         return
       }
       setResults(data)
       setMessage(
         data.stored === data.total
-          ? `Stored the dry point for all ${data.total} sensors.`
-          : `Stored ${data.stored} of ${data.total}. See the reasons below.`,
+          ? { text: `Stored the dry point for all ${data.total} sensors.`, warn: false }
+          : { text: `Stored ${data.stored} of ${data.total}. See the reasons below.`, warn: true },
       )
       await load()
     } catch (error) {
-      setMessage(`Calibration failed: ${error.message}`)
+      setMessage({ text: `Calibration failed: ${error.message}`, warn: true })
     } finally {
       setBusy('')
       setDeadline(null)
@@ -102,19 +111,34 @@ export function CalibrationPanel() {
   const reset = async () => {
     setBusy('reset')
     setResults(null)
+    setMessage(null)
     try {
-      await fetch(`${API_BASE}/sensors/calibration/reset`, { method: 'POST' })
-      setMessage(
-        'Air readings cleared. Every probe is back on MOISTURE_RAW_DRY. The ' +
-          'soil profiles’ readings are untouched, so no pot’s moisture moved.',
-      )
+      const response = await fetch(`${API_BASE}/sensors/calibration/reset`, { method: 'POST' })
+      // Checked: it used to report success whatever the planter answered,
+      // including when it refused because the hardware was busy.
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setMessage({
+          text: data.error || data.detail || `Reset failed (HTTP ${response.status})`,
+          warn: true,
+        })
+        return
+      }
+      setMessage({
+        text:
+          'Air readings cleared. Every probe is back on the default air reading ' +
+          'until you calibrate again. The soil profiles are untouched.',
+        warn: false,
+      })
       await load()
     } catch (error) {
-      setMessage(`Reset failed: ${error.message}`)
+      setMessage({ text: `Reset failed: ${error.message}`, warn: true })
     } finally {
       setBusy('')
     }
   }
+
+  const resetHold = useHoldToConfirm(RESET_HOLD_MS, reset)
 
   const sensors = calibration?.sensors ?? []
   const unmeasured = sensors.filter((sensor) => !sensor.usable)
@@ -167,7 +191,9 @@ export function CalibrationPanel() {
           </p>
         </div>
 
-        {message && <p className="field-hint warning">{message}</p>}
+        {message && (
+          <p className={message.warn ? 'field-hint warning' : 'field-hint'}>{message.text}</p>
+        )}
 
         {results && (
           <div className="field-row">
@@ -207,8 +233,14 @@ export function CalibrationPanel() {
         </div>
 
         <div className="field-row">
-          <button type="button" disabled={Boolean(busy)} onClick={reset}>
-            Reset dry calibration
+          <button
+            type="button"
+            className={resetHold.progress > 0 ? 'hold-delete holding' : 'hold-delete'}
+            disabled={Boolean(busy)}
+            {...resetHold.handlers}
+          >
+            <HoldRing progress={resetHold.progress} />
+            {resetHold.progress > 0 ? 'Resetting…' : 'Hold to reset dry calibration'}
           </button>
           <p className="field-hint">Soil profiles are not affected.</p>
         </div>

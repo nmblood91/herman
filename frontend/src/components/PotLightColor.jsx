@@ -18,7 +18,7 @@ const fromHex = (hex) => {
 // The color this pot's stretch of strip shows during its scheduled hours in
 // Zone Schedule. Separate from its Manual color on the Controls tab, so
 // changing one never changes the other.
-export function PotLightColor({ plant }) {
+export function PotLightColor({ plant, onSaved }) {
   const [color, setColor] = useState(toHex(plant.light_color))
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
@@ -56,6 +56,9 @@ export function PotLightColor({ plant }) {
           return
         }
         setError('')
+        // Brings the plant list up to date. Without it, collapsing the card and
+        // opening it again showed the old color: the card starts from the list.
+        onSaved?.()
       } catch (failure) {
         setError(`Could not reach the controller: ${failure.message}`)
       }

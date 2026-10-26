@@ -14,7 +14,9 @@ import { API_BASE } from '../api'
 // one scales every watering by the same factor and still reports success.
 export function PumpPanel() {
   const [pump, setPump] = useState(null)
+  // Text, and whether it is a problem: "Pump stopped." is not a warning.
   const [pumpStatus, setPumpStatus] = useState('')
+  const [pumpWarn, setPumpWarn] = useState(false)
   const [measuredMl, setMeasuredMl] = useState('')
   // When the run in progress ends, so the button can count down. The person
   // doing this is stood there holding a cup.
@@ -50,6 +52,7 @@ export function PumpPanel() {
       const response = await fetch(`${API_BASE}/pump/${action}`, { method: 'POST' })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
+        setPumpWarn(true)
         setPumpStatus(data.error || `Request failed (HTTP ${response.status})`)
         return
       }
@@ -57,6 +60,7 @@ export function PumpPanel() {
       // response.ok alone reported it as running -- and with no
       // max_run_seconds in that body the message read "after undefineds".
       if (data.status === 'error') {
+        setPumpWarn(true)
         setPumpStatus(`Pump did not start: ${data.error || 'unknown error'}`)
         return
       }
@@ -64,6 +68,7 @@ export function PumpPanel() {
       if (action === 'run') {
         const seconds = data.max_run_seconds
         setRunEndsAt(Date.now() + seconds * 1000)
+        setPumpWarn(false)
         setPumpStatus(`Pump running — stops on its own after ${seconds}s.`)
         // Re-read once it has stopped, so the measured run length appears
         // without anyone having to reload. The extra second is for the
@@ -77,12 +82,14 @@ export function PumpPanel() {
         )
       } else {
         setRunEndsAt(null)
+        setPumpWarn(false)
         setPumpStatus('Pump stopped.')
         window.setTimeout(readPump, 400)
       }
     } catch (error) {
       // Louder than a console.error: this control moves water, so a silent
       // failure is not acceptable.
+      setPumpWarn(true)
       setPumpStatus(`Failed to ${action} pump: ${error.message}`)
     }
   }
@@ -97,9 +104,11 @@ export function PumpPanel() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
+        setPumpWarn(true)
         setPumpStatus(data.detail || data.error || `Request failed (HTTP ${response.status})`)
         return
       }
+      setPumpWarn(false)
       setPumpStatus(
         `Flow rate is ${data.flow_ml_per_second} mL/s. A 100 mL dose now runs ` +
           `the pump for ${Math.round(data.seconds_for_100ml)}s.`,
@@ -107,6 +116,7 @@ export function PumpPanel() {
       setMeasuredMl('')
       await readPump()
     } catch (error) {
+      setPumpWarn(true)
       setPumpStatus(`Could not save the flow rate: ${error.message}`)
     }
   }
@@ -138,8 +148,9 @@ export function PumpPanel() {
 
         <div className="field-row">
           <p className="field-hint">
-            Run pump for 60 seconds to measure the flow rate. Run once as a prime, and then run
-            again to measure. I recommend using a kitchen scale to weigh the water. 1g = 1 mL.
+            Runs the pump for 60 seconds to measure its flow rate. Run it once to
+            fill the tube and throw that water away, then run it again into a cup
+            on a kitchen scale. One gram of water is one milliliter.
           </p>
           {/* One control, which becomes its own abort while the run is going.
               There is deliberately no idle Stop button: nothing in the app
@@ -156,7 +167,9 @@ export function PumpPanel() {
               Run calibration ({pump?.max_run_seconds ?? 60}s)
             </button>
           )}
-          {pumpStatus && <p className="field-hint warning">{pumpStatus}</p>}
+          {pumpStatus && (
+            <p className={pumpWarn ? 'field-hint warning' : 'field-hint'}>{pumpStatus}</p>
+          )}
         </div>
 
         <div className="field-row">

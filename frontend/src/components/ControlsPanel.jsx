@@ -126,19 +126,26 @@ export function ControlsPanel({
   const [unsavedZones, setUnsavedZones] = useState({})
   const [lightingError, setLightingError] = useState('')
   const [quietStatus, setQuietStatus] = useState('')
+  // Strip-wide settings with a drag still waiting to be sent. A refresh that
+  // lands in that gap must not snap the slider back to the old value.
+  const [pendingKeys, setPendingKeys] = useState({})
   const [dances, setDances] = useState([])
   const [dancing, setDancing] = useState('')
   const [danceStatus, setDanceStatus] = useState('')
 
   // Follows the server during render rather than in an effect, so the controls
-  // never paint one frame of stale values after a refresh.
-  const [syncedOverview, setSyncedOverview] = useState(null)
-  if (overview !== syncedOverview) {
-    setSyncedOverview(overview)
+  // never paint one frame of stale values after a refresh. Keyed on the
+  // lighting values rather than the overview object, which the page re-reads
+  // every few seconds: a refresh between a slider drag and its save would
+  // otherwise snap the slider back.
+  const servedLighting = JSON.stringify(lighting ?? null)
+  const [syncedLighting, setSyncedLighting] = useState(null)
+  if (servedLighting !== syncedLighting) {
+    setSyncedLighting(servedLighting)
     setLedMode(UI_MODE_BY_BACKEND[lighting?.mode] ?? ledMode)
-    setBrightness(lighting?.brightness ?? brightness)
-    setRainbowSpeed(lighting?.rainbow_speed ?? rainbowSpeed)
-    setColor(toHexColor(lighting?.color || color))
+    if (!pendingKeys.brightness) setBrightness(lighting?.brightness ?? brightness)
+    if (!pendingKeys.rainbowSpeed) setRainbowSpeed(lighting?.rainbow_speed ?? rainbowSpeed)
+    if (!pendingKeys.color) setColor(toHexColor(lighting?.color || color))
     setManualScope(lighting?.manual_scope ?? manualScope)
     const served = lighting?.zones ?? []
     if (served.length) {
@@ -183,7 +190,12 @@ export function ControlsPanel({
   // Keyed so a brightness drag and a color drag do not cancel each other.
   const postDebounced = (key, path, body) => {
     clearTimeout(timers.current[key])
-    timers.current[key] = setTimeout(() => post(path, body), APPLY_DEBOUNCE_MS)
+    setPendingKeys((current) => ({ ...current, [key]: true }))
+    timers.current[key] = setTimeout(async () => {
+      delete timers.current[key]
+      await post(path, body)
+      if (!timers.current[key]) setPendingKeys((current) => ({ ...current, [key]: false }))
+    }, APPLY_DEBOUNCE_MS)
   }
 
   const changeMode = (value) => {

@@ -99,6 +99,27 @@ export function SoilPanel({ soils, plants, onRefresh }) {
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
 
+  // Soil profiles are keyed by name, ignoring case, so saving a new one under a
+  // name already in the list replaces that one. It used to do so silently.
+  const clash =
+    mode === 'new'
+      ? list.find(
+          (soil) => soil.name.trim().toLocaleLowerCase() === form.name.trim().toLocaleLowerCase(),
+        )
+      : null
+
+  // A variant of an existing mix starts from its figures. The readings'
+  // baseline is cleared so they are sent with the copy: a reading is only
+  // sent when it differs from the baseline, and the copy has none of its own.
+  const makeCopy = () => {
+    setMode('new')
+    setPicked('')
+    setSyncedPick('')
+    setRawBase({ capacityRaw: '', wiltingRaw: '' })
+    setForm((current) => ({ ...current, name: `${current.name} copy` }))
+    setMessage('Copied. Give it its own name, change what you like, then save.')
+  }
+
   // A no-op on the already-active mode, like a tab: clicking New Profile again
   // does not discard a half-typed draft.
   const startNewProfile = () => {
@@ -498,8 +519,13 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               disabled={!formReady}
               onClick={save}
             >
-              Save soil profile
+              {clash ? `Replace ${clash.name}` : 'Save soil profile'}
             </button>
+            {mode === 'existing' && picked && (
+              <button type="button" onClick={makeCopy}>
+                Make a copy
+              </button>
+            )}
             {/* Hold rather than an inline Remove on every row: one place to
                 delete a mix, same as a plant profile, and a slip of the thumb
                 cannot finish five seconds by accident. */}
@@ -514,6 +540,12 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               </button>
             )}
           </div>
+          {clash && (
+            <p className="field-hint warning">
+              A soil profile named {clash.name} already exists. Saving replaces
+              it. Give this one a different name to keep both.
+            </p>
+          )}
           {message && <p className="field-hint">{message}</p>}
         </div>
       </div>

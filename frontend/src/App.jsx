@@ -30,9 +30,21 @@ const fetchJson = async (path, options = {}) => {
     ...options,
   })
 
-  const data = await response.json()
+  // Read as text first: while the API restarts, nginx answers with an HTML
+  // error page, and parsing that as JSON surfaced as "Unexpected token '<'".
+  const text = await response.text()
+  let data
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    throw new Error(
+      response.ok
+        ? 'The planter sent back something unreadable.'
+        : `The planter is not answering (HTTP ${response.status}). It may be restarting.`,
+    )
+  }
   if (!response.ok) {
-    throw new Error(data.detail || data.error || 'Request failed')
+    throw new Error(data.detail || data.error || `Request failed (HTTP ${response.status})`)
   }
 
   return data
@@ -41,6 +53,11 @@ const fetchJson = async (path, options = {}) => {
 // How often the Controls tab re-reads the carriage position. Fast enough to
 // watch a move, and only while that tab is open.
 const GANTRY_POLL_MS = 1000
+// How often the planter's state is re-read while the page is open. Without it
+// the page only learned anything on load and after a button press here, so the
+// status bar kept saying whatever was true then -- "test the motor direction"
+// long after it had passed on another device.
+const OVERVIEW_POLL_MS = 15000
 
 function App() {
   const [activeTab, setActiveTab] = useState('plants')
@@ -108,6 +125,29 @@ function App() {
       canceled = true
     }
   }, [loadDashboard])
+
+  // Only the overview: the plant list, profiles and soils feed editors, and
+  // those are re-read after each save rather than under someone's typing.
+  // Skipped while the page is hidden, and done at once when it comes back.
+  useEffect(() => {
+    let canceled = false
+    async function refresh() {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const data = await fetchJson('/overview')
+        if (!canceled) setOverview(data)
+      } catch {
+        // The next refresh tries again; a load or a button press reports it.
+      }
+    }
+    const id = setInterval(refresh, OVERVIEW_POLL_MS)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      canceled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
 
   const systemStatus = overview?.system_status ?? {
     level: 'info',
@@ -270,6 +310,9 @@ function App() {
   // Pot fields only. This used to be nine calls ending in a profile save, so
   // storing a rail coordinate also wrote a plant profile -- the two are edited
   // in separate places now, and this is the pot half.
+  //
+  // Answers '' when saved, or why not, so the card can keep the edit on screen
+  // and say so under the field rather than only in the status bar for a moment.
   const savePot = async (plant) => {
     try {
       setStatus(`Saving ${plant.name}'s pot...`, { sticky: true })
@@ -307,8 +350,10 @@ function App() {
 
       setStatus(`Saved ${plant.name}'s pot.`)
       await loadDashboard()
+      return ''
     } catch (error) {
       setStatus(`Save failed: ${error.message}`)
+      return `Not saved: ${error.message}`
     }
   }
 
@@ -336,6 +381,7 @@ function App() {
             onClearProfile={clearProfile}
             soils={soils}
             onMove={moveGantry}
+            onRefresh={loadDashboard}
           />
           {/* Below the cards, because both are libraries the cards pick from:
               a plant and a mix are chosen from dropdowns up there, so editing

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 // A press-and-hold in place of a second confirmation step, for an action
 // severe enough to want one but routine enough that a dialog every time
@@ -30,6 +30,16 @@ export function useHoldToConfirm(durationMs, onConfirm) {
   useLayoutEffect(() => {
     onConfirmRef.current = onConfirm
   })
+
+  // A panel that goes away mid-hold -- a tab switched from the keyboard --
+  // must not have its action fire a moment later with nobody looking.
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current)
+      frame.current = null
+    },
+    [],
+  )
 
   const cancel = () => {
     if (frame.current !== null) {

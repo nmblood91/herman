@@ -43,9 +43,11 @@ Where you make or change plant profiles. A profile holds:
 Changing a profile doesn't change pots that already loaded it. Load it onto the
 pot again to update it.
 
-**Tip:** profiles are saved by name, so a new name makes a new profile. Use this
-to try different settings side by side, such as "Basil - Dry" and
-"Basil - Wet", or to keep separate profiles for a seedling and a grown plant.
+**Tip:** to try different settings for the same plant, such as "Basil - Dry"
+and "Basil - Wet", or a seedling and a grown plant, pick the plant under
+**Edit Profile**, press **Make a copy**, give the copy its own name and save.
+Saving under a name that already exists replaces that profile, and the editor
+warns you first.
 
 ### Soil Profile Editor
 Herman comes with three soil mixes, which suit nearly every plant you're likely

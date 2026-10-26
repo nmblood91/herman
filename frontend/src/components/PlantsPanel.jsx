@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { API_BASE } from '../api'
 import { describeLighting } from '../time'
 import { cardTitle } from '../potLabel'
 import { groupByCategory } from '../profileGroups'
@@ -267,6 +268,7 @@ export function PlantsPanel({
   onClearProfile,
   soils,
   onMove,
+  onRefresh,
 }) {
   // Klipper refuses every move until the axis is homed, so the jog row is
   // disabled rather than left to fail. Undefined counts as not ready, so the
@@ -297,37 +299,61 @@ export function PlantsPanel({
 
   const scheduleSave = (plant, draft) => {
     clearTimeout(saveTimers.current[plant.plant_id])
-    saveTimers.current[plant.plant_id] = setTimeout(() => {
+    saveTimers.current[plant.plant_id] = setTimeout(async () => {
       // Cleared before the write rather than after it, so a keystroke that
       // lands while the request is in flight registers as pending again and
       // the refresh below cannot overwrite it.
       delete saveTimers.current[plant.plant_id]
       const held = reasonToHold(draft, plant)
       setHoldNote((current) => ({ ...current, [plant.plant_id]: held }))
-      if (!held) onSave({ ...plant, ...draft })
+      if (held) return
+      // A refused save keeps its note, and with it the draft (see the resync
+      // below), so the card goes on showing what was typed and why it did not
+      // go through rather than quietly reverting.
+      const refused = await onSave({ ...plant, ...draft })
+      if (refused) setHoldNote((current) => ({ ...current, [plant.plant_id]: refused }))
     }, SAVE_DEBOUNCE_MS)
   }
 
-  const capturePosition = (plant, field = 'position_mm') => {
+  const capturePosition = async (plant, field = 'position_mm') => {
     const say = (text) =>
       setCaptureNote((current) => ({ ...current, [plant.plant_id]: text }))
 
+    // Asked of the planter now, not taken from the last dashboard load: that
+    // can be seconds old, and an automatic move since -- the hourly patrol, a
+    // watering -- would have this capture somewhere the carriage no longer is.
+    let live
+    try {
+      const response = await fetch(`${API_BASE}/gantry/position`)
+      live = await response.json()
+    } catch (error) {
+      say(`Could not ask the planter where the carriage is: ${error.message}`)
+      return
+    }
+    if (live?.ok === false) {
+      say('The motion board is not answering, so there is no position to use.')
+      return
+    }
     // An unhomed axis reports a position relative to wherever it happened to
     // power up, which is a meaningless number that looks like a real one.
-    if (!movement?.homed) {
+    if (!live?.homed) {
       say('Home the gantry first — until then its position is not a real measurement.')
+      return
+    }
+    if (live.moving) {
+      say('The carriage is still moving. Wait for it to stop, then press again.')
       return
     }
     // Checked before converting: Number(null) is 0, which is finite, so a
     // board reporting nothing would otherwise sail through this and quietly
     // set the plant's position to the left end of the rail.
-    const raw = movement.position
+    const raw = live.position
     if (raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw))) {
       say('No position reported. Is the motion board connected?')
       return
     }
     const here = Number(raw)
-    const limit = Number(movement.max_x)
+    const limit = Number(movement?.max_x)
     if (Number.isFinite(limit) && (here < 0 || here > limit)) {
       say(`${here} mm is outside the usable rail (0 to ${limit} mm).`)
       return
@@ -374,7 +400,10 @@ export function PlantsPanel({
   //
   // A card with a save still pending keeps its draft. Every save ends in a
   // dashboard refresh, which lands a moment later: taking the server's copy
-  // then would delete whatever was typed in the meantime.
+  // then would delete whatever was typed in the meantime. So does a card whose
+  // edit was held back or refused: its note says why it was not saved, and
+  // putting the old value back under that note would leave it pointing at a
+  // number that is no longer on screen.
   const [syncedPlants, setSyncedPlants] = useState(null)
   if (plants !== syncedPlants) {
     setSyncedPlants(plants)
@@ -382,7 +411,7 @@ export function PlantsPanel({
       Object.fromEntries(
         plants.map((plant) => [
           plant.plant_id,
-          saveTimers.current[plant.plant_id]
+          saveTimers.current[plant.plant_id] || holdNote[plant.plant_id]
             ? current[plant.plant_id] ?? draftFrom(plant)
             : draftFrom(plant),
         ]),
@@ -527,7 +556,7 @@ export function PlantsPanel({
                       leaves it alone, which is why it sits outside the read-only
                       summary above. */}
                   <h3 className="card-group-title">Lights</h3>
-                  <PotLightColor plant={plant} />
+                  <PotLightColor plant={plant} onSaved={onRefresh} />
 
                   <h3 className="card-group-title">Soil Profile</h3>
                   <div className="field-grid">

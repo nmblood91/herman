@@ -6,6 +6,9 @@ import { HoldRing } from './HoldRing'
 // Shorter than the five-second deletes: nothing is lost by a shutdown, but a
 // stray tap still should not take the planter offline.
 const POWER_HOLD_MS = 3000
+// How long after a reboot request the buttons come back. A Pi 3 A+ takes a
+// minute or two to boot and start the services.
+const REBOOT_RECOVERY_MS = 150000
 
 const DONE = {
   shutdown:
@@ -41,6 +44,14 @@ export function PowerPanel() {
       }
       setSent(action)
       setMessage(DONE[action])
+      // A reboot comes back, and the buttons should too, rather than staying
+      // grayed out until somebody reloads the page. A shutdown does not.
+      if (action === 'reboot') {
+        window.setTimeout(() => {
+          setSent('')
+          setMessage('')
+        }, REBOOT_RECOVERY_MS)
+      }
     } catch (error) {
       setMessage(`Could not reach Herman: ${error.message}`)
     }
@@ -72,7 +83,7 @@ export function PowerPanel() {
             {holdButton(rebootHold, 'Hold to reboot', 'Rebooting…')}
           </div>
           <p className="field-hint">Shut down before unplugging.</p>
-          {message && <p className="field-hint warning">{message}</p>}
+          {message && <p className="field-hint">{message}</p>}
         </div>
       </div>
     </section>

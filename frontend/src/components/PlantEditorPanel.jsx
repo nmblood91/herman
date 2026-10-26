@@ -82,6 +82,27 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
 
   const stopsAt = lightStop(form.light_start_time, form.light_hours)
 
+  // Profiles are keyed by name, ignoring case, so saving a new one under a
+  // name already in the list replaces that one. It used to do so silently.
+  const clash =
+    mode === 'new'
+      ? list.find(
+          (profile) =>
+            profile.name.trim().toLocaleLowerCase() === form.name.trim().toLocaleLowerCase(),
+        )
+      : null
+
+  // A variant of an existing plant -- "Basil - Dry" beside "Basil" -- starts
+  // from that plant's settings rather than a blank form. Moves to New Profile
+  // with every field kept and the name marked as a copy, to be renamed.
+  const makeCopy = () => {
+    setMode('new')
+    setPicked('')
+    setSyncedPick('')
+    setForm((current) => ({ ...current, name: `${current.name} copy` }))
+    setMessage('Copied. Give it its own name, change what you like, then save.')
+  }
+
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
 
   // A no-op on the already-active mode, like a tab: clicking New Profile again
@@ -355,8 +376,13 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
               disabled={!form.name.trim()}
               onClick={save}
             >
-              Save plant profile
+              {clash ? `Replace ${clash.name}` : 'Save plant profile'}
             </button>
+            {mode === 'existing' && picked && (
+              <button type="button" onClick={makeCopy}>
+                Make a copy
+              </button>
+            )}
             {/* Hold rather than click-twice: a slip of the thumb cannot finish
                 five seconds by accident, so there is nothing left for a
                 second confirmation to catch. Releasing early -- pointer up,
@@ -373,6 +399,12 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
               </button>
             )}
           </div>
+          {clash && (
+            <p className="field-hint warning">
+              A plant profile named {clash.name} already exists. Saving replaces
+              it. Give this one a different name to keep both.
+            </p>
+          )}
           {message && <p className="field-hint">{message}</p>}
         </div>
       </div>

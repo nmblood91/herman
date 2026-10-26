@@ -61,13 +61,25 @@ export function AutomationPanel({ overview, onRefresh }) {
   const [quietOn, setQuietOn] = useState(false)
   const [quietStart, setQuietStart] = useState('21:00')
   const [quietStop, setQuietStop] = useState('08:00')
-  const [quietMsg, setQuietMsg] = useState('')
+  // {text, warn}, so "Saved." is not shown as a warning.
+  const [quietMsg, setQuietMsg] = useState(null)
 
   // Resynced during render rather than in an effect, so the form never paints
-  // one frame of stale values after a refresh.
-  const [syncedOverview, setSyncedOverview] = useState(null)
-  if (overview !== syncedOverview) {
-    setSyncedOverview(overview)
+  // one frame of stale values after a refresh. Keyed on the served values, not
+  // the overview object: the page re-reads the overview every few seconds, and
+  // a new object with the same values must not wipe quiet-hour times typed
+  // but not yet saved.
+  const served = JSON.stringify([
+    watering?.auto_watering_enabled,
+    startupHome?.enabled,
+    patrol?.enabled,
+    quiet?.quiet_hours_enabled,
+    quiet?.quiet_hours_start,
+    quiet?.quiet_hours_stop,
+  ])
+  const [syncedServed, setSyncedServed] = useState(null)
+  if (served !== syncedServed) {
+    setSyncedServed(served)
     setAutoOn(watering?.auto_watering_enabled ?? autoOn)
     setHomeOnStartup(startupHome?.enabled ?? homeOnStartup)
     setPatrolOn(patrol?.enabled ?? patrolOn)
@@ -154,23 +166,31 @@ export function AutomationPanel({ overview, onRefresh }) {
     }
   }
 
-  const saveQuiet = async () => {
-    setQuietMsg('')
+  // The switch saves on toggle like the three above, taking the times with
+  // it; it used to wait for the button, so ticking it and walking away left
+  // the page showing quiet hours on while the planter had them off. The button
+  // saves an edited window.
+  const saveQuiet = async (enabled = quietOn) => {
+    const previous = quietOn
+    setQuietOn(enabled)
+    setQuietMsg(null)
     try {
       const response = await fetch(`${API_BASE}/quiet/hours`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: quietOn, start: quietStart, stop: quietStop }),
+        body: JSON.stringify({ enabled, start: quietStart, stop: quietStop }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setQuietMsg(data.error || `Save failed (HTTP ${response.status})`)
+        setQuietOn(previous)
+        setQuietMsg({ text: data.error || `Save failed (HTTP ${response.status})`, warn: true })
         return
       }
-      setQuietMsg('Saved.')
+      setQuietMsg({ text: 'Saved.', warn: false })
       onRefresh?.()
     } catch (error) {
-      setQuietMsg(`Save failed: ${error.message}`)
+      setQuietOn(previous)
+      setQuietMsg({ text: `Save failed: ${error.message}`, warn: true })
     }
   }
 
@@ -269,7 +289,7 @@ export function AutomationPanel({ overview, onRefresh }) {
               <input
                 type="checkbox"
                 checked={quietOn}
-                onChange={(event) => setQuietOn(event.target.checked)}
+                onChange={(event) => saveQuiet(event.target.checked)}
               />
               Quiet hours
             </label>
@@ -290,10 +310,12 @@ export function AutomationPanel({ overview, onRefresh }) {
                   onChange={(event) => setQuietStop(event.target.value)}
                 />
               </label>
-              <button type="button" onClick={saveQuiet}>Save quiet hours</button>
+              <button type="button" onClick={() => saveQuiet()}>Save quiet hours</button>
             </div>
             <p className="field-hint">Watering you start yourself is never blocked.</p>
-            {quietMsg && <p className="field-hint warning">{quietMsg}</p>}
+            {quietMsg && (
+              <p className={quietMsg.warn ? 'field-hint warning' : 'field-hint'}>{quietMsg.text}</p>
+            )}
           </div>
         </div>
 

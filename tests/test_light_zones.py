@@ -191,6 +191,13 @@ options = {option["name"]: option["pixels"] for option in auto.leds.status()["ch
 assert options == {"WS2811": 20, "WS2815": 60, "GS8208": 60}, options
 print("ok: changing the strip type re-splits the zones at once, without a restart")
 
+# The page resets the color order the moment a chip is picked, to the order
+# saving that chip would give, so each option has to carry it.
+usual = {option["name"]: option["color_order"] for option in auto.leds.status()["chip_options"]}
+assert usual == {"WS2811": "RGB", "WS2815": "GRB", "GS8208": "GRB"}, usual
+assert auto.leds.status()["color_order"] == usual["WS2815"], "saving the chip did not reset the order"
+print("ok: each strip type lists the color order choosing it resets to")
+
 again = build(path)
 assert again.leds.strip.chip == "WS2815" and again.leds.led_count == 60
 assert spans(again) == [(0, 14), (15, 29), (30, 44), (45, 59)], spans(again)

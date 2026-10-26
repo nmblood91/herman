@@ -31,12 +31,25 @@ export function LedStripPanel({ overview }) {
 
   const [chip, setChip] = useState('WS2811')
   const [colorOrder, setColorOrder] = useState('BRG')
-  const [status, setStatus] = useState('')
-  const [testing, setTesting] = useState('')
+  // {text, warn}: "Saved." is not a warning, a refused save is.
+  const [status, setStatus] = useState(null)
+  const [testing, setTesting] = useState(null)
 
-  const [syncedOverview, setSyncedOverview] = useState(null)
-  if (overview !== syncedOverview) {
-    setSyncedOverview(overview)
+  // Choosing a chip resets the color order to that chip's usual one, which is
+  // what the planter does when the chip is saved. Shown now, so the order
+  // that gets saved is the one on screen; change it after picking the chip.
+  const pickChip = (name) => {
+    setChip(name)
+    const usual = chipOptions.find((option) => option.name === name)?.color_order
+    if (usual) setColorOrder(usual)
+  }
+
+  // Keyed on the served values, so the periodic refresh does not undo a
+  // choice made but not yet saved.
+  const served = `${lighting?.chip}|${lighting?.color_order}`
+  const [syncedServed, setSyncedServed] = useState(null)
+  if (served !== syncedServed) {
+    setSyncedServed(served)
     setChip(lighting?.chip ?? chip)
     setColorOrder(lighting?.color_order ?? colorOrder)
   }
@@ -45,7 +58,7 @@ export function LedStripPanel({ overview }) {
   // chip resets the color order to that chip's default, so the two have to be
   // sent in a known order.
   const save = async () => {
-    setStatus('')
+    setStatus(null)
     try {
       for (const [path, body] of [
         ['/lights/chip', { chip }],
@@ -58,13 +71,13 @@ export function LedStripPanel({ overview }) {
         })
         if (!response.ok) {
           const data = await response.json().catch(() => ({}))
-          setStatus(data.error || `Save failed (HTTP ${response.status})`)
+          setStatus({ text: data.error || `Save failed (HTTP ${response.status})`, warn: true })
           return
         }
       }
-      setStatus('Saved.')
+      setStatus({ text: 'Saved.', warn: false })
     } catch (error) {
-      setStatus(`Save failed: ${error.message}`)
+      setStatus({ text: `Save failed: ${error.message}`, warn: true })
     }
   }
 
@@ -73,26 +86,40 @@ export function LedStripPanel({ overview }) {
   // Deliberately the existing color endpoint rather than a test mode of its
   // own -- a "test" that drove the strip differently from normal use would
   // prove the test path works, not the strip.
+  //
+  // The whole strip, every time: Manual can be set to color each pot's zone
+  // separately, and then a strip-wide color only shows in no zone at all --
+  // the test would be read off whatever each zone happened to be set to.
   const show = async (name, rgb) => {
-    setTesting('')
+    setTesting(null)
     try {
-      const response = await fetch(`${API_BASE}/lights/color`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rgb),
-      })
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        setTesting(data.error || `Could not set the strip (HTTP ${response.status})`)
-        return
+      for (const [path, body] of [
+        ['/lights/manual-scope', { scope: 'all' }],
+        ['/lights/color', rgb],
+      ]) {
+        const response = await fetch(`${API_BASE}${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}))
+          setTesting({
+            text: data.error || `Could not set the strip (HTTP ${response.status})`,
+            warn: true,
+          })
+          return
+        }
       }
-      setTesting(
-        `Strip set to ${name}. If that is not the color you see, the color ` +
-          'order above is wrong. This leaves the lights on Manual — set the ' +
-          'mode back to Zone Schedule under Controls when you are done.',
-      )
+      setTesting({
+        text:
+          `Strip set to ${name}. If that is not the color you see, the color ` +
+          'order above is wrong. This leaves the lights on Manual, all zones — ' +
+          'set the mode back to Zone Schedule under Controls when you are done.',
+        warn: false,
+      })
     } catch (error) {
-      setTesting(`Could not set the strip: ${error.message}`)
+      setTesting({ text: `Could not set the strip: ${error.message}`, warn: true })
     }
   }
 
@@ -104,7 +131,7 @@ export function LedStripPanel({ overview }) {
         <div className="field-row">
           <label>
             LED strip type
-            <select value={chip} onChange={(event) => setChip(event.target.value)}>
+            <select value={chip} onChange={(event) => pickChip(event.target.value)}>
               {chipOptions.map((option) => (
                 <option key={option.name} value={option.name}>
                   {option.name} ({option.description})
@@ -131,13 +158,13 @@ export function LedStripPanel({ overview }) {
               ))}
             </select>
           </label>
-          <p className="field-hint">Set the strip type first; it resets this.</p>
+          <p className="field-hint">Picking a strip type resets this to its usual order.</p>
         </div>
 
         <button type="button" className="primary group-save-button" onClick={save}>
           Save LED strip
         </button>
-        {status && <p className="field-hint warning">{status}</p>}
+        {status && <p className={status.warn ? 'field-hint warning' : 'field-hint'}>{status.text}</p>}
 
         <div className="field-row">
           <label>Test the color order</label>
@@ -152,7 +179,7 @@ export function LedStripPanel({ overview }) {
               Blue
             </button>
           </div>
-          {testing && <p className="field-hint">{testing}</p>}
+          {testing && <p className={testing.warn ? 'field-hint warning' : 'field-hint'}>{testing.text}</p>}
         </div>
       </div>
     </section>

@@ -292,7 +292,14 @@ class LedController:
             "led_count_fixed": self._fixed_count is not None,
             "chip": self.strip.chip,
             "chip_options": [
-                {"name": name, "description": spec.description, "pixels": self._count_for(name)}
+                {
+                    "name": name,
+                    "description": spec.description,
+                    "pixels": self._count_for(name),
+                    # The order choosing this chip resets to, so the page can
+                    # show that the moment the chip is picked, before saving.
+                    "color_order": spec.color_order,
+                }
                 for name, spec in CHIPS.items()
             ],
             "color_order": self.strip.color_order,

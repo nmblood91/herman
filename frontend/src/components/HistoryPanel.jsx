@@ -14,6 +14,12 @@ const PLANT_COLORS = ['#4ade80', '#60a5fa', '#f472b6', '#fbbf24']
 // One empty list, so the temperature view's "no target lines" is the same
 // value every render and does not rebuild the chart data each time.
 const NO_TARGETS = []
+// The moisture axis, as one value: the chart rebuilds whenever its range
+// changes identity, and a fresh [0, 100] each render threw away any zoom.
+const MOISTURE_RANGE = [0, 100]
+// How often an open History tab fetches the latest readings. The control loop
+// records one a minute, so more often would only fetch the same thing.
+const HISTORY_POLL_MS = 60000
 
 // Readings are stored and transmitted in Celsius. This converts for display
 // only -- the history keeps one unit whatever anyone happens to be viewing in.
@@ -46,8 +52,11 @@ export function HistoryPanel() {
   useEffect(() => {
     let canceled = false
 
-    const load = async () => {
-      setStatus('Loading history...')
+    // `quiet` for the periodic refresh: the chart stays up while it fetches,
+    // rather than flashing "Loading" once a minute.
+    const load = async (quiet = false) => {
+      if (!quiet) setStatus('Loading history...')
+      if (quiet && document.visibilityState !== 'visible') return
       try {
         const response = await fetch(`${API_BASE}/history?hours=${hours}`)
         const data = await response.json()
@@ -64,9 +73,11 @@ export function HistoryPanel() {
     }
 
     load()
+    const id = setInterval(() => load(true), HISTORY_POLL_MS)
     // Ignore a response that arrives after the range changed again.
     return () => {
       canceled = true
+      clearInterval(id)
     }
   }, [hours])
 
@@ -102,11 +113,23 @@ export function HistoryPanel() {
     ]
   }, [history, moisture, fahrenheit, targets])
 
+  // The series only depend on each pot's name and target, so they are keyed on
+  // those rather than on the fetched history: a new series list rebuilds the
+  // chart, and the minute-by-minute refresh would otherwise reset the zoom.
+  const plantKey = history
+    ? JSON.stringify(history.plants.map((plant) => [plant.name, plant.target_available ?? null]))
+    : ''
+  const plantMeta = useMemo(
+    () => (plantKey ? JSON.parse(plantKey).map(([name, target]) => ({ name, target })) : []),
+    [plantKey],
+  )
+  const targetMeta = moisture ? plantMeta : NO_TARGETS
+
   const series = useMemo(() => {
-    if (!history) return [{}]
+    if (!plantMeta.length) return [{}]
     return [
       {},
-      ...history.plants.map((plant, index) => ({
+      ...plantMeta.map((plant, index) => ({
         label: plant.name,
         stroke: PLANT_COLORS[index % PLANT_COLORS.length],
         width: 2,
@@ -117,7 +140,7 @@ export function HistoryPanel() {
             ? '--'
             : `${raw.toFixed(1)}${moisture ? '%' : fahrenheit ? '°F' : '°C'}`,
       })),
-      ...targets.map((plant, index) => ({
+      ...targetMeta.map((plant, index) => ({
         label: `${plant.name} waters at`,
         stroke: PLANT_COLORS[index % PLANT_COLORS.length],
         width: 1,
@@ -125,11 +148,11 @@ export function HistoryPanel() {
         value: (self, raw) => (raw == null ? '--' : `${raw}%`),
       })),
     ]
-  }, [history, moisture, fahrenheit, targets])
+  }, [plantMeta, moisture, fahrenheit, targetMeta])
 
   // Fixed for moisture so plants and time ranges stay visually comparable
   // instead of the axis rescaling to whatever happens to be on screen.
-  const yRange = moisture ? [0, 100] : undefined
+  const yRange = moisture ? MOISTURE_RANGE : undefined
 
   const hasData = history?.timestamps?.length > 0
   const missedCount = (history?.waterings || []).filter(
