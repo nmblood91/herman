@@ -81,7 +81,7 @@ Plug the SKR into the Pi by USB first, so the installer can find it.
 sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
 ```
 
-It takes 6 mins on pi 4, 15 min on pi 3A+. It enables I2C and SPI, installs
+It takes about 6 minutes on a Pi 4 and 15 on a Pi 3 A+. It enables I2C and SPI, installs
 Klipper, installs the starter soil and plant libraries, builds the web app, and
 starts three services: `klipper`, `greenthumb-api` and `nginx`.
 
@@ -100,15 +100,18 @@ sudo reboot
 ssh pi@herman.local
 sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
 ```
-It will not take nearly as long as before.
+
+The second run is much quicker, since most of the work is already done.
+
 **If it says no Klipper device was found**, the SKR is not visible. Check the USB
 cable and that the board is powered, then run the installer again.
 
 ## 6. Check it came up
 
-go to herman.local
+Open **http://herman.local** in a browser. If the app loads, the install
+worked.
 
-for a more detailed look and/or possible trouble shooting see below:
+For a closer look, or if something isn't working:
 
 ```bash
 sudo systemctl status klipper
@@ -133,8 +136,7 @@ cd /opt/greenthumb && .venv/bin/python -m greenthumb.hardware.soil_sensors --soa
 
 Zero errors is clean. Under 1% is tolerable.
 
-Now open **http://herman.local** in a browser. The API docs are at
-`http://herman.local/docs`.
+The API docs are at `http://herman.local/docs`.
 
 ## 7. Check the gantry before it moves anything
 
