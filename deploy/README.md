@@ -1165,6 +1165,13 @@ tail -50 ~/klipper_logs/klippy.log
 sudo journalctl -u greenthumb-api.service -n 50
 ```
 
+**Find out why the Pi reset or dropped off the network:** the installer keeps
+the system log across reboots, so the end of the previous boot is still there.
+It just stopping, with no shutdown messages, means the power went.
+```bash
+sudo journalctl -b -1 -n 80 --no-pager
+```
+
 **Verify directories exist:**
 ```bash
 ls -la /opt/greenthumb/

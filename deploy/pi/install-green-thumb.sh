@@ -81,6 +81,17 @@ sudo usermod -aG i2c,spi,gpio pi
 sudo modprobe i2c-dev 2>/dev/null || true
 sudo modprobe spi-bcm2835 2>/dev/null || true
 
+# Keep the system log across reboots. Raspberry Pi OS holds it in RAM, so when
+# a Pi resets or drops off the network its log is gone by the time anyone can
+# look -- the A+ that kept resetting left nothing behind on its card. Capped so
+# the log cannot fill or wear out the SD card.
+JOURNALD_CONF=/etc/systemd/journald.conf.d/greenthumb.conf
+sudo mkdir -p "$(dirname "$JOURNALD_CONF")"
+printf '[Journal]\nStorage=persistent\nSystemMaxUse=50M\n' | sudo tee "$JOURNALD_CONF" >/dev/null
+sudo systemctl restart systemd-journald
+sudo journalctl --flush
+echo "✓ System log kept across reboots (up to 50 MB)"
+
 sudo apt update
 sudo apt install -y git python3-venv python3-pip nginx curl
 

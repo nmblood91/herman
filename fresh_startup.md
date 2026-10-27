@@ -265,6 +265,7 @@ command, so a hand-tuned `position_endstop` is recoverable.
 ```bash
 sudo journalctl -u greenthumb-api.service -n 50   # the API
 tail -50 ~/klipper_logs/klippy.log                # Klipper
+sudo journalctl -b -1 -n 80 --no-pager            # the end of the last boot
 sudo systemctl restart klipper greenthumb-api.service nginx
 ```
 
