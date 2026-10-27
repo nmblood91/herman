@@ -47,8 +47,40 @@ off the network. The planter software itself is not suspected.
 6. Later, while **idle**, the Wi-Fi was gone again. That is the event to
    explain.
 
+## What happened (2026-10-27)
+Fresh 64-bit card, persistent journal on, installer run several times.
+1. **The Pi reset at the Klipper step on every run.** Each previous boot's
+   journal just stops: no shutdown, no under-voltage, no Oops or panic, no
+   `mmc0` (SD card) errors. The last lines are the Klipper environment check;
+   writeback can lose the last ~30 s, which covers starting Klipper.
+2. **Not CPU load.** The npm build and the `pip install` of Klipper's
+   requirements finished on the same runs.
+3. **Not the core clock or heat.** With `core_freq` unpinned and the Pi
+   rebooted, it still reset at the same step, peaking at 51 °C.
+4. **Not Klipper's C helper compile.** Klipper compiled `c_helper.so` on its
+   own at boot (02:01) and the Pi stayed up.
+5. **Not Klipper itself.** With the SKR's USB unplugged, Klipper ran and
+   retried the serial port with the Pi up.
+6. **Plugging in the SKR's USB reset the Pi.** That is the trigger.
+7. **A reset can leave empty files behind.** Files written in the last ~30 s
+   reach the card empty: `cffi` in `~/klippy-env` came back with no `FFI`
+   after one, and only a fresh venv plus `sync` fixed it. Expect the same in
+   anything else written just before a reset.
+8. Side findings, not the reset:
+   - The Wi-Fi chip's own bus failed and recovered under load
+     (`mmc1: Controller never released inhibit bit(s)`, `brcmf_sdio_isr:
+     failed backplane access`), 2½ minutes before one reset. That fits
+     brief supply dips.
+   - The router sends `WNM: Disassociation Imminent` (band steering or mesh
+     roaming). A likely cause of the idle Wi-Fi drops; fixed at the router.
+     The installer now turns Wi-Fi power saving off as well.
+   - The `klipper` unit was found **masked**, which nothing in the repo
+     does. The installer now unmasks it before writing the unit.
+
 ## Ruled out or unlikely so far
 - **`core_freq=250`:** removed, and it still happened.
+- **`core_freq=400`, heat, CPU load, Klipper and its C helper compile:**
+  see 2026-10-27 above.
 - **The SKR drawing power over USB:** the SW_USB jumper is off.
 - **Running out of memory:** plenty free.
 - **Klipper failing to connect:** the installer's "not reached the motion
@@ -58,11 +90,27 @@ off the network. The planter software itself is not suspected.
   reset. That does **not** clear power: a drop fast and deep enough resets
   the Pi before the firmware flags it.
 
-## Suspects, in order
-1. **Fast power dips** from the DC-DC converter or the micro-USB lead. An
-   inline USB meter that records the minimum voltage is on order.
-2. **The SD card**, either worn out or corrupted by the hung reboot.
+## Suspects, in order (updated 2026-10-27)
+1. **The SKR's USB connection disturbing the Pi's supply.** The Pi and the
+   SKR already share ground through the 12 V supply and the DC-DC converter,
+   and the USB cable adds a second ground path straight to the SoC (the A+
+   has no hub chip). The A+'s micro-USB input has less margin than the
+   Pi 4's USB-C, which runs the same SKR and supply without resets.
+   Not yet split: whether the reset comes at the physical plug-in (Klipper
+   stopped) or when Klipper configures the board.
+2. **Fast power dips** from the DC-DC converter or the micro-USB lead, which
+   the SKR connection may only be exposing. An inline USB meter that records
+   the minimum voltage is on order.
 3. **The A+ board itself.**
+
+The SD card has dropped out: `mmc0` stayed clean through every reset.
+
+## Fixes to try, in order
+1. A **powered USB hub** between the Pi and the SKR.
+2. A **separate 5 V supply for the Pi** (an official Pi supply) instead of
+   the DC-DC converter off the 12 V rail.
+3. A better **5.1 V buck converter** with a large output capacitor, and a
+   short, thick lead to the Pi.
 
 ## What to read from the card
 Mount it read-only first (check `lsblk` for the right device; it is usually
