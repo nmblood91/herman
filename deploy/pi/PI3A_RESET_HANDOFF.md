@@ -20,8 +20,9 @@ off the network. The planter software itself is not suspected.
   Klipper. Klipper on the Pi runs from `~/klippy-env`. The SKR's SW_USB jumper
   is **off**, so the SKR does not draw power from the Pi.
 - **LED strip:** WS2811, data on header pin 19 (SPI MOSI), ground on pin 20.
-- **Same setup on a Pi 4:** the same planter, SKR and supply chain run on a
-  Pi 4 with no resets.
+- **Similar setup on a Pi 4:** the same planter and supply chain run on a
+  Pi 4 with no resets, but with an **SKR Mini E3 V2**. The A+ has the V3
+  (`stm32g0b1` in the Klipper log), so the Pi 4 does not clear the board.
 
 ## What happened (2026-10-26)
 1. With `core_freq=250` in `config.txt`, a reboot hung with the red and green
@@ -95,9 +96,10 @@ Fresh 64-bit card, persistent journal on, installer run several times.
    SKR already share ground through the 12 V supply and the DC-DC converter,
    and the USB cable adds a second ground path straight to the SoC (the A+
    has no hub chip). The A+'s micro-USB input has less margin than the
-   Pi 4's USB-C, which runs the same SKR and supply without resets.
-   Not yet split: whether the reset comes at the physical plug-in (Klipper
-   stopped) or when Klipper configures the board.
+   Pi 4's USB-C. The Pi 4 runs a V2 without resets, so either the A+ or the
+   V3 could be the weak side. Not yet split: whether the reset comes at the
+   physical plug-in (Klipper stopped) or when Klipper configures the board,
+   and which of the two it follows (swap the SKRs).
 2. **Fast power dips** from the DC-DC converter or the micro-USB lead, which
    the SKR connection may only be exposing. An inline USB meter that records
    the minimum voltage is on order.
