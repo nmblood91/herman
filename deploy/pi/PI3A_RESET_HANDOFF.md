@@ -30,6 +30,9 @@ off the network. The planter software itself is not suspected.
    web page. Removing `core_freq=250` did not bring the network back.
 2. The card was reflashed. The installer now writes `core_freq=400` and
    `core_freq_min=400` for a Pi 3 (check what is actually in `config.txt`).
+   **Update 2026-10-27:** resets continued with the 400 pin, with no
+   under-voltage flagged but the 60 °C soft limit hit (`throttled=0x80000`).
+   The installer no longer pins a Pi 3, and comments out an existing pin.
 3. During the install, SSH dropped twice at "Verifying Klipper connection".
    That is the heaviest point of the install: Klipper compiling its C helper
    on all cores while the SKR connects. Afterwards `uptime` showed **4 and 8

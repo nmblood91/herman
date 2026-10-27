@@ -953,10 +953,12 @@ root, which the usual PWM/DMA approach requires.
 **The installer pins the Pi's core clock**, because the SPI clock is divided
 down from it and the firmware otherwise changes it with load. A change in the
 middle of a frame shows as an occasional flicker, mostly in Rainbow, the only
-mode that sends frames nonstop. It reads the board model and sets
-`core_freq=400` and `core_freq_min=400` on a Pi 3, or `core_freq=500` and
-`core_freq_min=500` on a Pi 4, in `/boot/firmware/config.txt`. Each is the
-board's normal top core speed, held there instead of dropping when idle. It takes effect after a reboot.
+mode that sends frames nonstop. On a Pi 4 it sets `core_freq=500` and
+`core_freq_min=500` in `/boot/firmware/config.txt`, the board's normal top core
+speed, held there instead of dropping when idle. It takes effect after a reboot.
+**A Pi 3 is left unpinned**, and a pin from an earlier install is commented out:
+the Pi 3 A+ reset under load with the pin in place, so Rainbow may flicker on a
+Pi 3.
 
 **Take the Pi's ground from pin 20**, right beside it in the same row of the
 header, so data and ground can share one 2-pin connector:

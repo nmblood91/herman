@@ -3,6 +3,16 @@ set -euo pipefail
 
 echo "Installing GreenThumb on the Pi..."
 
+# arm64 only (see ROADMAP.md). Checked first, because on 32-bit Pi OS the
+# NodeSource step fails with "Unsupported architecture: armhf" only after
+# I2C, SPI and the packages have all been set up.
+ARCH=$(dpkg --print-architecture)
+if [ "$ARCH" != "arm64" ]; then
+  echo "⚠️  This Pi runs $ARCH Pi OS; GreenThumb needs 64-bit (arm64)."
+  echo "    Reflash the card with Raspberry Pi OS (64-bit) and start again."
+  exit 1
+fi
+
 # Enable I2C interface for sensor communication
 echo "Enabling I2C interface..."
 sudo raspi-config nonint do_i2c 0
@@ -43,14 +53,22 @@ sudo raspi-config nonint do_spi 0
 MODEL=$(tr -d '\0' </proc/device-tree/model 2>/dev/null || true)
 case "$MODEL" in
   *"Pi 4"*) CORE_CLOCK_SETTINGS="core_freq=500 core_freq_min=500" ;;
-  # 400 is the Pi 3's own top core speed; the minimum holds it there. A 250 pin
-  # (the low end) was tried first and the A+ lost its network after a reboot.
-  # Not proven to be the cause, but 400 keeps the clock where it runs anyway.
-  *"Pi 3"*) CORE_CLOCK_SETTINGS="core_freq=400 core_freq_min=400" ;;
+  # Not pinned on a Pi 3. The A+ reset under load with both 250 and 400 pins
+  # and no under-voltage, and a 400 pin holds the core clock up while the
+  # firmware lowers the voltage at the 60 C soft limit. The LEDs may flicker
+  # in Rainbow; a reset is worse. A pin left by an earlier run is commented out.
+  *"Pi 3"*) CORE_CLOCK_SETTINGS="none" ;;
   *) CORE_CLOCK_SETTINGS="" ;;
 esac
 CORE_CLOCK_CHANGED=0
-if [ -n "$CORE_CLOCK_SETTINGS" ] && [ -f "$BOOT_CONFIG" ]; then
+if [ "$CORE_CLOCK_SETTINGS" = "none" ]; then
+  if [ -f "$BOOT_CONFIG" ] && grep -qE "^core_freq(_min)?=" "$BOOT_CONFIG"; then
+    sudo sed -i -E 's/^(core_freq(_min)?=)/#\1/' "$BOOT_CONFIG"
+    echo "✓ Unpinned the core clock ($MODEL; applies after reboot)"
+  else
+    echo "✓ Core clock left unpinned ($MODEL)"
+  fi
+elif [ -n "$CORE_CLOCK_SETTINGS" ] && [ -f "$BOOT_CONFIG" ]; then
   for SETTING in $CORE_CLOCK_SETTINGS; do
     KEY=${SETTING%%=*}
     if grep -q "^$SETTING$" "$BOOT_CONFIG"; then
@@ -91,6 +109,19 @@ printf '[Journal]\nStorage=persistent\nSystemMaxUse=50M\n' | sudo tee "$JOURNALD
 sudo systemctl restart systemd-journald
 sudo journalctl --flush
 echo "✓ System log kept across reboots (up to 50 MB)"
+
+# Turn off Wi-Fi power saving. With it on, the Pi's Wi-Fi chip naps between
+# beacons, and a headless Pi drops off the network -- the A+ (Wi-Fi only, no
+# Ethernet) went unreachable while idle. 2 is NetworkManager's "disable". The
+# file applies from the next boot; iw turns it off now, without the reconnect
+# that restarting NetworkManager would cost an SSH session.
+if [ -d /etc/NetworkManager/conf.d ]; then
+  printf '[connection]\nwifi.powersave = 2\n' | sudo tee /etc/NetworkManager/conf.d/greenthumb-wifi-powersave.conf >/dev/null
+  sudo iw dev wlan0 set power_save off 2>/dev/null || true
+  echo "✓ Wi-Fi power saving off"
+else
+  echo "⚠️  NetworkManager not found; leaving Wi-Fi power saving as it is"
+fi
 
 sudo apt update
 sudo apt install -y git python3-venv python3-pip nginx curl
@@ -310,6 +341,9 @@ Restart=always
 RestartSec=10
 EOF
 
+# Unmask first. A masked unit is a symlink to /dev/null, so the cp below would
+# write the unit into /dev/null without complaint and Klipper would never start.
+sudo systemctl unmask klipper
 sudo cp /tmp/klipper.service /etc/systemd/system/klipper.service
 sudo systemctl daemon-reload
 
