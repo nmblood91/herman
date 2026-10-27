@@ -428,7 +428,9 @@ try:
     # A soil profile already installed without one gets the default; one with
     # a reading of its own keeps it.
     path = temp_state()
-    soil_library.LIBRARY = shipped
+    soil_library.LIBRARY = tuple(
+        dataclasses.replace(soil, field_capacity_raw=None) for soil in shipped
+    )
     soil_library.install(path=path)
     state.save_soil("Fast-Draining Mix", {"field_capacity_raw": 777}, path)
     soil_library.LIBRARY = tuple(

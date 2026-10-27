@@ -74,6 +74,9 @@ LIBRARY: tuple[LibrarySoil, ...] = (
             "lettuce, spinach, kale, basil, parsley, mint, cilantro; ferns, "
             "calatheas, peace lilies, begonias, fittonia."
         ),
+        # Measured on the reference build, 2026-10-26: 887-889 over three
+        # runs on a soaked and drained Bell Pepper pot, saved as 890.
+        field_capacity_raw=890,
     ),
     LibrarySoil(
         name="Fast-Draining Mix",
