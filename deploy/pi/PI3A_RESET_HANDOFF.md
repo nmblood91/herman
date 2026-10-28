@@ -78,7 +78,18 @@ Fresh 64-bit card, persistent journal on, installer run several times.
    - The `klipper` unit was found **masked**, which nothing in the repo
      does. The installer now unmasks it before writing the unit.
 
+## What happened later on 2026-10-27
+- **A Pi 3 B+ also reset at "Verifying Klipper connection"**, on the same
+  12 V supply and DC-DC converter as the A+. The B+ has a USB hub chip and a
+  stronger input stage, so **the A+ board itself is now unlikely**. What the
+  two Pi 3s share and the Pi 4 does not: a micro-USB power input (and its
+  lead), and possibly the SKR Mini E3 V3 (confirm which SKR the B+ had).
+- **The Pi 4 has its own converter**, the same make and look but with a
+  USB-C output. So the Pi 4 working does not clear the micro-USB unit the
+  Pi 3s share: that unit, or its built-in lead, could be the weak part.
+
 ## Ruled out or unlikely so far
+- **The A+ board itself:** a Pi 3 B+ resets the same way (see above).
 - **`core_freq=250`:** removed, and it still happened.
 - **`core_freq=400`, heat, CPU load, Klipper and its C helper compile:**
   see 2026-10-27 above.
@@ -99,11 +110,12 @@ Fresh 64-bit card, persistent journal on, installer run several times.
    Pi 4's USB-C. The Pi 4 runs a V2 without resets, so either the A+ or the
    V3 could be the weak side. Not yet split: whether the reset comes at the
    physical plug-in (Klipper stopped) or when Klipper configures the board,
-   and which of the two it follows (swap the SKRs).
+   and which of the two it follows (swap the SKRs). The B+ resetting too
+   weakens the "no hub chip" part of this and points at the V3 or the supply.
 2. **Fast power dips** from the DC-DC converter or the micro-USB lead, which
    the SKR connection may only be exposing. An inline USB meter that records
-   the minimum voltage is on order.
-3. **The A+ board itself.**
+   the minimum voltage is on order. Both Pi 3s use micro-USB; the Pi 4 does
+   not.
 
 The SD card has dropped out: `mmc0` stayed clean through every reset.
 
