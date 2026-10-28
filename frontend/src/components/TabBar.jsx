@@ -1,8 +1,8 @@
 export function TabBar({ activeTab, onChange }) {
   // Ordered by how often you open them: what the plants are doing, then
-  // driving the thing by hand, then what it does unattended, then the
-  // build-time facts and checks, then the trend you consult afterwards. Help
-  // is last, and explains the others in this same order.
+  // driving the thing by hand, then what it does unattended, then the trend
+  // you check on it, then the build-time facts and checks. Help is last, and
+  // explains the others in this same order.
   //
   // There is no Settings tab. It had become the place where unrelated things
   // landed -- "does this water by itself" sat next to "which LED strip did you
@@ -11,8 +11,8 @@ export function TabBar({ activeTab, onChange }) {
     { key: 'plants', label: 'Plants and Soil' },
     { key: 'controls', label: 'Controls' },
     { key: 'automation', label: 'Automation' },
-    { key: 'calibration', label: 'Calibration' },
     { key: 'history', label: 'History' },
+    { key: 'calibration', label: 'Calibration' },
     { key: 'help', label: 'Help' },
   ]
 

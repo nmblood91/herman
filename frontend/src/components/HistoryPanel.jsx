@@ -34,14 +34,12 @@ const HISTORY_POLL_MS = 60000
 
 // Readings are stored and transmitted in Celsius. This converts for display
 // only -- the history keeps one unit whatever anyone happens to be viewing in.
-const toFahrenheit = (celsius) => (celsius == null ? null : celsius * 9 / 5 + 32)
+const toFahrenheit = (celsius) => (celsius == null ? null : (celsius * 9) / 5 + 32)
 
 // One pot's line on the current view.
 const valuesOf = (plant, moisture, fahrenheit) => {
   if (moisture) return plant.moisture_percent
-  return fahrenheit
-    ? plant.temperature_c.map(toFahrenheit)
-    : plant.temperature_c
+  return fahrenheit ? plant.temperature_c.map(toFahrenheit) : plant.temperature_c
 }
 
 // Remembered per browser rather than on the Pi: it is a display preference,
@@ -208,8 +206,7 @@ export function HistoryPanel() {
 
       {!status && history && !shown.length && (
         <p className="field-hint">
-          No plants loaded. Load a plant profile onto a pot in Plants and Soil
-          to chart it here.
+          No plants loaded. Load a plant profile onto a pot in Plants and Soil to chart it here.
         </p>
       )}
 
@@ -246,7 +243,9 @@ export function HistoryPanel() {
               </li>
             )
           })}
-          {moisture && <li className="chart-legend-key">- - - waters at</li>}
+          {moisture && (
+            <li className="chart-legend-key">Dashed line is &lsquo;water-at&rsquo; level</li>
+          )}
         </ul>
       )}
 
