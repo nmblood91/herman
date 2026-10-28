@@ -1928,6 +1928,9 @@ class GreenThumbAutomation:
                     "name": plant.name,
                     "sensor_address": plant.sensor_address,
                     "target_available": plant.target_available,
+                    # "" when no plant profile is loaded, which the chart
+                    # leaves out: an empty pot's probe is not a plant's line.
+                    "profile": plant.profile,
                     **series[plant.sensor_address],
                 }
                 for plant in self.plants

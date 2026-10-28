@@ -36,6 +36,14 @@ const HISTORY_POLL_MS = 60000
 // only -- the history keeps one unit whatever anyone happens to be viewing in.
 const toFahrenheit = (celsius) => (celsius == null ? null : celsius * 9 / 5 + 32)
 
+// One pot's line on the current view.
+const valuesOf = (plant, moisture, fahrenheit) => {
+  if (moisture) return plant.moisture_percent
+  return fahrenheit
+    ? plant.temperature_c.map(toFahrenheit)
+    : plant.temperature_c
+}
+
 // Remembered per browser rather than on the Pi: it is a display preference,
 // and someone reading the chart on a phone should not change what the laptop
 // shows. localStorage can throw in a private window, so it never breaks the
@@ -105,33 +113,41 @@ export function HistoryPanel() {
     }
   }
 
+  // Only pots with a plant profile loaded. An empty pot's probe still reports,
+  // but it is not a plant anyone is watching, and its line and legend entry
+  // crowded the chart. Each pot keeps the color of its position, so loading a
+  // plant into one pot does not recolor the others.
+  const shown = useMemo(
+    () =>
+      (history?.plants || [])
+        .map((plant, index) => ({ ...plant, color: PLANT_COLORS[index % PLANT_COLORS.length] }))
+        .filter((plant) => plant.profile),
+    [history],
+  )
+
   // On the moisture view each pot's target is drawn as a flat dashed line in
   // its color: the reading and the target are on the same soil water scale,
   // so a line dropping to its dashes is a pot coming due.
-  const targets = moisture && history ? history.plants : NO_TARGETS
+  const targets = moisture ? shown : NO_TARGETS
 
   const data = useMemo(() => {
     if (!history) return [[]]
     return [
       history.timestamps,
-      ...history.plants.map((plant) => {
-        if (moisture) return plant.moisture_percent
-        return fahrenheit
-          ? plant.temperature_c.map(toFahrenheit)
-          : plant.temperature_c
-      }),
+      ...shown.map((plant) => valuesOf(plant, moisture, fahrenheit)),
       ...targets.map((plant) => history.timestamps.map(() => plant.target_available ?? null)),
     ]
-  }, [history, moisture, fahrenheit, targets])
+  }, [history, shown, moisture, fahrenheit, targets])
 
-  // The series only depend on each pot's name and target, so they are keyed on
-  // those rather than on the fetched history: a new series list rebuilds the
-  // chart, and the minute-by-minute refresh would otherwise reset the zoom.
-  const plantKey = history
-    ? JSON.stringify(history.plants.map((plant) => [plant.name, plant.target_available ?? null]))
-    : ''
+  // The series only depend on each pot's name, color and target, so they are
+  // keyed on those rather than on the fetched history: a new series list
+  // rebuilds the chart, and the minute-by-minute refresh would otherwise reset
+  // the zoom.
+  const plantKey = JSON.stringify(
+    shown.map((plant) => [plant.name, plant.color, plant.target_available ?? null]),
+  )
   const plantMeta = useMemo(
-    () => (plantKey ? JSON.parse(plantKey).map(([name, target]) => ({ name, target })) : []),
+    () => JSON.parse(plantKey).map(([name, color, target]) => ({ name, color, target })),
     [plantKey],
   )
   const targetMeta = moisture ? plantMeta : NO_TARGETS
@@ -140,32 +156,38 @@ export function HistoryPanel() {
     if (!plantMeta.length) return [{}]
     return [
       {},
-      ...plantMeta.map((plant, index) => ({
+      ...plantMeta.map((plant) => ({
         label: plant.name,
-        stroke: PLANT_COLORS[index % PLANT_COLORS.length],
+        stroke: plant.color,
         width: 2,
         // Gaps are real: they mean the sensor could not be read.
         spanGaps: false,
-        value: (self, raw) =>
-          raw == null
-            ? '--'
-            : `${raw.toFixed(1)}${moisture ? '%' : fahrenheit ? '°F' : '°C'}`,
       })),
-      ...targetMeta.map((plant, index) => ({
+      ...targetMeta.map((plant) => ({
         label: `${plant.name} waters at`,
-        stroke: PLANT_COLORS[index % PLANT_COLORS.length],
+        stroke: plant.color,
         width: 1,
         dash: [6, 6],
-        value: (self, raw) => (raw == null ? '--' : `${raw}%`),
       })),
     ]
-  }, [plantMeta, moisture, fahrenheit, targetMeta])
+  }, [plantMeta, targetMeta])
 
   // Fixed for moisture so plants and time ranges stay visually comparable
   // instead of the axis rescaling to whatever happens to be on screen.
   const yRange = moisture ? MOISTURE_RANGE : undefined
 
-  const hasData = history?.timestamps?.length > 0
+  // The point under the cursor, or null for each pot's latest reading.
+  const [cursorIdx, setCursorIdx] = useState(null)
+  const suffix = moisture ? '%' : fahrenheit ? '°F' : '°C'
+  const readingAt = (values) => {
+    if (cursorIdx != null) return values[cursorIdx]
+    for (let i = values.length - 1; i >= 0; i -= 1) {
+      if (values[i] != null) return values[i]
+    }
+    return null
+  }
+
+  const hasData = history?.timestamps?.length > 0 && shown.length > 0
   const missedCount = (history?.waterings || []).filter(
     (watering) => watering.soak === 'missed',
   ).length
@@ -184,7 +206,14 @@ export function HistoryPanel() {
 
       {status && <p className="field-hint">{status}</p>}
 
-      {!status && !hasData && (
+      {!status && history && !shown.length && (
+        <p className="field-hint">
+          No plants loaded. Load a plant profile onto a pot in Plants and Soil
+          to chart it here.
+        </p>
+      )}
+
+      {!status && shown.length > 0 && !hasData && (
         <p className="field-hint">
           No readings in this range yet. The control loop records one a minute,
           so a fresh install needs a few minutes before the chart fills in.
@@ -198,7 +227,27 @@ export function HistoryPanel() {
           markers={history.waterings || []}
           yRange={yRange}
           yLabel={moisture ? 'Soil water %' : fahrenheit ? 'Temp °F' : 'Temp °C'}
+          onCursor={setCursorIdx}
         />
+      )}
+
+      {/* One chip per pot instead of uPlot's table, which gave every pot a
+          second row for its target and listed the time as a series of its
+          own. The target lines get one shared key. */}
+      {hasData && (
+        <ul className="chart-legend">
+          {shown.map((plant) => {
+            const value = readingAt(valuesOf(plant, moisture, fahrenheit))
+            return (
+              <li key={plant.plant_id}>
+                <span className="chart-swatch" style={{ background: plant.color }} />
+                {plant.name}
+                <strong>{value == null ? '--' : `${value.toFixed(1)}${suffix}`}</strong>
+              </li>
+            )
+          })}
+          {moisture && <li className="chart-legend-key">- - - waters at</li>}
+        </ul>
       )}
 
       {/* Outside the chart's block, so a range with no readings still offers

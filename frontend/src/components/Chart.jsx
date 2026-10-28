@@ -6,9 +6,17 @@ import 'uplot/dist/uPlot.min.css'
  * Thin React wrapper around uPlot, whose API is imperative. Keeping the
  * instance in a ref means the rest of the UI never touches it directly.
  */
-export function Chart({ data, series, markers = [], height = 320, yRange, yLabel }) {
+export function Chart({ data, series, markers = [], height = 320, yRange, yLabel, onCursor }) {
   const containerRef = useRef(null)
   const plotRef = useRef(null)
+
+  // uPlot's own legend is off; the caller draws a compact one and is told
+  // which point the cursor is over (null when it leaves). Through a ref for
+  // the same reason as the markers: a new callback must not rebuild the plot.
+  const onCursorRef = useRef(onCursor)
+  useEffect(() => {
+    onCursorRef.current = onCursor
+  }, [onCursor])
 
   // Read through a ref inside the draw hook so new waterings repaint without
   // tearing down and rebuilding the whole plot on every fetch. Updated in an
@@ -31,10 +39,16 @@ export function Chart({ data, series, markers = [], height = 320, yRange, yLabel
         height,
         // Timestamps arrive as epoch seconds, which is uPlot's native x format.
         scales: { x: { time: true }, y: yRange ? { range: yRange } : {} },
-        legend: { live: true },
+        legend: { show: false },
         cursor: { drag: { x: true, y: false } },
         axes: [
-          { stroke: '#8fae9c', grid: { stroke: 'rgba(143, 174, 156, 0.12)' } },
+          {
+            stroke: '#8fae9c',
+            grid: { stroke: 'rgba(143, 174, 156, 0.12)' },
+            // At least this many pixels between time labels. uPlot's default
+            // of 50 packed two-line date and time labels edge to edge.
+            space: 90,
+          },
           {
             stroke: '#8fae9c',
             label: yLabel,
@@ -43,6 +57,7 @@ export function Chart({ data, series, markers = [], height = 320, yRange, yLabel
         ],
         series,
         hooks: {
+          setCursor: [(u) => onCursorRef.current?.(u.cursor.idx ?? null)],
           draw: [
             (u) => {
               const { ctx } = u

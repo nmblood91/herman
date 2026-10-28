@@ -799,15 +799,38 @@ input[type='color'] {
   min-height: 320px;
 }
 
-/* uPlot ships light-theme defaults; these pull it into the app's palette. */
-.chart .u-legend {
+/* The chart's legend: one chip per pot with its reading at the cursor, or its
+   latest when the cursor is off the chart. Wraps rather than scrolls. */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
   color: #cfe3d6;
   font-size: 0.85rem;
 }
 
-.chart .u-legend th,
-.chart .u-legend td {
-  padding: 2px 8px;
+.chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-legend strong {
+  color: #edf8ee;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.chart-legend-key {
+  color: #8fae9b;
 }
 
 /* The live reading in a plant card's header. Sits between the name and the
