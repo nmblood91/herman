@@ -445,7 +445,6 @@ option {
   color: #e6a04a;
 }
 
-
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -723,17 +722,76 @@ input[type='color'] {
   }
 }
 
-.history-controls {
+.history-toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
   margin: 14px 0 18px;
 }
 
-.range-row {
+/* Under the chart's legend, filling the width so five short labels read as
+   one scale rather than a cluster at the left. */
+.history-range {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  margin: 16px 0 12px;
+}
+
+.history-range button {
+  flex: 1;
+}
+
+/* One joined pill for picking a view, in .tab's colors but smaller, so it
+   reads as a setting on this panel rather than as page navigation. */
+.segmented {
+  display: inline-flex;
+  background: #1d382a;
+  border: 1px solid #2e4d3d;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.segmented button {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  color: #cfe3d6;
+}
+
+.segmented button + button {
+  border-left: 1px solid #2e4d3d;
+}
+
+/* No lift inside the pill: the segments share edges, and one rising out of
+   line looks broken. */
+.segmented button[aria-pressed='false']:not(:disabled):hover {
+  background: #25463a;
+  transform: none;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: #2f7a4b;
+  color: #edf8ee;
+}
+
+.segmented button[aria-pressed='true']:hover {
+  transform: none;
+}
+
+.segmented button:focus-visible {
+  outline: 2px solid #8fd6a8;
+  outline-offset: -2px;
+}
+
+/* After the rules above, which it overrides. Same height as the phone-width
+   buttons, about a 44px thumb target, with narrower sides so five range
+   segments fit. */
+@media (max-width: 460px) {
+  .segmented button {
+    padding: 12px 10px;
+  }
 }
 
 .chart {

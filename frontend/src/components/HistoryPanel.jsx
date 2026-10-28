@@ -1,13 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Chart } from './Chart'
+import { Segmented } from './Segmented'
 import { API_BASE } from '../api'
 
 const RANGES = [
-  { label: '6h', hours: 6 },
-  { label: '24h', hours: 24 },
-  { label: '7d', hours: 24 * 7 },
-  { label: '30d', hours: 24 * 30 },
-  { label: '90d', hours: 24 * 90 },
+  { label: '6h', value: 6 },
+  { label: '24h', value: 24 },
+  { label: '7d', value: 24 * 7 },
+  { label: '30d', value: 24 * 30 },
+  { label: '90d', value: 24 * 90 },
+]
+
+const METRICS = [
+  { label: 'Moisture', value: 'moisture' },
+  { label: 'Temperature', value: 'temperature' },
+]
+
+const UNITS = [
+  { label: '°C', value: 'C' },
+  { label: '°F', value: 'F' },
 ]
 
 const PLANT_COLORS = ['#4ade80', '#60a5fa', '#f472b6', '#fbbf24']
@@ -163,53 +174,12 @@ export function HistoryPanel() {
     <section className="panel-section">
       <h2>History</h2>
 
-      <div className="history-controls">
-        <div className="range-row">
-          {RANGES.map((range) => (
-            <button
-              key={range.label}
-              type="button"
-              className={hours === range.hours ? 'tab active' : 'tab'}
-              onClick={() => setHours(range.hours)}
-            >
-              {range.label}
-            </button>
-          ))}
-        </div>
-        <div className="range-row">
-          <button
-            type="button"
-            className={moisture ? 'tab active' : 'tab'}
-            onClick={() => setMetric('moisture')}
-          >
-            Moisture
-          </button>
-          <button
-            type="button"
-            className={!moisture ? 'tab active' : 'tab'}
-            onClick={() => setMetric('temperature')}
-          >
-            Temperature
-          </button>
-        </div>
-        {!moisture && (
-          <div className="range-row">
-            <button
-              type="button"
-              className={unit === 'C' ? 'tab active' : 'tab'}
-              onClick={() => chooseUnit('C')}
-            >
-              °C
-            </button>
-            <button
-              type="button"
-              className={unit === 'F' ? 'tab active' : 'tab'}
-              onClick={() => chooseUnit('F')}
-            >
-              °F
-            </button>
-          </div>
-        )}
+      {/* What to plot goes above the chart; how far back goes below it. The
+          unit sits at the end of the same row, so it appearing on Temperature
+          moves nothing under it. */}
+      <div className="history-toolbar">
+        <Segmented label="Show" options={METRICS} value={metric} onChange={setMetric} />
+        {!moisture && <Segmented label="Unit" options={UNITS} value={unit} onChange={chooseUnit} />}
       </div>
 
       {status && <p className="field-hint">{status}</p>}
@@ -222,14 +192,27 @@ export function HistoryPanel() {
       )}
 
       {hasData && (
+        <Chart
+          data={data}
+          series={series}
+          markers={history.waterings || []}
+          yRange={yRange}
+          yLabel={moisture ? 'Soil water %' : fahrenheit ? 'Temp °F' : 'Temp °C'}
+        />
+      )}
+
+      {/* Outside the chart's block, so a range with no readings still offers
+          the way to pick another one. */}
+      <Segmented
+        label="Time range"
+        className="history-range"
+        options={RANGES}
+        value={hours}
+        onChange={setHours}
+      />
+
+      {hasData && (
         <>
-          <Chart
-            data={data}
-            series={series}
-            markers={history.waterings || []}
-            yRange={yRange}
-            yLabel={moisture ? 'Soil water %' : fahrenheit ? 'Temp °F' : 'Temp °C'}
-          />
           <p className="field-hint">
             {history.waterings?.length === 1
               ? '1 watering in this range.'

@@ -1,6 +1,7 @@
 ## History
-The chart shows each pot's soil water over time. Choose 6 hours to 90 days
-along the top, and switch between moisture and temperature.
+The chart shows each pot's soil water over time. Switch between moisture and
+temperature (and °C or °F) above the chart, and choose 6 hours to 90 days
+below it.
 - **A flat dashed line** in a pot's color is the point that pot is watered at.
   When its line drops to it, the pot is due.
 - **Dashed vertical lines** are waterings that reached the soil.
