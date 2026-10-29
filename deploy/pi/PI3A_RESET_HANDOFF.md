@@ -88,12 +88,135 @@ Fresh 64-bit card, persistent journal on, installer run several times.
   USB-C output. So the Pi 4 working does not clear the micro-USB unit the
   Pi 3s share: that unit, or its built-in lead, could be the weak part.
 
+## Inline USB meter readings (2026-10-28)
+The meter sits between the converter's USB output and the Pi. Its voltage
+reads true; its current reads low below about 1 A (a Pi 4 at full load showed
+0.32 A, about 1.6 W against the 5-6 W it draws), though it read a phone's
+1.5 A charge correctly. Use its current only to compare one moment with
+another, not as a figure.
+
+| Converter | Board | Rest | Full load (4 cores) |
+|-----------|-------|------|---------------------|
+| USB-C (the Pi 4's) | Pi 4 B Rev 1.5, herman4 | 5.10 V | 5.05 V |
+| Micro-USB (shared by both Pi 3s) | Pi 3 | **4.90 V** | not yet |
+
+- **The micro-USB converter starts 0.2 V low**, at 4.90 V with almost no
+  load, under the 5.1 V a Pi 3 wants. Little is left before the Pi's
+  4.63 V under-voltage line, and a dip too fast to be flagged can go below
+  the point the Pi resets at. This is the part both Pi 3s share and the Pi 4
+  does not.
+- **No backfeed from the SKR V2 on herman4:** unplugging its USB cut the
+  Pi's draw rather than raising it, so the SKR draws a little from the Pi
+  over USB (about 30 mA by this meter) and supplies none.
+- **Backfeed from the SKR V3: suspected, then mostly cleared.** Plugging
+  its USB into the Pi 3 once *lowered* the current through the meter, which
+  would mean the SKR took over part of the Pi's load. But with a Pi 3 B's SD
+  card out and its own power unplugged, the SKR on 12 V and on its USB port
+  did **not** light the red LED, so the SKR cannot carry a Pi. That LED is a
+  power-good light (about 4.63 V), so a weak path through a diode is not
+  quite ruled out, and the one drop may have been idle noise on a meter
+  that reads low currents poorly. (No ground ran from the Pi to the 12 V
+  side for that test; the cable's own ground is the return, so it did not
+  matter.)
+- **The SKR V2 also lowers the Pi 3's current when plugged in**, so both
+  boards put their 5 V on the cable whatever the jumper says. Read that way,
+  the two 5 V rails are joined through the cable and the higher one feeds
+  the other: on herman4 (5.10 V) the Pi feeds the V2, which is the "draw"
+  noted above; on the Pi 3 (4.90 V) the SKR feeds the Pi.
+- **Swap: the V2 on the Pi 3 B installs fine.** Same Pi, the V3 resets it,
+  the V2 does not -- so the V3 is necessary, and the Pi boards are cleared.
+  Working idea: the V3 carries more of the Pi's load than the V2, and when
+  Klipper resets its chip that share drops at once onto a converter with no
+  headroom. Or the V3 draws a surge at that moment instead. Either way it is
+  the V3 together with the weak converter.
+- **The V2 installs fine on the Pi 3 A+ too.** Both Pi 3s: V2 fine, V3 resets.
+- **5 V cut, still resets (2026-10-29).** The V3 on the Pi 3 B through a
+  cable with its red 5 V wire removed (checked against the pinout) still
+  stopped the install at "Verifying Klipper connection". **Power through
+  the cable's 5 V is not the cause**, and a 5 V blocker would not fix it.
+- **The current drop was never backfeed.** With the 5 V wire gone the meter
+  still read less with the SKR plugged in. The meter measures on the ground
+  wire, and the Pi has other ground paths back to the 12 V negative: through
+  the converter, the SKR's USB cable, and (on herman4) the LED strip's ground
+  on pin 20. Return current shared across them skips the meter. That is
+  also why herman4 read about a fifth of a Pi 4's draw while the meter read
+  a phone, with no loop, correctly. **On this rig the meter's current means
+  nothing; its voltage still holds.**
+- **Nothing in printer.cfg switches on at configure**: the pump starts at
+  `value: 0` and the steppers stay disabled until a move.
+- **New suspect: the Pi 3's USB host driver (dwc_otg), not power.** Both
+  Pi 3s use it and the Pi 4 does not, and the V3's STM32G0B1 has a different
+  USB block from the V2's F103. Klipper resets the MCU at start, so the
+  board drops off USB and comes back. A hard lockup there leaves a journal
+  that just stops, with no under-voltage, and a watchdog reboot after it
+  looks like power loss.
+- **`dwc_otg.speed=1` test: inconclusive (2026-10-29).** Fresh card,
+  setting confirmed (`/sys/module/dwc_otg/parameters/speed` read 1), V3 on
+  the cut cable, the 4.90 V converter. The install died **early, while apt
+  was unpacking**, well before Klipper. The previous boot ended in Wi-Fi
+  chip errors (`brcmf_sdio_txfail`, `failed backplane access over SDIO,
+  halting operation`) for at least 24 s, with no USB errors. The setting
+  never got its chance. Also: the setting only removes the hub's speed
+  translation, and the A+ has no hub, so it was never likely to explain the
+  A+.
+- **The Pi 3 B is under-voltage on this converter even near idle.** After
+  that reset, in a 6-minute-old boot: `throttled=0x50000` and four
+  "Undervoltage detected!" episodes of 4-6 s each, two during boot and two
+  while running a few shell commands. Earlier runs read 0x0, so something in
+  the chain got worse: the meter's extra connectors and shunt, a worn
+  micro-USB plug or lead, or the plain 3 B drawing more than the A+.
+  `get_rsts=1000` after it (not yet compared with a clean reboot's value).
+  **Every Pi 3 result on this converter is now suspect**; that card also
+  needs reflashing after dying mid-unpack.
+- **Board jumpers checked.** The V3's factory-fitted jumper is the 5 V source
+  selector (onboard supply vs BTT's DCDC5V add-on) for the BLTouch, TFT and
+  RGB headers, and stays on. The separate USB_5V jumper (below the I/O
+  header) is the one used for flashing and is off.
+
+## Next session (from 2026-10-29)
+Nothing below runs on the 4.90 V converter. Every run: fresh card, no
+`dwc_otg.speed=1`, the meter out of the chain, the shortest lead, the V3 on
+a normal (uncut) cable. Pass is no reset through the install, then
+`uptime` and `vcgencmd get_throttled` reading `0x0`.
+
+1. **The V3 on a good supply.** Either an official Pi micro-USB supply
+   (5.1 V, 2.5 A) or the new buck converter, measured first: at least 5.1 V
+   at the Pi at rest, about 5.0 V or more under the stress loop. A wall
+   supply fixes the voltage *and* drops the converter's ground path, so a
+   pass there does not say which; the buck converter keeps the ground tied,
+   so a pass there means voltage was the cause and a single-plug design
+   works.
+2. **If it still resets on a good supply: a USB isolator** (ADuM3160 type,
+   full speed only, which is all the SKR uses). It breaks both 5 V and
+   ground between Pi and SKR. A pass means the ground path; a fail clears
+   power and ground both and leaves the V3 itself.
+3. **Decision either way.** The V2 works on every Pi tried, but is the older
+   board and may be scarce, so check it can be bought in quantity before
+   committing to it. If the V3 passes on a good supply, use the V3 and
+   specify the supply instead. Manta with a CM4/CB1 was set aside: a
+   redesign, and modules hard to find.
+
+   **Update 2026-10-29: an SKR Pico was bought.** It powers the Pi itself
+   (TPS5450, set to about 4.99 V, 3.5 A fuse) and talks over UART, which takes
+   the USB link and the ground loop out of the picture altogether. It's
+   supported in software now: [../SKR_PICO.md](../SKR_PICO.md). Its
+   *First power-up* checks are the next hardware test, and may make tests 1
+   and 2 above moot.
+
+Uncommitted doc edits made during this session and not yet decided:
+`BOM.md` and `POWER_SYSTEM.md` were changed to require a 5.1 V minimum
+converter. The V2 installing fine on the 4.90 V unit weakens that as a hard
+rule; settle the wording after step 1.
+
 ## Ruled out or unlikely so far
-- **The A+ board itself:** a Pi 3 B+ resets the same way (see above).
+- **The A+ board itself:** a Pi 3 B+ resets the same way (see above), and a
+  Pi 3 B with the V2 instead of the V3 installs fine (2026-10-28).
 - **`core_freq=250`:** removed, and it still happened.
 - **`core_freq=400`, heat, CPU load, Klipper and its C helper compile:**
   see 2026-10-27 above.
-- **The SKR drawing power over USB:** the SW_USB jumper is off.
+- **The SKR drawing power over USB:** the SW_USB jumper is off. **Not the
+  same as the SKR *feeding* power over USB**, which it does anyway (see the
+  meter readings above), so this line no longer clears the USB link.
 - **Running out of memory:** plenty free.
 - **Klipper failing to connect:** the installer's "not reached the motion
   board" warning was a bug in its check (fixed in commit c7936be). The board
@@ -113,13 +236,18 @@ Fresh 64-bit card, persistent journal on, installer run several times.
    and which of the two it follows (swap the SKRs). The B+ resetting too
    weakens the "no hub chip" part of this and points at the V3 or the supply.
 2. **Fast power dips** from the DC-DC converter or the micro-USB lead, which
-   the SKR connection may only be exposing. An inline USB meter that records
-   the minimum voltage is on order. Both Pi 3s use micro-USB; the Pi 4 does
-   not.
+   the SKR connection may only be exposing. Both Pi 3s use micro-USB; the
+   Pi 4 does not. **Update 2026-10-28:** this is now the leading suspect. The
+   micro-USB converter reads 4.90 V at rest against 5.10 V on the Pi 4's (see
+   the meter readings above), and backfeed from the SKR is mostly cleared.
 
 The SD card has dropped out: `mmc0` stayed clean through every reset.
 
 ## Fixes to try, in order
+0. **A good supply for the Pi**, then a **USB isolator** -- see "Next
+   session" above. (A 5 V blocker was tried as a cut 5 V wire and did not
+   help; `dwc_otg.speed=1` was tried but the run died of under-voltage
+   first.)
 1. A **powered USB hub** between the Pi and the SKR.
 2. A **separate 5 V supply for the Pi** (an official Pi supply) instead of
    the DC-DC converter off the 12 V rail.

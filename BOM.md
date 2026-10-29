@@ -253,7 +253,7 @@ from the Pi with no level shifter.
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
 | 12 V power supply, 5 A min (7 A recommended) | 1 | $15.00 | $15.00 | the only supply in the build |
-| DC-DC converter, 12 V to 5 V @ 3 A | 1 | $10.00 | $10.00 | Yipin hexa; this is what powers the Pi. Buy the version whose output plug fits the board: **micro-USB** for a Pi 3 A+ / 3 B+, **USB-C** for a Pi 4 |
+| DC-DC converter, 12 V to 5.1 V min @ 3 A | 1 | $10.00 | $10.00 | Yipin hexa; this is what powers the Pi. **Must put out at least 5.1 V**: a 5.0 V unit leaves the Pi no margin, and the micro-USB one measured 4.90 V. Buy the version whose output plug fits the board: **micro-USB** for a Pi 3 A+ / 3 B+, **USB-C** for a Pi 4 |
 | Fuse, 5 A fast-blow | 1 | TBD | TBD | charger output into the busbar |
 | Fuse, 1 A fast-blow | 1 | TBD | TBD | SKR HB to pump positive |
 | Fuse, 2 A fast-blow | 1 | TBD | TBD | busbar to strip +12 V |

@@ -139,7 +139,10 @@ another density needs `LED_COUNT` in `.env`, and then in pixels, not LEDs.
 ## DC-DC Converter Specifications
 
 - **Input:** 12V DC (8-18V range typical)
-- **Output:** 5V DC @ 3A (15W continuous)
+- **Output:** 5.1V DC minimum @ 3A (15W continuous). Not 5.0V: a Pi 3 on a
+  micro-USB unit measuring 4.90V logged under-voltage at idle and reset with
+  an SKR Mini E3 V3 attached, while a Pi 4 on a 5.10V unit ran clean. (An SKR
+  Pico powers the Pi itself instead; see deploy/SKR_PICO.md.)
 - **Efficiency:** ~85-90%
 - **Purpose:** Powers Raspberry Pi, camera, and sensors
 - **Mounting:** Secure with thermal paste or small heatsink to prevent shutdown under load
@@ -266,7 +269,7 @@ carry. They are short runs, so this costs nothing but stiffness.
 
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
-| Pi won't boot / reboots randomly | Low 5V voltage | Check DC-DC input/output; may need heatsink |
+| Pi won't boot / reboots randomly | Low 5V voltage | Measure the converter's output at the Pi; under 5.1V at rest, replace it. May need heatsink |
 | Pump doesn't run | Blown 1A fuse | Check for shorts in pump wiring, and that the flyback diode is not reversed |
 | Strip dead but everything else fine | Blown 2A LED fuse | Inspect the strip's input end for a solder bridge |
 | LEDs flicker or dim | Voltage sag under LED draw | Upgrade charger or add capacitor |
