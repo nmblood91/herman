@@ -216,9 +216,13 @@ if [ ! -f "$DIRECTION_CFG" ]; then
   echo "✓ Created motor-direction.cfg (no override yet)"
 fi
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "Installing Node.js 20 LTS..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+# Node 24 LTS. Was 20, which went end of life in April 2026. Checked by major
+# version rather than presence, so a Pi still on 20 is moved up the next time
+# this runs instead of building on it forever. npm comes with it.
+NODE_MAJOR=24
+if [ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -lt "$NODE_MAJOR" ]; then
+  echo "Installing Node.js $NODE_MAJOR LTS..."
+  curl -fsSL "https://deb.nodesource.com/setup_$NODE_MAJOR.x" | sudo -E bash -
   sudo apt install -y nodejs
 fi
 
