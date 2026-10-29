@@ -267,6 +267,9 @@ export function PlantsPanel({
   onLoadProfile,
   onClearProfile,
   soils,
+  // Whether the pot list has arrived yet, so an empty one can say so rather
+  // than leave a bare heading.
+  loaded = true,
   onMove,
   onRefresh,
 }) {
@@ -442,6 +445,7 @@ export function PlantsPanel({
   return (
     <section className="panel-section">
       <h2>Active Plants</h2>
+      {!plants.length && !loaded && <p className="field-hint">Loading pots…</p>}
       <div className="cards">
         {plants.map((plant) => {
           const draft = drafts[plant.plant_id] || draftFrom(plant)

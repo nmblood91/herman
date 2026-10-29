@@ -25,10 +25,21 @@ import { API_BASE } from './api'
 import { describeLighting } from './time'
 
 const fetchJson = async (path, options = {}) => {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
+  let response
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    })
+  } catch (error) {
+    // No answer at all: the Pi is off the network, rebooting, or wedged past
+    // the timeout below. The browser's own wording ("Failed to fetch", "signal
+    // timed out") says none of that.
+    if (error.name === 'TypeError' || error.name === 'TimeoutError') {
+      throw new Error('The planter is not answering. It may be restarting.', { cause: error })
+    }
+    throw error
+  }
 
   // Read as text first: while the API restarts, nginx answers with an HTML
   // error page, and parsing that as JSON surfaced as "Unexpected token '<'".
@@ -58,6 +69,19 @@ const GANTRY_POLL_MS = 1000
 // status bar kept saying whatever was true then -- "test the motor direction"
 // long after it had passed on another device.
 const OVERVIEW_POLL_MS = 15000
+// How soon a dashboard load that came back incomplete is tried again. Far
+// sooner than the poll above, and it has to exist at all: the poll only reads
+// the overview, so a pot list or library that failed on page load used to stay
+// empty until someone reloaded the page.
+const RETRY_MS = 3000
+// A dashboard read that has not answered by now counts as failed, so a wedged
+// Pi shows up as a retry rather than a page that waits forever. Only the
+// reads: a watering request legitimately takes over a minute.
+const LOAD_TIMEOUT_MS = 10000
+
+// "a", "a and b", "a, b and c".
+const joinNames = (names) =>
+  names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 
 function App() {
   const [activeTab, setActiveTab] = useState('plants')
@@ -67,6 +91,15 @@ function App() {
   // plant changes it, so it has to refresh on the same beat.
   const [profiles, setProfiles] = useState([])
   const [soils, setSoils] = useState([])
+  // Which lists have arrived at least once. An empty list means two different
+  // things -- "not heard yet" and "there are none" -- and the panels warn that
+  // the library was deleted on the second, which is alarming and wrong on the
+  // first.
+  const [loaded, setLoaded] = useState({ plants: false, profiles: false, soils: false })
+  // What the last dashboard load could not get, or ''. Kept apart from
+  // `action` because it must not expire while it is still true.
+  const [loadProblem, setLoadProblem] = useState('')
+  const loadsInFlight = useRef(0)
   // Transient feedback from something the user just did. Clears itself so the
   // bar falls back to the planter's actual state rather than freezing on the
   // last thing that happened to be clicked.
@@ -87,30 +120,52 @@ function App() {
   // the move, so a successful request is not a successful move.
   const describeResult = (result) => (result?.ok === false ? `failed - ${result.error}` : 'ok')
 
+  // Each read stands alone. This was one Promise.all, so a single slow or
+  // failed read -- the overview mid-restart, say -- threw away the three that
+  // had answered and left the pots and both libraries empty. Now whatever
+  // arrived is shown, whatever did not keeps its last good copy, and the gap
+  // is named in the status bar until a retry fills it.
   const loadDashboard = useCallback(async () => {
+    loadsInFlight.current += 1
     try {
-      const [overviewData, plantsData, profileData, soilData] = await Promise.all([
-        fetchJson('/overview'),
-        fetchJson('/plants'),
-        fetchJson('/plant-profiles'),
-        fetchJson('/soils'),
+      const read = (path) => fetchJson(path, { signal: AbortSignal.timeout(LOAD_TIMEOUT_MS) })
+      const [overviewResult, plantsResult, profileResult, soilResult] = await Promise.allSettled([
+        read('/overview'),
+        read('/plants'),
+        read('/plant-profiles'),
+        read('/soils'),
       ])
+      const ok = (result) => result.status === 'fulfilled'
 
-      setOverview(overviewData)
-      setPlants(plantsData)
-      setProfiles(profileData.profiles ?? [])
-      setSoils(soilData.soils ?? [])
+      if (ok(overviewResult)) setOverview(overviewResult.value)
+      if (ok(plantsResult)) setPlants(plantsResult.value)
+      if (ok(profileResult)) setProfiles(profileResult.value.profiles ?? [])
+      if (ok(soilResult)) setSoils(soilResult.value.soils ?? [])
+      setLoaded((prev) => ({
+        plants: prev.plants || ok(plantsResult),
+        profiles: prev.profiles || ok(profileResult),
+        soils: prev.soils || ok(soilResult),
+      }))
+
+      const failed = [
+        ['the planter status', overviewResult],
+        ['the pots', plantsResult],
+        ['the plant profiles', profileResult],
+        ['the soil profiles', soilResult],
+      ].filter(([, result]) => !ok(result))
       // Deliberately does not touch `action`. This runs after every action, so
-      // writing to the status bar here would wipe the feedback from whatever
-      // the user just pressed. The bar falls back to the planter's computed
-      // state from overview.system_status on its own once `action` expires.
-    } catch (error) {
-      setStatus(`Connection failed: ${error.message}`)
+      // writing to it here would wipe the feedback from whatever the user just
+      // pressed; loadProblem shows once that feedback expires.
+      setLoadProblem(
+        failed.length
+          ? `Could not load ${joinNames(failed.map(([name]) => name))}: ` +
+              `${failed[0][1].reason.message} Retrying...`
+          : '',
+      )
+    } finally {
+      loadsInFlight.current -= 1
     }
-    // setStatus is itself a stable useCallback, so this stays stable too and
-    // the mount effect below can depend on it honestly rather than
-    // suppressing the dependency warning.
-  }, [setStatus])
+  }, [])
 
   useEffect(() => {
     // Guarded rather than a bare loadDashboard(): a response that lands after
@@ -125,6 +180,17 @@ function App() {
       canceled = true
     }
   }, [loadDashboard])
+
+  // Until a load comes back whole. Skipped while one is still out, so a Pi
+  // that answers slowly is not buried under overlapping retries, and while the
+  // page is hidden -- the next tick after it comes back catches up.
+  useEffect(() => {
+    if (!loadProblem) return undefined
+    const id = setInterval(() => {
+      if (loadsInFlight.current === 0 && document.visibilityState === 'visible') loadDashboard()
+    }, RETRY_MS)
+    return () => clearInterval(id)
+  }, [loadProblem, loadDashboard])
 
   // Only the overview: the plant list, profiles and soils feed editors, and
   // those are re-read after each save rather than under someone's typing.
@@ -365,8 +431,12 @@ function App() {
           from something you just did while that is fresh, otherwise the
           planter's own computed state -- never the log, which is a record of
           what was written rather than a description of what is true. */}
-      <div className={`status-bar ${action ? '' : `level-${systemStatus.level}`}`}>
-        {action || systemStatus.message}
+      <div
+        className={`status-bar ${
+          action ? '' : loadProblem ? 'level-problem' : `level-${systemStatus.level}`
+        }`}
+      >
+        {action || loadProblem || systemStatus.message}
       </div>
 
       {activeTab === 'plants' && (
@@ -380,14 +450,25 @@ function App() {
             onLoadProfile={loadProfile}
             onClearProfile={clearProfile}
             soils={soils}
+            loaded={loaded.plants}
             onMove={moveGantry}
             onRefresh={loadDashboard}
           />
           {/* Below the cards, because both are libraries the cards pick from:
               a plant and a mix are chosen from dropdowns up there, so editing
               them belongs on the same tab rather than one away. */}
-          <PlantEditorPanel profiles={profiles} soils={soils} onRefresh={loadDashboard} />
-          <SoilPanel soils={soils} plants={plants} onRefresh={loadDashboard} />
+          <PlantEditorPanel
+            profiles={profiles}
+            soils={soils}
+            loaded={loaded.profiles}
+            onRefresh={loadDashboard}
+          />
+          <SoilPanel
+            soils={soils}
+            plants={plants}
+            loaded={loaded.soils}
+            onRefresh={loadDashboard}
+          />
           <LibraryBackupPanel onRefresh={loadDashboard} />
         </>
       )}

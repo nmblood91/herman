@@ -27,7 +27,9 @@ const BLANK = {
 // The sensor readings as the form shows them: blank for none.
 const rawText = (value) => (value == null ? '' : String(value))
 
-export function SoilPanel({ soils, plants, onRefresh }) {
+// loaded: whether the soil list has arrived yet. Until it has, an empty list
+// means "not heard yet", not "they were all deleted".
+export function SoilPanel({ soils, plants, loaded = true, onRefresh }) {
   // 'new' types a free name below; 'existing' turns that field into a picker
   // over the list. Picked is only ever non-empty in 'existing' mode -- every
   // path back to 'new' clears it, so the two stay in lockstep. Same split as
@@ -339,7 +341,8 @@ export function SoilPanel({ soils, plants, onRefresh }) {
               Edit Profile
             </button>
           </div>
-          {!list.length && (
+          {!list.length && !loaded && <p className="field-hint">Loading soil profiles…</p>}
+          {!list.length && loaded && (
             <p className="field-hint warning">
               No soil profiles. The installer adds a starting set, so this
               means they were all deleted — add your own below, or put the set

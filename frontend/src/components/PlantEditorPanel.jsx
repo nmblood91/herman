@@ -57,7 +57,9 @@ const DELETE_HOLD_MS = 5000
 // Nothing here touches a pot. A plant becomes real on a pot when you load it
 // from that pot's card, which is the same direction the whole pot/plant split
 // runs in: this names what a plant wants, the card says where it lives.
-export function PlantEditorPanel({ profiles, soils, onRefresh }) {
+// loaded: whether the profile list has arrived yet. Until it has, an empty
+// list means "not heard yet", not "they were all deleted".
+export function PlantEditorPanel({ profiles, soils, loaded = true, onRefresh }) {
   // 'new' types a free name below; 'existing' turns that field into a picker
   // over the list. Picked is only ever non-empty in 'existing' mode -- every
   // path back to 'new' clears it, so the two stay in lockstep.
@@ -217,7 +219,8 @@ export function PlantEditorPanel({ profiles, soils, onRefresh }) {
               Edit Profile
             </button>
           </div>
-          {!list.length && (
+          {!list.length && !loaded && <p className="field-hint">Loading plant profiles…</p>}
+          {!list.length && loaded && (
             <p className="field-hint warning">
               No plant profiles. The installer adds a starter set, so this means
               they were all deleted — fill the form below, or put the set back
