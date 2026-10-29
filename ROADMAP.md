@@ -217,8 +217,9 @@ What the host actually has to provide:
    the strip works, and the two supported chip families need rates in windows
    that barely touch.
 4. **WiFi**, there being no Ethernet in the chassis plan.
-5. **A USB host port** for the SKR serial link. Not negotiable — see below
-   for why GPIO UART is not the escape hatch it looks like.
+5. **A USB host port** for the SKR serial link, with an SKR Mini E3 — see
+   below for why GPIO UART is not the escape hatch it looks like there, and
+   why the SKR Pico is different.
 
 Requirement 3 is the one that eliminates whole categories, because `spidev`
 silently substitutes the nearest rate its driver supports. A host that cannot
@@ -307,6 +308,14 @@ surgery plus giving up the serial console. On top of that it trades one plug
 for a hand-wired link across the enclosure, and the SKR has to be reflashed for
 serial-on-USART, which costs the USB recovery path. A motion link that can
 desync under thermal load is the wrong place to economise.
+
+**That is the SKR Mini E3's case, and the SKR Pico answers most of it**
+([deploy/SKR_PICO.md](deploy/SKR_PICO.md), supported, not yet proven on the
+planter). `disable-bt` gives the PL011 to the header, so the link never sees the
+core clock; the RP2040's boot ROM keeps USB recovery whatever firmware is on
+it; and the link is one ready-made cable that also carries the Pi's power. What
+remains is the boot-config surgery, which the installer does, and Bluetooth,
+which goes off until BLE provisioning needs it back.
 
 That leaves two honest options, and the second is better:
 

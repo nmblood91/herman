@@ -45,8 +45,8 @@ export function VersionPanel() {
               The SKR&apos;s firmware ({build.klipper.mcu}) was built from a
               different Klipper than the one on the Pi ({build.klipper.host}).
               The gantry and pump may stop responding. Flash
-              the firmware.bin for your board (deploy/klipper/skr-mini-e3-v2
-              or skr-mini-e3-v3) from an SD card, or
+              your board&apos;s firmware from deploy/klipper (from an SD card
+              for an SKR Mini E3, the Boot jumper and USB for an SKR Pico), or
               re-run the installer to put the Pi back on the pinned Klipper.
             </p>
           )}

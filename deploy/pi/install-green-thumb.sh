@@ -13,6 +13,49 @@ if [ "$ARCH" != "arm64" ]; then
   exit 1
 fi
 
+# Which motion board drives the gantry. An SKR Mini E3 (V2 or V3) is found on
+# USB by itself. An SKR Pico talks over the Pi's GPIO UART, where nothing can be
+# detected before Klipper is already configured for it, so it is named once:
+#
+#   sudo bash install-green-thumb.sh --board skr-pico
+#
+# and remembered, so a later plain re-run keeps it. A Pi installed before the
+# board was remembered has a printer.cfg and no record, and was a Mini E3.
+BOARD_FILE=/home/pi/printer_data/motion-board
+SAVED_BOARD=$(cat "$BOARD_FILE" 2>/dev/null || true)
+if [ -z "$SAVED_BOARD" ] && [ -f /home/pi/printer_data/config/printer.cfg ]; then
+  SAVED_BOARD=skr-mini-e3
+fi
+BOARD=${SAVED_BOARD:-skr-mini-e3}
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --board)
+      if [ "$#" -lt 2 ]; then
+        echo "--board needs a value: skr-mini-e3 or skr-pico"
+        exit 1
+      fi
+      BOARD=$2
+      shift 2
+      ;;
+    --board=*)
+      BOARD=${1#--board=}
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1 (the only option is --board skr-mini-e3|skr-pico)"
+      exit 1
+      ;;
+  esac
+done
+case "$BOARD" in
+  skr-mini-e3 | skr-pico) ;;
+  *)
+    echo "Unknown board: $BOARD. Use skr-mini-e3 (V2 or V3) or skr-pico."
+    exit 1
+    ;;
+esac
+echo "Motion board: $BOARD"
+
 # Enable I2C interface for sensor communication
 echo "Enabling I2C interface..."
 sudo raspi-config nonint do_i2c 0
@@ -89,6 +132,52 @@ elif [ -z "$CORE_CLOCK_SETTINGS" ]; then
   echo "⚠️  Unrecognized board ($MODEL); leaving the core clock as it is"
 fi
 
+# The SKR Pico's link: the Pi's GPIO UART on header pins 8 and 10, as
+# /dev/ttyAMA0 at Klipper's 250000 baud. A Pi 3 or 4 gives its good UART, the
+# PL011, to Bluetooth and puts the mini-UART on the header, and the mini-UART's
+# baud rate follows the core clock -- which is deliberately left unpinned on a
+# Pi 3 (above), so Klipper over it would drift as the clock does. disable-bt
+# moves the PL011 to the header instead. That turns Bluetooth off: nothing uses
+# it yet, but BLE provisioning (ROADMAP.md) would need it back, on the
+# mini-UART, which means a pinned core clock. The serial console has to go too,
+# or a login prompt answers Klipper on the same wire. Only for the Pico; a USB
+# board leaves all of this as it was.
+UART_CHANGED=0
+if [ "$BOARD" = "skr-pico" ]; then
+  if [ -f "$BOOT_CONFIG" ]; then
+    if grep -q "^enable_uart=1$" "$BOOT_CONFIG"; then
+      :
+    elif grep -q "^enable_uart=" "$BOOT_CONFIG"; then
+      sudo sed -i "s/^enable_uart=.*/enable_uart=1/" "$BOOT_CONFIG"
+      UART_CHANGED=1
+    else
+      echo "enable_uart=1" | sudo tee -a "$BOOT_CONFIG" >/dev/null
+      UART_CHANGED=1
+    fi
+    if ! grep -q "^dtoverlay=disable-bt$" "$BOOT_CONFIG"; then
+      echo "dtoverlay=disable-bt" | sudo tee -a "$BOOT_CONFIG" >/dev/null
+      UART_CHANGED=1
+    fi
+  else
+    echo "⚠️  No boot config found; the SKR Pico's UART cannot be enabled"
+  fi
+  CMDLINE=/boot/firmware/cmdline.txt
+  [ -f "$CMDLINE" ] || CMDLINE=/boot/cmdline.txt
+  if [ -f "$CMDLINE" ] && grep -qE "console=(serial0|ttyAMA0|ttyS0)," "$CMDLINE"; then
+    sudo sed -i -E "s/ ?console=(serial0|ttyAMA0|ttyS0),[0-9]+//g; s/^ +//" "$CMDLINE"
+    UART_CHANGED=1
+  fi
+  # The Bluetooth modem service would otherwise keep trying the UART it lost.
+  sudo systemctl disable --now hciuart 2>/dev/null || true
+  # /dev/ttyAMA0 belongs to dialout, and Klipper runs as pi.
+  sudo usermod -aG dialout pi
+  if [ "$UART_CHANGED" -eq 1 ]; then
+    echo "✓ GPIO UART set up for the SKR Pico (applies after reboot)"
+  else
+    echo "✓ GPIO UART already set up for the SKR Pico"
+  fi
+fi
+
 # The API runs as pi, so it needs these groups to reach /dev/i2c-1 and
 # /dev/spidev0.0. Raspberry Pi OS usually grants them to the first user, but not
 # to one created later, and the failure looks like a wiring fault.
@@ -146,30 +235,38 @@ fi
 # Create printer_data and log directories
 sudo -u pi mkdir -p /home/pi/printer_data/config /home/pi/printer_data/gcodes /home/pi/klipper_logs
 
-# Auto-detect Klipper device with retry (up to 30 seconds)
-echo "Detecting Klipper device (waiting up to 30 seconds)..."
-KLIPPER_DEVICE=""
-for i in {1..30}; do
-  # grep exits non-zero when the board is not up yet, which pipefail would
-  # otherwise turn into an immediate exit instead of a retry.
-  KLIPPER_DEVICE=$(ls /dev/serial/by-id/ 2>/dev/null | grep -i klipper | head -1 || true)
-  if [ -n "$KLIPPER_DEVICE" ]; then
-    echo "✓ Found Klipper device: $KLIPPER_DEVICE"
-    break
-  fi
-  if [ $i -lt 30 ]; then
-    echo "  Waiting... ($i/30)"
-    sleep 1
-  fi
-done
+KLIPPER_SERIAL=""
+if [ "$BOARD" = "skr-pico" ]; then
+  # Fixed by the UART set up above, and present whether or not the Pico is.
+  KLIPPER_SERIAL=/dev/ttyAMA0
+  echo "✓ SKR Pico on the GPIO UART ($KLIPPER_SERIAL)"
+else
+  # Auto-detect Klipper device with retry (up to 30 seconds)
+  echo "Detecting Klipper device (waiting up to 30 seconds)..."
+  KLIPPER_DEVICE=""
+  for i in {1..30}; do
+    # grep exits non-zero when the board is not up yet, which pipefail would
+    # otherwise turn into an immediate exit instead of a retry.
+    KLIPPER_DEVICE=$(ls /dev/serial/by-id/ 2>/dev/null | grep -i klipper | head -1 || true)
+    if [ -n "$KLIPPER_DEVICE" ]; then
+      echo "✓ Found Klipper device: $KLIPPER_DEVICE"
+      KLIPPER_SERIAL=/dev/serial/by-id/$KLIPPER_DEVICE
+      break
+    fi
+    if [ $i -lt 30 ]; then
+      echo "  Waiting... ($i/30)"
+      sleep 1
+    fi
+  done
 
-if [ -z "$KLIPPER_DEVICE" ]; then
-  echo ""
-  echo "⚠️  No Klipper device detected after 30 seconds"
-  echo "Make sure your SKR board is connected and powered on."
-  echo "After connecting it, run:"
-  echo "  sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh"
-  echo ""
+  if [ -z "$KLIPPER_DEVICE" ]; then
+    echo ""
+    echo "⚠️  No Klipper device detected after 30 seconds"
+    echo "Make sure your SKR board is connected and powered on."
+    echo "After connecting it, run:"
+    echo "  sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh"
+    echo ""
+  fi
 fi
 
 # Generate printer.cfg from template with actual device ID.
@@ -179,10 +276,11 @@ fi
 # position_endstop is meant to be measured against your own switch mounting, so
 # back up anything that differs before replacing it rather than discarding it
 # silently. Nothing is written when the generated file already matches, so
-# re-running the script does not pile up backups.
+# re-running the script does not pile up backups. make-printer-cfg.py also
+# swaps the template's Mini E3 pins for the Pico's when that is the board.
 PRINTER_CFG=/home/pi/printer_data/config/printer.cfg
-if [ -n "$KLIPPER_DEVICE" ]; then
-  sed "s|serial: /dev/serial/by-id/usb-Klipper_xxx|serial: /dev/serial/by-id/$KLIPPER_DEVICE|" /opt/greenthumb/deploy/klipper/printer.cfg.example > /tmp/printer.cfg
+if [ -n "$KLIPPER_SERIAL" ]; then
+  python3 /opt/greenthumb/deploy/klipper/make-printer-cfg.py "$BOARD" "$KLIPPER_SERIAL" > /tmp/printer.cfg
   if [ -f "$PRINTER_CFG" ] && ! cmp -s /tmp/printer.cfg "$PRINTER_CFG"; then
     PRINTER_CFG_BACKUP="$PRINTER_CFG.$(date +%Y%m%d-%H%M%S).bak"
     sudo -u pi cp "$PRINTER_CFG" "$PRINTER_CFG_BACKUP"
@@ -207,6 +305,19 @@ fi
 # rewritten here: that is what lets a corrected direction survive this script
 # regenerating printer.cfg above.
 DIRECTION_CFG=/home/pi/printer_data/config/motor-direction.cfg
+# Except across a change of board. An override names a pin on the board it was
+# written for, which the other board does not have, and Klipper would refuse to
+# start over it. Nor does a passed test carry over: the motor now plugs into a
+# different connector. So the override goes here and the pass is cleared once
+# the API's environment exists, below, and nothing homes until the test on the
+# Calibration tab has been run again.
+BOARD_CHANGED=0
+if [ -n "$SAVED_BOARD" ] && [ "$BOARD" != "$SAVED_BOARD" ]; then
+  BOARD_CHANGED=1
+  sudo rm -f "$DIRECTION_CFG"
+  echo "⚠️  Motion board changed from $SAVED_BOARD to $BOARD: run the motor direction"
+  echo "    test on the Calibration tab again before homing."
+fi
 if [ ! -f "$DIRECTION_CFG" ]; then
   printf '%s\n' \
     "# Written by Herman's motor direction test, on the Calibration tab." \
@@ -386,22 +497,35 @@ while not data.endswith(b"\x03"):
 sys.exit(0 if json.loads(data.rstrip(b"\x03"))["result"]["state"] == "ready" else 1)
 PYEOF
 }
-echo "Verifying Klipper connection (up to 60 s)..."
+if [ "$BOARD" = "skr-pico" ]; then
+  LINK_HINT="the Pico's 5-wire cable to header pins 2-10"
+else
+  LINK_HINT="the SKR's USB cable"
+fi
 KLIPPER_OK=0
-for i in $(seq 1 30); do
-  sleep 2
-  printf "."
-  if klipper_ready; then
-    KLIPPER_OK=1
-    break
-  fi
-done
-echo ""
-if [ "$KLIPPER_OK" -eq 1 ]; then
+if [ "$UART_CHANGED" -eq 1 ]; then
+  # The UART the Pico answers on does not exist until the reboot, so there is
+  # nothing to wait for yet.
+  echo "Klipper will reach the SKR Pico after the reboot below."
+else
+  echo "Verifying Klipper connection (up to 60 s)..."
+  for i in $(seq 1 30); do
+    sleep 2
+    printf "."
+    if klipper_ready; then
+      KLIPPER_OK=1
+      break
+    fi
+  done
+  echo ""
+fi
+if [ "$UART_CHANGED" -eq 1 ]; then
+  :
+elif [ "$KLIPPER_OK" -eq 1 ]; then
   echo "✓ Klipper connected to the motion board"
 elif [ -S /run/klipper/uds ]; then
   echo "⚠️  Klipper is running but has not reached the motion board."
-  echo "    Check the SKR's USB cable and power, then: tail -30 ~/klipper_logs/klippy.log"
+  echo "    Check $LINK_HINT and the board's 12V, then: tail -30 ~/klipper_logs/klippy.log"
 else
   echo "⚠️  Klipper is not running. The last thing it said:"
   sudo journalctl -u klipper -n 15 --no-pager
@@ -458,6 +582,18 @@ fi
 
 sudo cp /opt/greenthumb/deploy/systemd/greenthumb-api.service /etc/systemd/system/greenthumb-api.service
 sudo systemctl daemon-reload
+# The other half of a board change (see motor-direction.cfg above): forget the
+# direction test's pass. With the API stopped first, so it cannot write its
+# own copy of the pass back before the restart below reads this one.
+if [ "$BOARD_CHANGED" -eq 1 ]; then
+  sudo systemctl stop greenthumb-api.service 2>/dev/null || true
+  sudo -u pi /opt/greenthumb/.venv/bin/python -c \
+    "from greenthumb import state; state.update_state({'motor_direction': {'checked': False}})"
+  echo "✓ Cleared the motor direction test's pass"
+fi
+# Recorded only now, with everything above done: an install that stopped
+# partway still sees the board as changed when it is run again.
+echo "$BOARD" | sudo -u pi tee "$BOARD_FILE" >/dev/null
 # Same as Klipper above: `--now` would not restart an already-running service,
 # so a pull that brought new Python kept being served by the old process.
 sudo systemctl enable greenthumb-api.service
@@ -501,6 +637,8 @@ printf "API docs: http://$(hostname -I | awk '{print $1}')/docs\n"
 
 if [ "$REBOOT_NEEDED" -eq 1 ]; then
   printf "\n⚠️  Reboot required to finish enabling I2C/SPI, then re-run this script.\n"
+elif [ "$UART_CHANGED" -eq 1 ]; then
+  printf "\n⚠️  Reboot to bring up the SKR Pico's UART: sudo reboot\n"
 elif [ "$I2C_CLOCK_CHANGED" -eq 1 ] || [ "$CORE_CLOCK_CHANGED" -eq 1 ]; then
   printf "\n⚠️  Reboot to apply the new clock settings.\n"
 fi

@@ -1,0 +1,24 @@
+# printer.cfg.example names the SKR Mini E3's pins. This maps each one to the
+# SKR Pico pin on the same header, so the one template serves both boards:
+# make-printer-cfg.py swaps every name below, comments included, so the prose
+# keeps describing the board it is on. Pico pins from Klipper's
+# config/generic-bigtreetech-skr-pico-v1.0.cfg and BTT's pinout.
+#
+# Mini E3   Pico     header
+PB13        gpio11   # X motor step
+PB12        gpio10   # X motor dir
+PB14        gpio12   # X motor enable
+PC0         gpio4    # X-STOP
+PC11        gpio9    # driver UART RX (all four drivers share it)
+PC10        gpio8    # driver UART TX
+PB10        gpio6    # Y motor step
+PB2         gpio5    # Y motor dir
+PB11        gpio7    # Y motor enable
+PC1         gpio3    # Y-STOP, a spare input
+PB0         gpio19   # Z motor step
+PC5         gpio28   # Z motor dir
+PB1         gpio2    # Z motor enable
+PC2         gpio25   # Z-STOP, a spare input
+PC15        gpio16   # E0-STOP, the Y placeholder's endstop
+PC14        gpio22   # PROBE, the Z placeholder's endstop
+PC9         gpio21   # HB, the pump

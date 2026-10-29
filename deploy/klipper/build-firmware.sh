@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Rebuild firmware.bin for each supported SKR board from the commit in
+# Rebuild the firmware for each supported SKR board from the commit in
 # KLIPPER_COMMIT.
 #
 # Each board has a folder here holding its build options (klipper.config) and
-# the firmware built from them (firmware.bin), so the file copied to the SD
-# card already has the name the bootloader wants:
+# the firmware built from them, named the way that board is flashed:
 #
-#   skr-mini-e3-v2/   STM32F103, 28 KiB bootloader
-#   skr-mini-e3-v3/   STM32G0B1, 8 KiB bootloader
+#   skr-mini-e3-v2/   STM32F103, 28 KiB bootloader   firmware.bin, SD card
+#   skr-mini-e3-v3/   STM32G0B1, 8 KiB bootloader    firmware.bin, SD card
+#   skr-pico/         RP2040, UART to the Pi         firmware.uf2, USB drive
 #
 #   ./build-firmware.sh                    # every board
 #   ./build-firmware.sh skr-mini-e3-v3     # just one
 #
 # Only needed when moving Klipper to a new commit or adding a board: change
-# KLIPPER_COMMIT, run this, flash the new firmware.bin from an SD card
-# (deploy/README.md), check the planter homes and waters, then commit them
-# together. tests/test_firmware_pin.py fails until every board's firmware.bin
-# matches KLIPPER_COMMIT.
+# KLIPPER_COMMIT, run this, flash the new firmware (deploy/README.md), check
+# the planter homes and waters, then commit them together.
+# tests/test_firmware_pin.py fails until every board's firmware matches
+# KLIPPER_COMMIT.
 #
 # Needs Linux with: git make gcc-arm-none-eabi binutils-arm-none-eabi
 # libnewlib-arm-none-eabi python3 (a Pi or WSL both work).
@@ -50,6 +50,14 @@ for board in "${BOARDS[@]}"; do
   grep -v '^#' "$config" >"$WORK/klipper/.config"
   make -C "$WORK/klipper" olddefconfig >/dev/null
   make -C "$WORK/klipper" -j"$(nproc)" >/dev/null
-  cp "$WORK/klipper/out/klipper.bin" "$HERE/$board/firmware.bin"
-  echo "Built $board/firmware.bin from Klipper $(git -C "$WORK/klipper" rev-parse --short HEAD)"
+  # An RP2040 with no bootloader builds only a .uf2, the file its boot ROM's
+  # USB drive takes; the STM32 boards build a .bin for their SD bootloader.
+  if [ -f "$WORK/klipper/out/klipper.uf2" ]; then
+    firmware=firmware.uf2
+    cp "$WORK/klipper/out/klipper.uf2" "$HERE/$board/$firmware"
+  else
+    firmware=firmware.bin
+    cp "$WORK/klipper/out/klipper.bin" "$HERE/$board/$firmware"
+  fi
+  echo "Built $board/$firmware from Klipper $(git -C "$WORK/klipper" rev-parse --short HEAD)"
 done

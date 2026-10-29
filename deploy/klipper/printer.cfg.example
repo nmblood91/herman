@@ -1,3 +1,8 @@
+# Written by the installer from deploy/klipper/printer.cfg.example, which names
+# the SKR Mini E3's pins (V2 and V3 share them). For an SKR Pico each is swapped
+# for the Pico pin on the same header: see make-printer-cfg.py and
+# skr-pico/pins.map. A change belongs in the template, not in the printer.cfg
+# on a Pi, which the next install replaces.
 [mcu]
 serial: /dev/serial/by-id/usb-Klipper_xxx
 restart_method: command
@@ -116,7 +121,7 @@ position_endstop: 0
 uart_pin: PC11
 tx_pin: PC10
 # The board straps its drivers X=0, Y=2, Z=1, E=3 (Klipper's stock config for
-# both the V2 and V3), so Y and Z are not in order.
+# the V2, the V3 and the Pico alike), so Y and Z are not in order.
 uart_address: 2
 run_current: 0.7
 stealthchop_threshold: 999999

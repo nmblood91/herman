@@ -7,7 +7,8 @@ This folder contains the deployment files needed to run Herman on a Raspberry Pi
 - `systemd/greenthumb-api.service` — runs the FastAPI backend on `127.0.0.1:8000`, reached through nginx
 - `nginx/greenthumb.conf` — serves the built React app and proxies `/api` to the backend
 - `klipper/skr-mini-e3-v2/firmware.bin` and `klipper/skr-mini-e3-v3/firmware.bin` — pre-built Klipper MCU firmware, one per supported SKR board (flash via SD card)
-- `klipper/printer.cfg.example` — bare-bones single-axis gantry Klipper template
+- `klipper/skr-pico/firmware.uf2` — the same for the SKR Pico, which talks to the Pi over UART and powers it; see [SKR_PICO.md](SKR_PICO.md)
+- `klipper/printer.cfg.example` — bare-bones single-axis gantry Klipper template, written by `klipper/make-printer-cfg.py`
 - `pi/install-green-thumb.sh` — install script for the Pi
 - `pi/send-gcode.py` — sends one gcode command to Klipper and prints the reply
 
@@ -22,6 +23,10 @@ the board itself.
 |---|---|
 | SKR Mini E3 V2 | `deploy/klipper/skr-mini-e3-v2/firmware.bin` |
 | SKR Mini E3 V3 | `deploy/klipper/skr-mini-e3-v3/firmware.bin` |
+
+The **SKR Pico** is flashed differently (a USB drive, not an SD card) and
+installed with `--board skr-pico`; it has its own page, [SKR_PICO.md](SKR_PICO.md).
+The rest of this section is the Mini E3.
 
 Both boards have an onboard micro-SD card reader with a bootloader, and the
 Klipper firmware is flashed through it. Every pin Herman uses is in the same
@@ -108,6 +113,9 @@ For a clean installation with the latest OS, start here:
    sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
    ```
    This will take 10-15 minutes. Watch for "GreenThumb install complete" at the end.
+
+   On an **SKR Pico**, add `--board skr-pico` the first time and reboot when
+   it asks; see [SKR_PICO.md](SKR_PICO.md). A Mini E3 needs no option.
 
    It also seeds the **starter soil and plant libraries**. Both keep anything
    already there, so re-running the installer never replaces a mix or a plant
@@ -755,8 +763,11 @@ per-plant mapping are in [SENSOR_WIRING.md](../SENSOR_WIRING.md).
 Hub red (3.3V) ----> Pin 1   (or pin 17)
 Hub blue (SDA) ----> Pin 3   (GPIO 2)
 Hub yellow (SCL) --> Pin 5   (GPIO 3)
-Hub black (GND) ---> Pin 6   (or any GND: 9, 14, 20, 25, 30, 34, 39)
+Hub black (GND) ---> Pin 9   (or any GND: 6, 14, 20, 25, 30, 34, 39)
 ```
+
+Not pin 6 on an SKR Pico build: the Pico's cable takes pins 2–10 of the outer
+row, 6 included ([SKR_PICO.md](SKR_PICO.md)).
 
 Bus 1 is what `i2cdetect -y 1` queries and what the install script's
 `dtparam=i2c_arm_baudrate` applies to. Nothing else in the build touches these

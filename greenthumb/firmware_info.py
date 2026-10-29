@@ -1,4 +1,4 @@
-"""Which Klipper commit a firmware.bin was built from.
+"""Which Klipper commit a firmware.bin or firmware.uf2 was built from.
 
 Klipper embeds a zlib-compressed JSON "data dictionary" in the firmware, and its
 "version" field is the commit the build came from. The Pi's Klipper host has to
@@ -11,15 +11,43 @@ leave the planter stopped until somebody reflashed the board.
 from __future__ import annotations
 
 import json
+import struct
 import zlib
 from pathlib import Path
 
 # The second byte of a zlib header, for every compression level.
 _ZLIB_LEVELS = (0x01, 0x5E, 0x9C, 0xDA)
 
+# A UF2 file is 512-byte blocks, each carrying at most 476 bytes of the image
+# between a 32-byte header and an end magic.
+_UF2_MAGIC = (0x0A324655, 0x9E5D5157)
+_UF2_END = 0x0AB16F30
+_UF2_BLOCK = 512
+
+
+def _uf2_image(firmware: bytes) -> bytes | None:
+    """The flash image inside a UF2 file, or None if it is not one.
+
+    Needed because each block's header cuts into the image every 256 bytes,
+    which splits the compressed data dictionary and stops zlib reading it.
+    """
+    if len(firmware) < _UF2_BLOCK or len(firmware) % _UF2_BLOCK:
+        return None
+    chunks = []
+    for at in range(0, len(firmware), _UF2_BLOCK):
+        block = firmware[at:at + _UF2_BLOCK]
+        magic0, magic1, _flags, address, size = struct.unpack_from("<5I", block)
+        (end,) = struct.unpack_from("<I", block, _UF2_BLOCK - 4)
+        if (magic0, magic1) != _UF2_MAGIC or end != _UF2_END or size > 476:
+            return None
+        chunks.append((address, block[32:32 + size]))
+    chunks.sort()
+    return b"".join(data for _, data in chunks)
+
 
 def data_dictionary(firmware: bytes) -> dict | None:
     """The firmware's data dictionary, or None if there is none to find."""
+    firmware = _uf2_image(firmware) or firmware
     for start in range(len(firmware) - 1):
         if firmware[start] != 0x78 or firmware[start + 1] not in _ZLIB_LEVELS:
             continue
@@ -34,7 +62,7 @@ def data_dictionary(firmware: bytes) -> dict | None:
 
 
 def firmware_version(path: str | Path) -> str | None:
-    """The Klipper version a firmware.bin reports, e.g. "2d7717e"."""
+    """The Klipper version a firmware file reports, e.g. "2d7717e"."""
     found = data_dictionary(Path(path).read_bytes())
     version = found.get("version") if found else None
     return version if isinstance(version, str) else None
