@@ -172,7 +172,10 @@
   user-select: none;
 }
 
-.hold-delete.holding {
+/* :not(:disabled) for specificity: a mouse hold is always a hover, and the
+   global button:not(:disabled):hover outranked a plain .hold-delete.holding,
+   so the amber never showed under a mouse. */
+.hold-delete.holding:not(:disabled) {
   background: #4a3418;
   cursor: default;
 }
@@ -213,13 +216,11 @@
   stroke: rgba(255, 255, 255, 0.25);
 }
 
+/* No transition: useHoldToConfirm already sets the offset every animation
+   frame. A transition restarted on every frame never left its start value,
+   and the ring sat empty for the whole hold. */
 .hold-ring-fill {
   stroke: #e6a04a;
-  /* The only animated property, and only while a hold is live -- see
-     DELETE_HOLD_MS in PlantEditorPanel.jsx. Matched to roughly one
-     requestAnimationFrame tick so the sweep reads as smooth rather than
-     stepped, without animating anything while idle. */
-  transition: stroke-dashoffset 0.05s linear;
 }
 
 button {
