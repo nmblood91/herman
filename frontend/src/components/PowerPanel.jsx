@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
-import { HoldRing } from './HoldRing'
+import { HoldLabel } from './HoldRing'
 
 // Shorter than the five-second deletes: nothing is lost by a shutdown, but a
 // stray tap still should not take the planter offline.
@@ -67,8 +67,7 @@ export function PowerPanel() {
       disabled={Boolean(sent)}
       {...hold.handlers}
     >
-      <HoldRing progress={hold.progress} />
-      {hold.progress > 0 ? holdingLabel : label}
+      <HoldLabel progress={hold.progress} idle={label} busy={holdingLabel} />
     </button>
   )
 

@@ -177,6 +177,24 @@
   cursor: default;
 }
 
+/* Both labels share one cell, so the wider one sets the button's width
+   whichever is showing (see HoldLabel). */
+.hold-label {
+  display: inline-grid;
+}
+
+.hold-label > span {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.hold-label-off {
+  visibility: hidden;
+}
+
 .hold-ring {
   width: 18px;
   height: 18px;

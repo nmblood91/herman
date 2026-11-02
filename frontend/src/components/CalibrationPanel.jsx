@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
-import { HoldRing } from './HoldRing'
+import { HoldLabel } from './HoldRing'
 
 const SAMPLE_SECONDS = 20
 
@@ -311,8 +311,11 @@ export function CalibrationPanel() {
             disabled={Boolean(busy)}
             {...resetHold.handlers}
           >
-            <HoldRing progress={resetHold.progress} />
-            {resetHold.progress > 0 ? 'Resetting…' : 'Hold to reset dry calibration'}
+            <HoldLabel
+              progress={resetHold.progress}
+              idle="Hold to reset dry calibration"
+              busy="Resetting…"
+            />
           </button>
           <p className="field-hint">Soil profiles are not affected.</p>
         </div>

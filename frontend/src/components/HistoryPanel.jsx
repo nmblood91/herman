@@ -3,7 +3,7 @@ import { Chart } from './Chart'
 import { Segmented } from './Segmented'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
-import { HoldRing } from './HoldRing'
+import { HoldLabel } from './HoldRing'
 
 const RANGES = [
   { label: '6h', value: 6 },
@@ -329,8 +329,7 @@ export function HistoryPanel() {
           className={clearHold.progress > 0 ? 'hold-delete holding' : 'hold-delete'}
           {...clearHold.handlers}
         >
-          <HoldRing progress={clearHold.progress} />
-          {clearHold.progress > 0 ? 'Clearing…' : 'Hold to clear history'}
+          <HoldLabel progress={clearHold.progress} idle="Hold to clear history" busy="Clearing…" />
         </button>
         <p className="field-hint">
           Deletes every reading and watering on the chart. Doses from the last

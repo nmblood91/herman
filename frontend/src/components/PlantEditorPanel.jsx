@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
-import { HoldRing } from './HoldRing'
+import { HoldLabel } from './HoldRing'
 import { describeBrightness, formatClock, lightStop } from '../time'
 import { groupByCategory } from '../profileGroups'
 
@@ -397,8 +397,11 @@ export function PlantEditorPanel({ profiles, soils, loaded = true, onRefresh }) 
                 className={holdProgress > 0 ? 'hold-delete holding' : 'hold-delete'}
                 {...holdHandlers}
               >
-                <HoldRing progress={holdProgress} />
-                {holdProgress > 0 ? `Deleting ${picked}…` : `Hold to delete ${picked}`}
+                <HoldLabel
+                  progress={holdProgress}
+                  idle={`Hold to delete ${picked}`}
+                  busy={`Deleting ${picked}…`}
+                />
               </button>
             )}
           </div>
