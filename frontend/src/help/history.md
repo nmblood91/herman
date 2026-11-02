@@ -1,7 +1,8 @@
 ## History
 The chart shows each pot's soil water over time. Switch between moisture and
 temperature (and °C or °F) above the chart, and choose 6 hours to 90 days
-below it.
+below it. The 7, 30 and 90 day ranges are grayed out until the planter has
+been recording longer than the range before each one.
 - **A flat dashed line** in a pot's color is the point that pot is watered at.
   When its line drops to it, the pot is due.
 - **Dashed vertical lines** are waterings that reached the soil.

@@ -262,6 +262,24 @@ class HistoryStore:
             }
         return bucket, timestamps, series
 
+    def recorded_hours(self, now: int | None = None) -> float:
+        """How far back the chartable readings go, in hours; 0 with none.
+
+        Taken from the lowest id rather than MIN(recorded_at): rows are written
+        in time order, so the first one is the oldest, and the id is the primary
+        key -- an indexed lookup instead of a scan of every reading, on a query
+        the chart repeats once a minute.
+        """
+        end = int(time.time()) if now is None else now
+        with self._lock:
+            row = self._db.execute(
+                "SELECT recorded_at FROM readings WHERE moisture_percent >= 0"
+                " ORDER BY id LIMIT 1"
+            ).fetchone()
+        if row is None:
+            return 0.0
+        return max(0.0, (end - row["recorded_at"]) / 3600)
+
     def waterings(self, hours: float, now: int | None = None) -> list[dict[str, object]]:
         end = int(time.time()) if now is None else now
         since = end - int(hours * 3600)

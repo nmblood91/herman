@@ -10,6 +10,22 @@ const RANGES = [
   { label: '30d', value: 24 * 30 },
   { label: '90d', value: 24 * 90 },
 ]
+// The short ranges are always offered. A longer one is offered once the
+// readings go back further than the range below it: before that it would draw
+// the same line as the shorter range, squeezed into a corner of the axis.
+const ALWAYS_OFFERED_HOURS = 24
+
+const rangesFor = (recordedHours) =>
+  RANGES.map((range, index) => {
+    if (range.value <= ALWAYS_OFFERED_HOURS) return range
+    const shorter = RANGES[index - 1]
+    if (recordedHours > shorter.value) return range
+    return {
+      ...range,
+      disabled: true,
+      title: `Available once there is more than ${shorter.label} of readings`,
+    }
+  })
 
 const METRICS = [
   { label: 'Moisture', value: 'moisture' },
@@ -185,6 +201,11 @@ export function HistoryPanel() {
     return null
   }
 
+  // 0 until the first response, so the long ranges start unavailable rather
+  // than offered and then taken away.
+  const recordedHours = history?.recorded_hours ?? 0
+  const ranges = useMemo(() => rangesFor(recordedHours), [recordedHours])
+
   const hasData = history?.timestamps?.length > 0 && shown.length > 0
   const missedCount = (history?.waterings || []).filter(
     (watering) => watering.soak === 'missed',
@@ -254,7 +275,7 @@ export function HistoryPanel() {
       <Segmented
         label="Time range"
         className="history-range"
-        options={RANGES}
+        options={ranges}
         value={hours}
         onChange={setHours}
       />

@@ -1921,6 +1921,9 @@ class GreenThumbAutomation:
         return {
             "hours": hours,
             "bucket_seconds": bucket,
+            # How far back any reading goes, so the chart only offers the
+            # ranges that would show more than a shorter one.
+            "recorded_hours": round(self.history.recorded_hours(), 2),
             "timestamps": timestamps,
             "plants": [
                 {

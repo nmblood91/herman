@@ -119,6 +119,19 @@ assert db.waterings(hours=24 * 365, now=base) == []
 print("ok: prune drops rows past retention and keeps the rest")
 
 
+# --- how far back the readings go ---
+db = store()
+assert db.recorded_hours(now=base) == 0.0
+# A failed read is stored with a raw but no percentage; it is not chartable,
+# so it must not make the history look older than it is.
+db.record_readings([SensorSample(0x36, -1.0, 650.0, 22.0)], at=base - 50 * HOUR)
+assert db.recorded_hours(now=base) == 0.0, db.recorded_hours(now=base)
+db.record_readings([sample(0x36)], at=base - 30 * HOUR)
+db.record_readings([sample(0x36)], at=base - HOUR)
+assert db.recorded_hours(now=base) == 30.0, db.recorded_hours(now=base)
+print("ok: recorded_hours measures from the oldest chartable reading")
+
+
 # --- concurrent writes do not raise ---
 db = store()
 errors = []
