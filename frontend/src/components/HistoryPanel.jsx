@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Chart } from './Chart'
 import { Segmented } from './Segmented'
 import { API_BASE } from '../api'
+import { useHoldToConfirm } from '../useHoldToConfirm'
+import { HoldRing } from './HoldRing'
 
 const RANGES = [
   { label: '6h', value: 6 },
@@ -47,6 +49,8 @@ const MOISTURE_RANGE = [0, 100]
 // How often an open History tab fetches the latest readings. The control loop
 // records one a minute, so more often would only fetch the same thing.
 const HISTORY_POLL_MS = 60000
+// Matches the profile deletes: what it throws away does not come back.
+const CLEAR_HOLD_MS = 5000
 
 // Readings are stored and transmitted in Celsius. This converts for display
 // only -- the history keeps one unit whatever anyone happens to be viewing in.
@@ -81,6 +85,10 @@ export function HistoryPanel() {
   const [unit, setUnit] = useState(storedUnit)
   const [history, setHistory] = useState(null)
   const [status, setStatus] = useState('Loading history...')
+  // Bumped after a clear, so the chart refetches instead of showing the
+  // deleted readings until the next minute's poll.
+  const [reloadKey, setReloadKey] = useState(0)
+  const [clearMessage, setClearMessage] = useState('')
 
   useEffect(() => {
     let canceled = false
@@ -112,7 +120,24 @@ export function HistoryPanel() {
       canceled = true
       clearInterval(id)
     }
-  }, [hours])
+  }, [hours, reloadKey])
+
+  const clearHistory = async () => {
+    setClearMessage('')
+    try {
+      const response = await fetch(`${API_BASE}/history/clear`, { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setClearMessage(data.error || data.detail || `Request failed (HTTP ${response.status})`)
+        return
+      }
+      setClearMessage('History cleared. The chart starts again from the next reading.')
+      setReloadKey((key) => key + 1)
+    } catch (error) {
+      setClearMessage(`Could not reach Herman: ${error.message}`)
+    }
+  }
+  const clearHold = useHoldToConfirm(CLEAR_HOLD_MS, clearHistory)
 
   const moisture = metric === 'moisture'
   const fahrenheit = !moisture && unit === 'F'
@@ -297,6 +322,22 @@ export function HistoryPanel() {
           )}
         </>
       )}
+
+      <div className="field-row">
+        <button
+          type="button"
+          className={clearHold.progress > 0 ? 'hold-delete holding' : 'hold-delete'}
+          {...clearHold.handlers}
+        >
+          <HoldRing progress={clearHold.progress} />
+          {clearHold.progress > 0 ? 'Clearing…' : 'Hold to clear history'}
+        </button>
+        <p className="field-hint">
+          Deletes every reading and watering on the chart. Doses from the last
+          cooldown window are kept, so a pot just watered is not watered again.
+        </p>
+        {clearMessage && <p className="field-hint">{clearMessage}</p>}
+      </div>
     </section>
   )
 }

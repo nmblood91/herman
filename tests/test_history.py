@@ -132,6 +132,20 @@ assert db.recorded_hours(now=base) == 30.0, db.recorded_hours(now=base)
 print("ok: recorded_hours measures from the oldest chartable reading")
 
 
+# --- clearing keeps the doses the cooldown still needs ---
+db = store()
+db.record_readings([sample(0x36)], at=base - 10 * HOUR)
+db.record_readings([sample(0x36)], at=base - 60)
+db.record_watering("plant_1", 100, "auto", at=base - 10 * HOUR)
+recent = db.record_watering("plant_2", 50, "auto", at=base - 30 * 60, soak="pending")
+deleted = db.clear(keep_waterings_since=base - HOUR)
+assert deleted == 3, deleted
+assert db.recorded_hours(now=base) == 0.0
+assert [row["id"] for row in db.pending_soaks()] == [recent], db.pending_soaks()
+assert list(db.last_waterings()) == ["plant_2"], db.last_waterings()
+print("ok: clear drops every reading and old waterings, keeps recent doses")
+
+
 # --- concurrent writes do not raise ---
 db = store()
 errors = []

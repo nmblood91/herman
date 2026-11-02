@@ -320,6 +320,25 @@ class HistoryStore:
             logger.info("Pruned %d rows older than %d days", deleted, retention_days)
         return deleted
 
+    def clear(self, keep_waterings_since: int) -> int:
+        """Drop every reading, and every watering before keep_waterings_since.
+        Returns rows deleted.
+
+        Recent doses stay because the history is not only the chart: the
+        watering cooldown is seeded from it at startup and the soak check
+        judges pending doses from it, so wiping a dose from a few minutes ago
+        would let a restart water that pot again at once.
+        """
+        with self._lock:
+            readings = self._db.execute("DELETE FROM readings").rowcount
+            waterings = self._db.execute(
+                "DELETE FROM waterings WHERE recorded_at < ?", (int(keep_waterings_since),)
+            ).rowcount
+            self._db.commit()
+        deleted = readings + waterings
+        logger.info("Cleared history: %d readings, %d waterings", readings, waterings)
+        return deleted
+
     def close(self) -> None:
         with self._lock:
             self._db.close()

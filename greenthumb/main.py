@@ -394,6 +394,14 @@ def get_history(hours: float = 24.0) -> dict[str, object]:
     return automation.get_history(bounded)
 
 
+@app.post(f"{settings.api_prefix}/history/clear")
+def clear_history() -> dict[str, object]:
+    """Delete the chart's readings and waterings, keeping recent doses."""
+    result = automation.clear_history()
+    log_event("History cleared from the UI")
+    return result
+
+
 @app.get(f"{settings.api_prefix}/logs")
 async def get_logs(lines: int = 100) -> list[str]:
     return read_recent_logs(lines)

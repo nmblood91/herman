@@ -1941,6 +1941,13 @@ class GreenThumbAutomation:
             "waterings": self.history.waterings(hours),
         }
 
+    def clear_history(self) -> dict[str, object]:
+        """Wipe the chart's history, keeping the doses still inside the
+        cooldown window (see HistoryStore.clear)."""
+        keep_since = int(datetime.now().timestamp()) - settings.watering_cooldown_minutes * 60
+        deleted = self.history.clear(keep_waterings_since=keep_since)
+        return {"ok": True, "deleted": deleted}
+
     def read_sensors(self) -> list[dict[str, object]]:
         """Last polled reading per sensor; the control loop owns the I2C bus.
 
