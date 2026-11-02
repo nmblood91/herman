@@ -780,6 +780,14 @@ input[type='color'] {
   transform: none;
 }
 
+/* Its own rule because .segmented button above ties with the global
+   button:disabled and, coming later, kept a disabled range looking live. */
+.segmented button:disabled {
+  background: #1a2620;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+}
+
 .segmented button:focus-visible {
   outline: 2px solid #8fd6a8;
   outline-offset: -2px;
