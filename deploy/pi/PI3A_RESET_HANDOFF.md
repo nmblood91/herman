@@ -203,6 +203,15 @@ a normal (uncut) cable. Pass is no reset through the install, then
    *First power-up* checks are the next hardware test, and may make tests 1
    and 2 above moot.
 
+   **Result 2026-11-01: test 1 failed on the buck converter.** The V3 on the
+   Pi 3 B, powered by the new buck converter, rebooted the Pi by itself at
+   "Verifying Klipper connection". The buck converter keeps the ground tied,
+   so this points away from voltage and toward the USB link: the ground
+   path, or the Pi 3's `dwc_otg` driver locking up when the V3 re-enumerates.
+   Still open: the V3 on the Pi 4 (different USB controller, no `dwc_otg`),
+   the official wall supply (drops the converter's ground path), and
+   `dwc_otg.fiq_enable=0 dwc_otg.fiq_fsm_enable=0`.
+
 Uncommitted doc edits made during this session and not yet decided:
 `BOM.md` and `POWER_SYSTEM.md` were changed to require a 5.1 V minimum
 converter. The V2 installing fine on the 4.90 V unit weakens that as a hard
