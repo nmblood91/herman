@@ -5,10 +5,12 @@ import { API_BASE } from '../api'
 // setting, which is why it lives with the checks: there is no battery-backed
 // clock, so after a power cut it reverts to roughly its last shutdown, and "the
 // lights came on at the wrong time" is answered from here.
-export function ClockPanel() {
+export function ClockPanel({ onRefresh }) {
   const [clock, setClock] = useState(null)
   const [clockStatus, setClockStatus] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const [savingFormat, setSavingFormat] = useState(false)
+  const hour24 = clock?.clock_24h ?? false
   // Ticks locally off the offset between the planter's clock and this device's,
   // so the readout counts seconds like a device display instead of freezing on
   // whatever the last fetch returned.
@@ -45,7 +47,33 @@ export function ClockPanel() {
           timeZone: clock?.timezone || undefined,
           dateStyle: 'medium',
           timeStyle: 'medium',
+          hourCycle: hour24 ? 'h23' : 'h12',
         })
+
+  // Every time of day the app writes follows this, the status bar and the log
+  // included, so it is stored on the planter rather than in this browser.
+  const saveFormat = async (enabled) => {
+    setSavingFormat(true)
+    setClockStatus('')
+    try {
+      const response = await fetch(`${API_BASE}/system/clock-format`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setClockStatus(data.error || `Could not save (HTTP ${response.status})`)
+        return
+      }
+      setClock((current) => ({ ...current, clock_24h: data.clock_24h }))
+      onRefresh?.()
+    } catch (error) {
+      setClockStatus(`Could not save: ${error.message}`)
+    } finally {
+      setSavingFormat(false)
+    }
+  }
 
   const syncTimezone = async () => {
     setSyncing(true)
@@ -61,7 +89,8 @@ export function ClockPanel() {
         setClockStatus(data.error || `Could not sync (HTTP ${response.status})`)
         return
       }
-      setClock(data)
+      // The time zone answer does not carry the clock format.
+      setClock((current) => ({ ...data, clock_24h: current?.clock_24h }))
       setSkewMs(new Date(data.now).getTime() - Date.now())
       setClockStatus(`Planter time zone set to ${data.timezone}.`)
     } catch (error) {
@@ -84,6 +113,18 @@ export function ClockPanel() {
             <span className="position-readout">Herman&apos;s clock: {planterClock}</span>
           </div>
           <p className="field-hint">The lights follow this clock.</p>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={hour24}
+              disabled={savingFormat || !clock}
+              onChange={(event) => saveFormat(event.target.checked)}
+            />
+            24-hour clock
+          </label>
+          <p className="field-hint">
+            Shows times as 14:00 instead of 2:00 PM, everywhere in the app.
+          </p>
           {clock && !clock.ntp_synchronised && (
             <p className="field-hint warning">
               The clock has not reached a time server yet, so it may be wrong

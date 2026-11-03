@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api'
-import { describeLighting } from '../time'
+import { describeLighting, useClock24h } from '../time'
 import { cardTitle } from '../potLabel'
 import { groupByCategory } from '../profileGroups'
 import { PotLightColor } from './PotLightColor'
@@ -277,6 +277,7 @@ export function PlantsPanel({
   // disabled rather than left to fail. Undefined counts as not ready, so the
   // buttons do not flicker enabled before the first poll answers.
   const motionReady = movement?.ok !== false && movement?.homed === true
+  const clock24h = useClock24h()
 
   const [drafts, setDrafts] = useState({})
   // Which plant profile each card has picked, keyed by plant so one card's
@@ -492,7 +493,12 @@ export function PlantsPanel({
                       <strong>{plant.name}</strong> — waters{' '}
                       {plant.watering_volume_ml} mL at {plant.target_available}% soil water
                       {plant.water_level ? ` (${plant.water_level})` : ''}. Lights{' '}
-                      {describeLighting(plant.light_start_time, plant.light_hours, plant.light_brightness)}.
+                      {describeLighting(
+                        plant.light_start_time,
+                        plant.light_hours,
+                        plant.light_brightness,
+                        clock24h,
+                      )}.
                       {plant.preferred_soil ? ` Prefers ${plant.preferred_soil}.` : ''}
                     </p>
                   ) : (

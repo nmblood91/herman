@@ -279,7 +279,7 @@ in a room people sit in. So anything the planter does on its own — watering,
 and the re-homes described under *Homing* — can be held back two ways:
 
 - **Quiet hours** — a nightly window, set under Automation. A window that ends before
-  it starts runs through midnight, so 21:00 to 08:00 means overnight.
+  it starts runs through midnight, so 9:00 PM to 8:00 AM means overnight.
 - **Snooze** — one tap in Controls for 1, 2 or 4 hours, for when you are
   watching something and do not want the pump starting up behind you.
 

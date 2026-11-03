@@ -179,7 +179,15 @@ def get_version() -> dict[str, object]:
 
 @app.get(f"{settings.api_prefix}/system/time")
 def get_system_time() -> dict[str, object]:
-    return system_clock.status()
+    return {**system_clock.status(), "clock_24h": automation.clock_24h}
+
+
+@app.post(f"{settings.api_prefix}/system/clock-format")
+def set_clock_format(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Write times of day as 14:00 ({"enabled": true}) or 2:00 PM (false)."""
+    result = automation.set_clock_24h(_require_enabled(payload))
+    log_event(f"Clock set to {'24' if result['clock_24h'] else '12'}-hour")
+    return result
 
 
 @app.post(f"{settings.api_prefix}/system/timezone")
@@ -314,7 +322,8 @@ def set_quiet_hours(payload: dict[str, object] = Body(default_factory=dict)) -> 
     )
     log_event(
         f"Quiet hours {'on' if result['quiet_hours_enabled'] else 'off'} "
-        f"({result['quiet_hours_start']}-{result['quiet_hours_stop']})"
+        f"({automation.format_clock(result['quiet_hours_start'])} to "
+        f"{automation.format_clock(result['quiet_hours_stop'])})"
     )
     return result
 
@@ -323,7 +332,7 @@ def set_quiet_hours(payload: dict[str, object] = Body(default_factory=dict)) -> 
 def snooze_watering(payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
     """Hold automatic watering off for a few hours, starting now."""
     result = automation.snooze_watering(float(payload.get("hours", 1)))
-    log_event(f"Automatic watering snoozed until {result['snooze_until']}")
+    log_event(f"Automatic watering snoozed until {automation.format_clock(result['snooze_until'])}")
     return result
 
 
@@ -806,8 +815,9 @@ async def update_light_schedule(plant_id: str, payload: dict[str, object] = Body
         payload.get("light_brightness", plant.light_brightness if plant else None),
     )
     log_event(
-        f"Plant {plant_id} lights {result['light_start_time']} for {result['light_hours']} h "
-        f"(off at {result['light_stop_time']}) at {result['light_brightness']}%"
+        f"Plant {plant_id} lights {automation.format_clock(result['light_start_time'])} "
+        f"for {result['light_hours']} h "
+        f"(off at {automation.format_clock(result['light_stop_time'])}) at {result['light_brightness']}%"
     )
     return result
 

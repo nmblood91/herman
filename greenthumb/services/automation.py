@@ -226,6 +226,8 @@ class GreenThumbAutomation:
         self._startup_homed = False
         self._startup_home_attempts = 0
         self._startup_home_error: str | None = None
+        # How times of day are written, here and in the UI. See format_clock.
+        self.clock_24h = settings.clock_24h
         # Nothing homes until the motor direction test has passed. See
         # settings.motor_direction_checked and the motor direction section.
         self.motor_direction_checked = settings.motor_direction_checked
@@ -461,6 +463,10 @@ class GreenThumbAutomation:
         if isinstance(startup_home, dict) and isinstance(startup_home.get("enabled"), bool):
             self.home_on_startup = startup_home["enabled"]
 
+        clock = stored.get("clock")
+        if isinstance(clock, dict) and isinstance(clock.get("24h"), bool):
+            self.clock_24h = clock["24h"]
+
         direction = stored.get("motor_direction")
         if isinstance(direction, dict) and isinstance(direction.get("checked"), bool):
             self.motor_direction_checked = direction["checked"]
@@ -593,6 +599,7 @@ class GreenThumbAutomation:
                 "soak_reset_at": self._soak_reset_at,
             },
             "startup_home": {"enabled": self.home_on_startup},
+            "clock": {"24h": self.clock_24h},
             # A fact about how this unit is wired, not a preference, so a
             # restore to defaults keeps it.
             "motor_direction": {"checked": self.motor_direction_checked},
@@ -1794,15 +1801,31 @@ class GreenThumbAutomation:
         """Why nothing may move on its own at all (snooze, quiet hours), or None."""
         moment = now or datetime.now()
         if self.snooze_until and moment < self.snooze_until:
-            return f"snoozed until {self.snooze_until.strftime('%H:%M')}"
+            return f"snoozed until {self.format_clock(self.snooze_until)}"
 
         if self.quiet_hours_enabled and within_window(
             moment.time(), self.quiet_hours_start, self.quiet_hours_stop
         ):
-            return (
-                f"quiet hours until {self.quiet_hours_stop.strftime('%H:%M')}"
-            )
+            return f"quiet hours until {self.format_clock(self.quiet_hours_stop)}"
         return None
+
+    def format_clock(self, moment: time | datetime | str) -> str:
+        """A time of day as the owner chose to read them: "2:00 PM" or "14:00".
+
+        Takes the API's own strings too ("07:00", "2026-11-02T15:00:00"), for
+        the log lines main.py writes from a result.
+        """
+        if isinstance(moment, str):
+            moment = datetime.fromisoformat(moment) if "T" in moment else time.fromisoformat(moment)
+        if self.clock_24h:
+            return f"{moment.hour:02d}:{moment.minute:02d}"
+        suffix = "AM" if moment.hour < 12 else "PM"
+        return f"{moment.hour % 12 or 12}:{moment.minute:02d} {suffix}"
+
+    def set_clock_24h(self, enabled: bool) -> dict[str, object]:
+        self.clock_24h = bool(enabled)
+        self._persist()
+        return {"clock_24h": self.clock_24h}
 
     def set_quiet_hours(self, enabled: bool, start: str | None = None, stop: str | None = None) -> dict[str, object]:
         if start is not None:
@@ -1821,7 +1844,7 @@ class GreenThumbAutomation:
             raise ValueError("Snooze is capped at 24 hours")
         self.snooze_until = datetime.now() + timedelta(hours=hours)
         self._persist()
-        logger.info("Automatic watering snoozed until %s", self.snooze_until)
+        logger.info("Automatic watering snoozed until %s", self.format_clock(self.snooze_until))
         return self.quiet_status()
 
     def cancel_snooze(self) -> dict[str, object]:
@@ -2023,6 +2046,7 @@ class GreenThumbAutomation:
             "startup_home": self.startup_home_status(),
             "motor_direction": self.motor_direction_status(),
             "quiet": self.quiet_status(),
+            "clock_24h": self.clock_24h,
             # What the status bar shows. Computed rather than echoed from the
             # log, so it says what is true now instead of what was last written.
             "system_status": self.system_status(),
@@ -2386,6 +2410,7 @@ class GreenThumbAutomation:
 
         self.home_on_startup = settings.home_on_startup
         self._require_startup_home()
+        self.clock_24h = settings.clock_24h
 
         self.quiet_hours_enabled = settings.quiet_hours_enabled
         self.quiet_hours_start = time.fromisoformat(settings.quiet_hours_start)

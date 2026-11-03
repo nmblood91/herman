@@ -89,7 +89,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/system/restore-defaults` | back to a fresh install; the plant profile and soil libraries and the history are kept |
 | `/camera`, `/camera/stream`, `/camera/snapshot` | whether a camera is fitted, the live MJPEG view, and one frame. No UI — reach these directly |
 | `/diagnostics/endstop` | reads the home switch and interprets it |
-| `/system/time`, `/system/timezone` | the planter's clock |
+| `/system/time`, `/system/timezone`, `/system/clock-format` | the planter's clock, and whether times of day are written 12- or 24-hour |
 | `/version` | what is running, and whether the checkout has moved on without it |
 
 **The full, current list is generated from the routes themselves** at
@@ -413,7 +413,7 @@ Installing keeps any entry you have already tuned; `--overwrite` replaces them.
 
 Two things the source table does not give are filled in the same for every
 plant: a **100 mL** dose (it depends on the pot more than the plant) and lights
-on at **07:00** (the longest photoperiod, 15 h, then ends at 22:00). Change
+on at **7:00 AM** (the longest photoperiod, 15 h, then ends at 10:00 PM). Change
 either per plant in the Plant Profile Editor.
 
 ## Hardware assumptions

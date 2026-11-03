@@ -149,6 +149,11 @@ class Settings(BaseSettings):
     # Automatic watering switches it on and keeps it on.
     home_on_startup: bool = False
 
+    # How the planter writes times of day: "2:00 PM" when off, "14:00" when
+    # on. Only the value a planter starts life with; the choice made on the
+    # Calibration tab is stored and wins.
+    clock_24h: bool = False
+
     # Whether the motor direction test on the Calibration tab has passed. Until
     # it has, nothing homes: a reversed motor homes away from the switch and
     # drives the carriage into the far end of the rail at homing speed, and

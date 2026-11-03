@@ -1,9 +1,6 @@
 import { useState } from 'react'
 import { API_BASE } from '../api'
-
-// "2026-10-14T14:00" -> "14:00". The planter only ever reports today-ish
-// times here, and the date would just be noise.
-const clock = (iso) => (iso ? iso.slice(11, 16) : '')
+import { formatTimeOf, useClock24h } from '../time'
 
 // What the startup home is doing right now, or null when there is nothing
 // worth saying.
@@ -27,23 +24,24 @@ function startupLine(status) {
 }
 
 // The last hourly patrol, and what it watered. Null until one has run.
-function patrolLine(status) {
+function patrolLine(status, hour24) {
   const last = status?.last
   if (!status?.enabled || !last) return null
-  if (!last.ok) return `The ${clock(last.at)} patrol had a problem: ${last.error}.`
+  const at = formatTimeOf(last.at, hour24)
+  if (!last.ok) return `The ${at} patrol had a problem: ${last.error}.`
   const watered = last.watered?.length
     ? `watered ${last.watered.join(', ')}`
     : 'nothing needed water'
-  return `Last patrol at ${clock(last.at)}: ${watered}.`
+  return `Last patrol at ${at}: ${watered}.`
 }
 
 // The gantry motor between moves. Idle is normal, not a fault: the arm homes
 // again before it next moves. Null before the first home, which the startup
 // home line already covers.
-function motorLine(motor) {
+function motorLine(motor, hour24) {
   if (motor?.state === 'idle') {
     return motor.since
-      ? `Motor idle since ${clock(motor.since)}. It homes again before the next move.`
+      ? `Motor idle since ${formatTimeOf(motor.since, hour24)}. It homes again before the next move.`
       : 'Motor idle. It homes again before the next move.'
   }
   if (motor?.state === 'active') {
@@ -72,6 +70,9 @@ export function AutomationPanel({ overview, onRefresh }) {
 
   const patrol = overview?.patrol
   const motor = overview?.motor
+  const clock24h = useClock24h()
+  const patrolText = patrolLine(patrol, clock24h)
+  const motorText = motorLine(motor, clock24h)
 
   const quiet = overview?.quiet
   const [quietOn, setQuietOn] = useState(false)
@@ -219,12 +220,14 @@ export function AutomationPanel({ overview, onRefresh }) {
               Every hour, on the hour, the arm homes, then visits each pot and
               waters the ones that need it.
             </p>
-            {patrolLine(patrol) && (
+            {patrolText && (
               <p className={`field-hint${patrol?.last?.ok === false ? ' warning' : ''}`}>
-                {patrolLine(patrol)}
+                {patrolText}
               </p>
             )}
-            {patrol?.next && <p className="field-hint">Next patrol at {clock(patrol.next)}.</p>}
+            {patrol?.next && (
+              <p className="field-hint">Next patrol at {formatTimeOf(patrol.next, clock24h)}.</p>
+            )}
             {autoMsg && <p className="field-hint warning">{autoMsg}</p>}
           </div>
 
@@ -275,7 +278,7 @@ export function AutomationPanel({ overview, onRefresh }) {
                 {startupLine(startupHome)}
               </p>
             )}
-            {motorLine(motor) && <p className="field-hint">{motorLine(motor)}</p>}
+            {motorText && <p className="field-hint">{motorText}</p>}
             {startupMsg && <p className="field-hint warning">{startupMsg}</p>}
           </div>
         </div>

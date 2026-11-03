@@ -2,11 +2,39 @@ import { useEffect, useRef } from 'react'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 
+// The time axis's labels, in uPlot's table form: from each tick spacing (in
+// seconds) down, the label for a tick, then the extra line added when the
+// year, month, day, hour, minute or second rolls over. Written out rather than
+// left to uPlot's default so the 24-hour clock setting reaches the axis.
+const HOUR = 3600
+const DAY = 24 * HOUR
+const timeAxis = (hour24) => {
+  const hm = hour24 ? '{HH}:{mm}' : '{h}:{mm} {AA}'
+  const h = hour24 ? '{HH}:00' : '{h} {AA}'
+  return [
+    [365 * DAY, '{YYYY}', null, null, null, null, null, null, 1],
+    [28 * DAY, '{MMM}', '\n{YYYY}', null, null, null, null, null, 1],
+    [DAY, '{M}/{D}', '\n{YYYY}', null, null, null, null, null, 1],
+    [HOUR, h, '\n{M}/{D}/{YY}', null, '\n{M}/{D}', null, null, null, 1],
+    [60, hm, '\n{M}/{D}/{YY}', null, '\n{M}/{D}', null, null, null, 1],
+    [1, '{ss}', `\n{M}/{D}/{YY} ${hm}`, null, `\n{M}/{D} ${hm}`, null, `\n${hm}`, null, 1],
+  ]
+}
+
 /**
  * Thin React wrapper around uPlot, whose API is imperative. Keeping the
  * instance in a ref means the rest of the UI never touches it directly.
  */
-export function Chart({ data, series, markers = [], height = 320, yRange, yLabel, onCursor }) {
+export function Chart({
+  data,
+  series,
+  markers = [],
+  height = 320,
+  yRange,
+  yLabel,
+  onCursor,
+  hour24 = false,
+}) {
   const containerRef = useRef(null)
   const plotRef = useRef(null)
 
@@ -48,6 +76,7 @@ export function Chart({ data, series, markers = [], height = 320, yRange, yLabel
             // At least this many pixels between time labels. uPlot's default
             // of 50 packed two-line date and time labels edge to edge.
             space: 90,
+            values: timeAxis(hour24),
           },
           {
             stroke: '#8fae9c',
@@ -108,7 +137,7 @@ export function Chart({ data, series, markers = [], height = 320, yRange, yLabel
     // poll, losing any zoom or cursor state. The effect below pushes new data
     // into the existing instance instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [series, height, yRange, yLabel])
+  }, [series, height, yRange, yLabel, hour24])
 
   useEffect(() => {
     plotRef.current?.setData(data)

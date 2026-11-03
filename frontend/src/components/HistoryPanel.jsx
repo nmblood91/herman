@@ -4,6 +4,7 @@ import { Segmented } from './Segmented'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
 import { HoldLabel } from './HoldRing'
+import { useClock24h } from '../time'
 
 const RANGES = [
   { label: '6h', value: 6 },
@@ -80,6 +81,7 @@ const storedUnit = () => {
 }
 
 export function HistoryPanel() {
+  const clock24h = useClock24h()
   const [hours, setHours] = useState(24)
   const [metric, setMetric] = useState('moisture')
   const [unit, setUnit] = useState(storedUnit)
@@ -271,6 +273,7 @@ export function HistoryPanel() {
           yRange={yRange}
           yLabel={moisture ? 'Soil water %' : fahrenheit ? 'Temp °F' : 'Temp °C'}
           onCursor={setCursorIdx}
+          hour24={clock24h}
         />
       )}
 

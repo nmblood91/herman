@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
+import { formatDateTime, useClock24h } from '../time'
 
 // The pump's flow rate: run it for a fixed time, weigh what came out, type in
 // the milliliters.
@@ -13,6 +14,7 @@ import { API_BASE } from '../api'
 // someone measures it. A dose is a run time worked out from it, so a wrong
 // one scales every watering by the same factor and still reports success.
 export function PumpPanel() {
+  const clock24h = useClock24h()
   const [pump, setPump] = useState(null)
   // Text, and whether it is a problem: "Pump stopped." is not a warning.
   const [pumpStatus, setPumpStatus] = useState('')
@@ -142,7 +144,7 @@ export function PumpPanel() {
               : '—'}
           </p>
           {pump?.measured_at && (
-            <p className="field-hint">Measured {new Date(pump.measured_at).toLocaleString()}.</p>
+            <p className="field-hint">Measured {formatDateTime(pump.measured_at, clock24h)}.</p>
           )}
         </div>
 

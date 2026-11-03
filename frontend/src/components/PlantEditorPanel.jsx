@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
 import { useHoldToConfirm } from '../useHoldToConfirm'
 import { HoldLabel } from './HoldRing'
-import { describeBrightness, formatClock, lightStop } from '../time'
+import { describeBrightness, formatClock, lightStop, useClock24h } from '../time'
 import { groupByCategory } from '../profileGroups'
 
 const BLANK = {
@@ -60,6 +60,7 @@ const DELETE_HOLD_MS = 5000
 // loaded: whether the profile list has arrived yet. Until it has, an empty
 // list means "not heard yet", not "they were all deleted".
 export function PlantEditorPanel({ profiles, soils, loaded = true, onRefresh }) {
+  const clock24h = useClock24h()
   // 'new' types a free name below; 'existing' turns that field into a picker
   // over the list. Picked is only ever non-empty in 'existing' mode -- every
   // path back to 'new' clears it, so the two stay in lockstep.
@@ -343,7 +344,7 @@ export function PlantEditorPanel({ profiles, soils, loaded = true, onRefresh }) 
               : Number(form.light_hours) <= 0
                 ? 'Lights stay off.'
                 : stopsAt
-                  ? `Lights off at ${formatClock(stopsAt)}.`
+                  ? `Lights off at ${formatClock(stopsAt, clock24h)}.`
                   : 'Set a start time and a whole number of hours.'}
           </p>
           <label>

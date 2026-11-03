@@ -5,6 +5,10 @@ Settings you set once. Most never need changing.
 The lights follow the planter's own clock. If the time shown isn't your local
 time, press **Sync to Local Time**.
 
+Times show as 2:00 PM. Tick **24-hour clock** to show 14:00 instead,
+everywhere in the app. The time boxes you type into, such as quiet hours,
+follow your phone or computer's own setting.
+
 ### Network name
 The address you type to open the planter, such as herman.local. Only change it
 if you have more than one planter at home. After renaming, use the new address.

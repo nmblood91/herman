@@ -22,7 +22,7 @@ import { LedStripPanel } from './components/LedStripPanel'
 import { LogsPanel } from './components/LogsPanel'
 import './App.css'
 import { API_BASE } from './api'
-import { describeLighting } from './time'
+import { Clock24hContext, describeLighting } from './time'
 
 const fetchJson = async (path, options = {}) => {
   let response
@@ -86,6 +86,7 @@ const joinNames = (names) =>
 function App() {
   const [activeTab, setActiveTab] = useState('plants')
   const [overview, setOverview] = useState(null)
+  const clock24h = overview?.clock_24h ?? false
   const [plants, setPlants] = useState([])
   // The plant profile library. Fetched alongside the dashboard because saving a
   // plant changes it, so it has to refresh on the same beat.
@@ -351,7 +352,7 @@ function App() {
       setStatus(
         `Loaded plant profile ${result.name}: waters ${result.watering_volume_ml} mL ` +
           `at ${result.target_available}% soil water, lights ` +
-          `${describeLighting(result.light_start_time, result.light_hours, result.light_brightness)}. Soil profile: ` +
+          `${describeLighting(result.light_start_time, result.light_hours, result.light_brightness, clock24h)}. Soil profile: ` +
           `${result.soil || 'not set'}. ` +
           (result.soil_note ? `${result.soil_note} ` : '') +
           `The pot keeps its position (${result.position_mm} mm).`,
@@ -426,6 +427,7 @@ function App() {
   }
 
   return (
+    <Clock24hContext.Provider value={clock24h}>
     <div className="app-shell">
       <TopBar />
       <TabBar activeTab={activeTab} onChange={setActiveTab} />
@@ -501,7 +503,7 @@ function App() {
           another as Calibration and Logs were. */}
       {activeTab === 'calibration' && (
         <>
-          <ClockPanel />
+          <ClockPanel onRefresh={loadDashboard} />
           <HostnamePanel />
           <HomeSwitchPanel />
           <MotorDirectionPanel overview={overview} onRefresh={loadDashboard} />
@@ -520,6 +522,7 @@ function App() {
       {activeTab === 'history' && <HistoryPanel />}
       {activeTab === 'help' && <HelpPanel />}
     </div>
+    </Clock24hContext.Provider>
   )
 }
 
