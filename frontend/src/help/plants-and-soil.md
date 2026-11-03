@@ -32,7 +32,7 @@ accepts.
 
 ### Turning a pot off
 For a pot with nothing planted in it, or a probe you've taken out, open its
-card and press **Turn off** at the bottom. While it's off:
+card and switch **Pot**, at the bottom, to **Off**. While it's off:
 - its probe isn't read, so a missing probe isn't reported;
 - the hourly patrol doesn't visit or water it, and it can't be watered from
   **Controls** (moving the arm to it still works);
@@ -40,8 +40,8 @@ card and press **Turn off** at the bottom. While it's off:
   **Controls** still works;
 - its line is hidden on **History**. Its past readings are kept.
 
-The card stays gray, and you can still change its settings. Press
-**Turn on** to start using it again. It takes a few minutes of readings before
+The card stays gray, and you can still change its settings. Switch it back to
+**On** to start using it again. It takes a few minutes of readings before
 it can be watered.
 
 ### Plant Profile Editor

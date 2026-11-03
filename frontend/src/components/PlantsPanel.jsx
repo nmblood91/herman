@@ -4,6 +4,13 @@ import { describeLighting, useClock24h } from '../time'
 import { cardTitle } from '../potLabel'
 import { groupByCategory } from '../profileGroups'
 import { PotLightColor } from './PotLightColor'
+import { Segmented } from './Segmented'
+
+// Whether the pot is in use (PlantSpec.enabled).
+const POT_STATES = [
+  { label: 'On', value: 'on' },
+  { label: 'Off', value: 'off' },
+]
 
 // Pot fields only. A card no longer edits what a plant wants -- that is the
 // Plant Profile Editor's job, and a pot takes those settings by loading a
@@ -426,12 +433,13 @@ export function PlantsPanel({
   const profileGroups = groupByCategory(profiles)
   const soilList = soils ?? []
 
-  // Turning a pot off or on. Keyed by plant like the notes above.
+  // Turning a pot off or on. switching holds the value being sent, per plant,
+  // until the refresh after it lands.
   const [switching, setSwitching] = useState({})
   const [switchNote, setSwitchNote] = useState({})
   const setEnabled = async (plant, enabled) => {
     const note = (text) => setSwitchNote((current) => ({ ...current, [plant.plant_id]: text }))
-    setSwitching((current) => ({ ...current, [plant.plant_id]: true }))
+    setSwitching((current) => ({ ...current, [plant.plant_id]: enabled }))
     note('')
     try {
       const response = await fetch(`${API_BASE}/plants/${plant.plant_id}/enabled`, {
@@ -448,7 +456,11 @@ export function PlantsPanel({
     } catch (error) {
       note(`Could not save: ${error.message}`)
     } finally {
-      setSwitching((current) => ({ ...current, [plant.plant_id]: false }))
+      setSwitching((current) => {
+        const next = { ...current }
+        delete next[plant.plant_id]
+        return next
+      })
     }
   }
 
@@ -479,6 +491,10 @@ export function PlantsPanel({
           const isExpanded = expandedPlantIds.includes(plant.plant_id)
           const plantStatus = status?.find((item) => item.plant_id === plant.plant_id)
           const off = plant.enabled === false
+          // The toggle's own state while a change is on its way, so it moves
+          // the moment it is pressed; the card follows once the planter answers.
+          const shownOff =
+            plant.plant_id in switching ? switching[plant.plant_id] === false : off
           const reading = off
             ? { text: 'Off', hint: 'Not read or watered' }
             : describeMoisture(plantStatus)
@@ -784,20 +800,21 @@ export function PlantsPanel({
 
                   {/* Last on the card: it is about the pot as a whole, not one
                       of the groups above. No hold to confirm, since turning a
-                      pot back on loses nothing. */}
-                  <div className="plant-actions-row">
-                    <button
-                      type="button"
-                      disabled={switching[plant.plant_id]}
-                      onClick={() => setEnabled(plant, !off)}
-                    >
-                      {off ? 'Turn on' : 'Turn off'}
-                    </button>
-                  </div>
+                      pot back on loses nothing. Shows the choice the moment
+                      it is made, before the planter answers. */}
+                  <h3 className="card-group-title">Pot</h3>
+                  <Segmented
+                    label={`Whether ${plant.name} is in use`}
+                    options={POT_STATES}
+                    value={shownOff ? 'off' : 'on'}
+                    onChange={(value) => {
+                      if ((value === 'off') !== shownOff) setEnabled(plant, value === 'on')
+                    }}
+                  />
                   <p className="field-hint">
-                    {off
-                      ? 'Off: its probe is not read, it is left out of the hourly patrol and its schedule lights stay dark. Settings can still be changed.'
-                      : 'Turning a pot off stops its readings, watering and schedule lights. Manual lighting still reaches it.'}
+                    {shownOff
+                      ? 'Off: its probe is not read, it is left out of the hourly patrol and its schedule lights stay dark. Manual lighting still reaches it, and its settings can still be changed.'
+                      : 'Switch it off for an empty spot or a probe you have taken out: it stops being read, watered and lit on the schedule.'}
                   </p>
                   {switchNote[plant.plant_id] && (
                     <p className="field-hint warning">{switchNote[plant.plant_id]}</p>

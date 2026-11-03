@@ -215,4 +215,50 @@ again._restore_defaults_locked()
 assert all(plant.enabled for plant in again.plants)
 print("ok: restoring defaults turns every pot back on")
 
+# --- through the API, the way the card's toggle calls it ---
+#
+# The first version of the card sent the opposite of what it showed, and every
+# check above passed because they call the service directly. These go through
+# the routes and read back what the page reads.
+
+from greenthumb.services import automation as automation_module
+
+served, served_klip, _ = build({0x36: WET, 0x37: WET, 0x38: WET, 0x39: WET})
+real_class = automation_module.GreenThumbAutomation
+automation_module.GreenThumbAutomation = lambda *a, **k: served
+try:
+    from fastapi.testclient import TestClient
+    from greenthumb import main
+finally:
+    automation_module.GreenThumbAutomation = real_class
+main.automation = served
+client = TestClient(main.app)
+api = settings.api_prefix
+
+
+def card(plant_id):
+    return next(p for p in client.get(f"{api}/plants").json() if p["plant_id"] == plant_id)
+
+
+assert card("plant_2")["enabled"] is True
+response = client.post(f"{api}/plants/plant_2/enabled", json={"enabled": False})
+assert response.status_code == 200 and response.json()["enabled"] is False, response.text
+assert card("plant_2")["enabled"] is False
+overview = {p["plant_id"]: p for p in client.get(f"{api}/overview").json()["plants"]}
+assert overview["plant_2"]["enabled"] is False and overview["plant_1"]["enabled"] is True
+print("ok: switching Off through the API turns the pot off, and /plants and /overview say so")
+
+response = client.post(f"{api}/water/plant_2")
+assert response.status_code == 400 and "turned off" in response.json()["error"], response.text
+print("ok: watering an off pot through the API is a 400 that says why")
+
+assert client.post(f"{api}/plants/plant_2/enabled", json={}).status_code == 400
+assert client.post(f"{api}/plants/plant_2/enabled", json={"enabled": "no"}).status_code == 400
+assert card("plant_2")["enabled"] is False
+print("ok: a malformed request is refused rather than read as a switch")
+
+response = client.post(f"{api}/plants/plant_2/enabled", json={"enabled": True})
+assert response.status_code == 200 and card("plant_2")["enabled"] is True, response.text
+print("ok: switching On turns it back on")
+
 print("\nall plant on/off checks passed")
