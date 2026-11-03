@@ -4,13 +4,7 @@ import { describeLighting, useClock24h } from '../time'
 import { cardTitle } from '../potLabel'
 import { groupByCategory } from '../profileGroups'
 import { PotLightColor } from './PotLightColor'
-import { Segmented } from './Segmented'
-
-// Whether the pot is in use (PlantSpec.enabled).
-const POT_STATES = [
-  { label: 'On', value: 'on' },
-  { label: 'Off', value: 'off' },
-]
+import { OnOff } from './Segmented'
 
 // Pot fields only. A card no longer edits what a plant wants -- that is the
 // Plant Profile Editor's job, and a pot takes those settings by loading a
@@ -803,13 +797,10 @@ export function PlantsPanel({
                       pot back on loses nothing. Shows the choice the moment
                       it is made, before the planter answers. */}
                   <h3 className="card-group-title">Pot</h3>
-                  <Segmented
+                  <OnOff
                     label={`Whether ${plant.name} is in use`}
-                    options={POT_STATES}
-                    value={shownOff ? 'off' : 'on'}
-                    onChange={(value) => {
-                      if ((value === 'off') !== shownOff) setEnabled(plant, value === 'on')
-                    }}
+                    value={!shownOff}
+                    onChange={(on) => setEnabled(plant, on)}
                   />
                   <p className="field-hint">
                     {shownOff

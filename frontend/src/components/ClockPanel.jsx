@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
 import { API_BASE } from '../api'
+import { Segmented } from './Segmented'
+
+const CLOCK_FORMATS = [
+  { label: '12-hour (2:00 PM)', value: '12h' },
+  { label: '24-hour (14:00)', value: '24h' },
+]
 
 // The planter's clock. A readout with three warning states rather than a
 // setting, which is why it lives with the checks: there is no battery-backed
@@ -113,18 +119,18 @@ export function ClockPanel({ onRefresh }) {
             <span className="position-readout">Herman&apos;s clock: {planterClock}</span>
           </div>
           <p className="field-hint">The lights follow this clock.</p>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={hour24}
-              disabled={savingFormat || !clock}
-              onChange={(event) => saveFormat(event.target.checked)}
-            />
-            24-hour clock
-          </label>
-          <p className="field-hint">
-            Shows times as 14:00 instead of 2:00 PM, everywhere in the app.
-          </p>
+          <Segmented
+            label="Clock format"
+            options={CLOCK_FORMATS.map((option) => ({
+              ...option,
+              disabled: savingFormat || !clock,
+            }))}
+            value={hour24 ? '24h' : '12h'}
+            onChange={(value) => {
+              if ((value === '24h') !== hour24) saveFormat(value === '24h')
+            }}
+          />
+          <p className="field-hint">How times are shown everywhere in the app.</p>
           {clock && !clock.ntp_synchronised && (
             <p className="field-hint warning">
               The clock has not reached a time server yet, so it may be wrong

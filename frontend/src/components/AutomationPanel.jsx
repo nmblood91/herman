@@ -1,6 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api'
 import { formatTimeOf, useClock24h } from '../time'
+import { OnOff } from './Segmented'
+
+// How long a quiet-hours time sits still before it is saved. See
+// changeQuietTime.
+const QUIET_SAVE_DELAY_MS = 600
 
 // What the startup home is doing right now, or null when there is nothing
 // worth saying.
@@ -170,11 +175,11 @@ export function AutomationPanel({ overview, onRefresh }) {
     }
   }
 
-  // The switch saves on toggle like the three above, taking the times with
-  // it; it used to wait for the button, so ticking it and walking away left
-  // the page showing quiet hours on while the planter had them off. The button
-  // saves an edited window.
-  const saveQuiet = async (enabled = quietOn) => {
+  // Everything here saves as it is changed, the switch and both times, with
+  // the other two values going along. There is no Save button: the time
+  // pickers already show what was picked, and a button left an edited window
+  // looking saved when it was not. Only a failure is worth a message.
+  const saveQuiet = async ({ enabled = quietOn, start = quietStart, stop = quietStop } = {}) => {
     const previous = quietOn
     setQuietOn(enabled)
     setQuietMsg(null)
@@ -182,7 +187,7 @@ export function AutomationPanel({ overview, onRefresh }) {
       const response = await fetch(`${API_BASE}/quiet/hours`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled, start: quietStart, stop: quietStop }),
+        body: JSON.stringify({ enabled, start, stop }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -190,12 +195,27 @@ export function AutomationPanel({ overview, onRefresh }) {
         setQuietMsg({ text: data.error || `Save failed (HTTP ${response.status})`, warn: true })
         return
       }
-      setQuietMsg({ text: 'Saved.', warn: false })
       onRefresh?.()
     } catch (error) {
       setQuietOn(previous)
       setQuietMsg({ text: `Save failed: ${error.message}`, warn: true })
     }
+  }
+
+  // A time picker fires on every part of the time it is given -- the hour,
+  // then the minutes -- so its saves wait a moment for it to settle. One
+  // write instead of several also stops an older answer's refresh from
+  // putting back a time already changed again. A half-typed time ("") is
+  // never sent.
+  const quietTimer = useRef(null)
+  useEffect(() => () => clearTimeout(quietTimer.current), [])
+  const changeQuietTime = (field, value) => {
+    const next = { start: quietStart, stop: quietStop, [field]: value }
+    if (field === 'start') setQuietStart(value)
+    else setQuietStop(value)
+    clearTimeout(quietTimer.current)
+    if (!/^\d{2}:\d{2}$/.test(value)) return
+    quietTimer.current = setTimeout(() => saveQuiet(next), QUIET_SAVE_DELAY_MS)
   }
 
   return (
@@ -204,18 +224,15 @@ export function AutomationPanel({ overview, onRefresh }) {
 
       <div className="general-settings-form">
         <div className="settings-group">
-          <h3>Auto-water</h3>
+          <h3>Water plants automatically</h3>
 
           <div className="field-row">
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={autoOn}
-                disabled={savingAuto}
-                onChange={(event) => saveAutoWatering(event.target.checked)}
-              />
-              Water plants automatically
-            </label>
+            <OnOff
+              label="Water plants automatically"
+              value={autoOn}
+              disabled={savingAuto}
+              onChange={saveAutoWatering}
+            />
             <p className="field-hint">
               Every hour, on the hour, the arm homes, then visits each pot and
               waters the ones that need it.
@@ -258,18 +275,15 @@ export function AutomationPanel({ overview, onRefresh }) {
             before someone has checked it is clear. Automatic watering turns
             it on and holds it there, since the patrol depends on it. */}
         <div className="settings-group">
-          <h3>Homing</h3>
+          <h3>Home after startup</h3>
 
           <div className="field-row">
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={homeOnStartup}
-                disabled={savingStartup || startupHome?.required}
-                onChange={(event) => saveHomeOnStartup(event.target.checked)}
-              />
-              Home after startup
-            </label>
+            <OnOff
+              label="Home after startup"
+              value={homeOnStartup}
+              disabled={savingStartup || startupHome?.required}
+              onChange={saveHomeOnStartup}
+            />
             {startupHome?.required && (
               <p className="field-hint">Automatic watering needs this.</p>
             )}
@@ -287,21 +301,22 @@ export function AutomationPanel({ overview, onRefresh }) {
           <h3>Quiet hours</h3>
 
           <div className="field-row">
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={quietOn}
-                onChange={(event) => saveQuiet(event.target.checked)}
-              />
-              Quiet hours
-            </label>
+            <OnOff
+              label="Quiet hours"
+              value={quietOn}
+              onChange={(enabled) => {
+                // Carries the times with it, so a pending time save is spent.
+                clearTimeout(quietTimer.current)
+                saveQuiet({ enabled })
+              }}
+            />
             <div className="slider-row">
               <label>
                 From
                 <input
                   type="time"
                   value={quietStart}
-                  onChange={(event) => setQuietStart(event.target.value)}
+                  onChange={(event) => changeQuietTime('start', event.target.value)}
                 />
               </label>
               <label>
@@ -309,10 +324,9 @@ export function AutomationPanel({ overview, onRefresh }) {
                 <input
                   type="time"
                   value={quietStop}
-                  onChange={(event) => setQuietStop(event.target.value)}
+                  onChange={(event) => changeQuietTime('stop', event.target.value)}
                 />
               </label>
-              <button type="button" onClick={() => saveQuiet()}>Save quiet hours</button>
             </div>
             <p className="field-hint">Watering you start yourself is never blocked.</p>
             {quietMsg && (

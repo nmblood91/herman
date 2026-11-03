@@ -24,3 +24,26 @@ export function Segmented({ label, options, value, onChange, className = '' }) {
     </div>
   )
 }
+
+const ON_OFF = [
+  { label: 'On', value: true },
+  { label: 'Off', value: false },
+]
+
+/**
+ * A setting that is either on or off, as an On | Off pill. `label` is for
+ * screen readers; the heading above it says what it switches. Pressing the
+ * side already chosen does nothing, so it never resends the same value.
+ */
+export function OnOff({ label, value, onChange, disabled = false }) {
+  return (
+    <Segmented
+      label={label}
+      options={ON_OFF.map((option) => ({ ...option, disabled }))}
+      value={Boolean(value)}
+      onChange={(next) => {
+        if (next !== Boolean(value)) onChange(next)
+      }}
+    />
+  )
+}
