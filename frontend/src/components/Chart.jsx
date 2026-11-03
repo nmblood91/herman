@@ -21,9 +21,22 @@ const timeAxis = (hour24) => {
   ]
 }
 
+const NONE_HIDDEN = []
+
+// Shows or hides each series in place, so hiding a line keeps the zoom where
+// rebuilding the plot without it would reset it. Index 0 is the time axis.
+const applyHidden = (plot, hidden) => {
+  plot.series.forEach((series, index) => {
+    if (index === 0) return
+    const show = !hidden.includes(index)
+    if (series.show !== show) plot.setSeries(index, { show })
+  })
+}
+
 /**
  * Thin React wrapper around uPlot, whose API is imperative. Keeping the
  * instance in a ref means the rest of the UI never touches it directly.
+ * `hidden` lists the series indexes (into `series`) not to draw.
  */
 export function Chart({
   data,
@@ -34,6 +47,7 @@ export function Chart({
   yLabel,
   onCursor,
   hour24 = false,
+  hidden = NONE_HIDDEN,
 }) {
   const containerRef = useRef(null)
   const plotRef = useRef(null)
@@ -56,6 +70,13 @@ export function Chart({
   useEffect(() => {
     markersRef.current = markers
   }, [markers])
+
+  // Read by the build below, so a rebuilt plot comes up with the same lines
+  // hidden; the effect after the build handles a change on a live plot.
+  const hiddenRef = useRef(hidden)
+  useEffect(() => {
+    hiddenRef.current = hidden
+  }, [hidden])
 
   useEffect(() => {
     const container = containerRef.current
@@ -120,6 +141,7 @@ export function Chart({
       container,
     )
     plotRef.current = plot
+    applyHidden(plot, hiddenRef.current)
 
     const observer = new ResizeObserver(() => {
       plot.setSize({ width: container.clientWidth || 600, height })
@@ -142,6 +164,10 @@ export function Chart({
   useEffect(() => {
     plotRef.current?.setData(data)
   }, [data])
+
+  useEffect(() => {
+    if (plotRef.current) applyHidden(plotRef.current, hidden)
+  }, [hidden])
 
   return <div className="chart" ref={containerRef} />
 }

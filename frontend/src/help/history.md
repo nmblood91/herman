@@ -10,6 +10,9 @@ been recording longer than the range before each one.
 
 A gap in a line means that probe couldn't be read at the time.
 
+Tap a pot's name under the chart to hide its line, and tap it again to bring
+it back. A hidden pot's name is grayed out.
+
 **Hold to clear history** (five seconds) deletes every reading and watering
 the chart draws. Waterings from the last cooldown window stay, because the
 planter uses them to avoid watering a pot twice.

@@ -219,6 +219,25 @@ export function HistoryPanel() {
   // instead of the axis rescaling to whatever happens to be on screen.
   const yRange = moisture ? MOISTURE_RANGE : undefined
 
+  // Pots taken off the chart from the legend, by plant_id. Only for this
+  // visit to the tab: coming back shows every pot again.
+  const [hiddenIds, setHiddenIds] = useState([])
+  const toggleHidden = (plantId) =>
+    setHiddenIds((current) =>
+      current.includes(plantId) ? current.filter((id) => id !== plantId) : [...current, plantId],
+    )
+  // The series indexes to hide: each pot's line, and on the moisture view
+  // its dashed target too. The order matches `series` above.
+  const hidden = useMemo(
+    () =>
+      shown.flatMap((plant, index) =>
+        hiddenIds.includes(plant.plant_id)
+          ? [index + 1, ...(moisture ? [shown.length + index + 1] : [])]
+          : [],
+      ),
+    [shown, hiddenIds, moisture],
+  )
+
   // The point under the cursor, or null for each pot's latest reading.
   const [cursorIdx, setCursorIdx] = useState(null)
   const suffix = moisture ? '%' : fahrenheit ? '°F' : '°C'
@@ -276,6 +295,7 @@ export function HistoryPanel() {
           yLabel={moisture ? 'Soil water %' : fahrenheit ? 'Temp °F' : 'Temp °C'}
           onCursor={setCursorIdx}
           hour24={clock24h}
+          hidden={hidden}
         />
       )}
 
@@ -286,11 +306,22 @@ export function HistoryPanel() {
         <ul className="chart-legend">
           {shown.map((plant) => {
             const value = readingAt(valuesOf(plant, moisture, fahrenheit))
+            const off = hiddenIds.includes(plant.plant_id)
             return (
               <li key={plant.plant_id}>
-                <span className="chart-swatch" style={{ background: plant.color }} />
-                {plant.name}
-                <strong>{value == null ? '--' : `${value.toFixed(1)}${suffix}`}</strong>
+                {/* Press to take the pot's line off the chart, again to put
+                    it back. Grayed while it is off. */}
+                <button
+                  type="button"
+                  className={`chart-legend-item${off ? ' hidden' : ''}`}
+                  aria-pressed={!off}
+                  title={off ? `Show ${plant.name}` : `Hide ${plant.name}`}
+                  onClick={() => toggleHidden(plant.plant_id)}
+                >
+                  <span className="chart-swatch" style={{ background: plant.color }} />
+                  {plant.name}
+                  <strong>{value == null ? '--' : `${value.toFixed(1)}${suffix}`}</strong>
+                </button>
               </li>
             )
           })}

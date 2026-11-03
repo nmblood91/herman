@@ -864,6 +864,41 @@ input[type='color'] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Each pot's chip is a button that hides its line. Drawn as the plain chip it
+   was, not as a page button; grayed out while its line is hidden. */
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  margin: 0 -6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Scored above button:not(:disabled):hover, which would otherwise paint the
+   chip green and lift it. */
+.chart-legend .chart-legend-item:not(:disabled):hover {
+  background: rgba(143, 174, 156, 0.12);
+  transform: none;
+}
+
+.chart-legend-item.hidden {
+  opacity: 0.4;
+}
+
+.chart-legend-item.hidden .chart-swatch {
+  filter: grayscale(1);
+}
+
+.chart-legend-item.hidden strong {
+  text-decoration: line-through;
+}
+
 .chart-swatch {
   width: 10px;
   height: 10px;
