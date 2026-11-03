@@ -74,7 +74,7 @@ Everything is under `/api/v1`, grouped roughly as:
 | Group | What it covers |
 |---|---|
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
-| `/plants/...` | per-plant name, light window and scheduled light color, moisture target, dose volume, rail position, watering mode and sweep span, and move-to |
+| `/plants/...` | per-plant name, light window and scheduled light color, moisture target, dose volume, rail position, watering mode and sweep span, move-to, and turning a pot off or on (`/plants/{id}/enabled`) |
 | `/plant-profiles`, `/plants/{id}/profile` | the plant profile library: list, read one, write one from a body, snapshot a pot, load onto a pot, delete |
 | `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
 | `/water/{plant_id}` | move to a plant and dose it |

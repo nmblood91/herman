@@ -76,6 +76,11 @@ class PlantSpec:
     light_color: tuple[int, int, int] = care.DEFAULT_LIGHT_COLOR
     manual_color: tuple[int, int, int] = care.DEFAULT_LIGHT_COLOR
     manual_brightness: int = care.DEFAULT_LIGHT_BRIGHTNESS
+    # Whether this pot is in use. An off pot's probe is not read, it is left
+    # off the patrol and out of the status bar, and its stretch of strip stays
+    # dark on the schedule; manual lighting still reaches it. A property of
+    # the pot, so loading a plant profile leaves it alone.
+    enabled: bool = True
 
 
 @dataclass
@@ -113,3 +118,5 @@ class PlantStatus:
     # "minutes", "rise"}, state being pending, soaked, missed, unknown or
     # skipped. None when it has never been watered with the check on.
     last_soak: dict | None = None
+    # False for a pot that has been turned off (PlantSpec.enabled).
+    enabled: bool = True

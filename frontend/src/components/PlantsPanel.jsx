@@ -426,6 +426,32 @@ export function PlantsPanel({
   const profileGroups = groupByCategory(profiles)
   const soilList = soils ?? []
 
+  // Turning a pot off or on. Keyed by plant like the notes above.
+  const [switching, setSwitching] = useState({})
+  const [switchNote, setSwitchNote] = useState({})
+  const setEnabled = async (plant, enabled) => {
+    const note = (text) => setSwitchNote((current) => ({ ...current, [plant.plant_id]: text }))
+    setSwitching((current) => ({ ...current, [plant.plant_id]: true }))
+    note('')
+    try {
+      const response = await fetch(`${API_BASE}/plants/${plant.plant_id}/enabled`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        note(data.error || `Could not save (HTTP ${response.status})`)
+        return
+      }
+      await onRefresh?.()
+    } catch (error) {
+      note(`Could not save: ${error.message}`)
+    } finally {
+      setSwitching((current) => ({ ...current, [plant.plant_id]: false }))
+    }
+  }
+
   const togglePlantExpanded = (plantId) => {
     setExpandedPlantIds((current) =>
       current.includes(plantId)
@@ -452,11 +478,14 @@ export function PlantsPanel({
           const draft = drafts[plant.plant_id] || draftFrom(plant)
           const isExpanded = expandedPlantIds.includes(plant.plant_id)
           const plantStatus = status?.find((item) => item.plant_id === plant.plant_id)
-          const reading = describeMoisture(plantStatus)
-          const lastSoak = describeSoak(plantStatus?.last_soak)
+          const off = plant.enabled === false
+          const reading = off
+            ? { text: 'Off', hint: 'Not read or watered' }
+            : describeMoisture(plantStatus)
+          const lastSoak = off ? null : describeSoak(plantStatus?.last_soak)
 
           return (
-            <div key={plant.plant_id} className="plant-card">
+            <div key={plant.plant_id} className={`plant-card${off ? ' off' : ''}`}>
               <button
                 type="button"
                 className="plant-header"
@@ -753,6 +782,26 @@ export function PlantsPanel({
                     )}
                   </div>
 
+                  {/* Last on the card: it is about the pot as a whole, not one
+                      of the groups above. No hold to confirm, since turning a
+                      pot back on loses nothing. */}
+                  <div className="plant-actions-row">
+                    <button
+                      type="button"
+                      disabled={switching[plant.plant_id]}
+                      onClick={() => setEnabled(plant, !off)}
+                    >
+                      {off ? 'Turn on' : 'Turn off'}
+                    </button>
+                  </div>
+                  <p className="field-hint">
+                    {off
+                      ? 'Off: its probe is not read, it is left out of the hourly patrol and its schedule lights stay dark. Settings can still be changed.'
+                      : 'Turning a pot off stops its readings, watering and schedule lights. Manual lighting still reaches it.'}
+                  </p>
+                  {switchNote[plant.plant_id] && (
+                    <p className="field-hint warning">{switchNote[plant.plant_id]}</p>
+                  )}
                 </>
               )}
             </div>

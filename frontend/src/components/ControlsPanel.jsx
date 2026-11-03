@@ -422,7 +422,8 @@ export function ControlsPanel({
               plantList.map((plant) => (
                 <button
                   key={plant.plant_id}
-                  disabled={!canHomeAndGo}
+                  disabled={!canHomeAndGo || plant.enabled === false}
+                  title={plant.enabled === false ? 'Turned off' : undefined}
                   onClick={() => onWaterPlant(plant.plant_id)}
                 >
                   {plant.name}

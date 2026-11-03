@@ -372,7 +372,7 @@ class GreenThumbAutomation:
         polled = set(getattr(self.sensor_hub, "addresses", []) or [])
         if not polled:
             return
-        orphaned = [plant for plant in self.plants if plant.sensor_address not in polled]
+        orphaned = [plant for plant in self._active_plants() if plant.sensor_address not in polled]
         if orphaned:
             logger.warning(
                 "%s will never be watered: sensor address%s %s not in "
@@ -399,6 +399,8 @@ class GreenThumbAutomation:
                 value = saved.get(text_field)
                 if isinstance(value, str) and value.strip():
                     setattr(plant, text_field, value.strip())
+            if isinstance(saved.get("enabled"), bool):
+                plant.enabled = saved["enabled"]
             # The care settings, each checked the way the editor checks it. A
             # bad value keeps the default rather than failing the restore.
             for field_name, check in (
@@ -578,6 +580,7 @@ class GreenThumbAutomation:
                     "light_color": list(plant.light_color),
                     "manual_color": list(plant.manual_color),
                     "manual_brightness": plant.manual_brightness,
+                    "enabled": plant.enabled,
                     **{
                         key: value for key, value in care_fields(plant).items()
                         if key not in DERIVED_CARE_FIELDS
@@ -1115,7 +1118,7 @@ class GreenThumbAutomation:
     def _patrol_visits(self) -> list[tuple[PlantSpec, dances.PatrolStop]]:
         """Each pot the patrol visits, with how it visits it (_patrol_stops)."""
         visits = []
-        for plant in self.plants:
+        for plant in self._active_plants():
             resolved = self._resolve_sweep(plant, plant.watering_volume_ml)
             if isinstance(resolved, tuple):
                 low, high, plan = resolved
@@ -1209,7 +1212,9 @@ class GreenThumbAutomation:
                 Zone(
                     start=plant.led_start_index,
                     end=plant.led_end_index,
-                    lit=care.light_on(now, plant.light_start_time, plant.light_hours),
+                    # An off pot stays dark on the schedule. Manual lighting
+                    # is an override and still reaches it.
+                    lit=plant.enabled and care.light_on(now, plant.light_start_time, plant.light_hours),
                     brightness=plant.light_brightness,
                     color=plant.light_color,
                     manual_color=plant.manual_color,
@@ -1219,9 +1224,18 @@ class GreenThumbAutomation:
             ]
         )
 
+    def _active_plants(self) -> list[PlantSpec]:
+        """The pots that are turned on (PlantSpec.enabled)."""
+        return [plant for plant in self.plants if plant.enabled]
+
     def _poll_sensors(self) -> None:
+        # An off pot's probe is not read at all, so an unplugged one is not a
+        # fault. An address no pot owns is still read, as it always was.
+        off = {plant.sensor_address for plant in self.plants if not plant.enabled}
         samples = []
         for address in self.sensor_hub.addresses:
+            if address in off:
+                continue
             sample = self.sensor_hub.read_one(address)
             self._latest[address] = sample
             samples.append(sample)
@@ -1315,7 +1329,9 @@ class GreenThumbAutomation:
         for row in self.history.pending_soaks():
             plant = self.get_plant(str(row["plant_id"]))
             dosed = int(row["recorded_at"])
-            if plant is None:
+            # An off pot's probe is no longer read, so its dose cannot be
+            # judged -- and must not count as a miss.
+            if plant is None or not plant.enabled:
                 self.history.record_soak(int(row["id"]), soak.SKIPPED)
                 continue
             address = plant.sensor_address
@@ -1436,14 +1452,20 @@ class GreenThumbAutomation:
         # "not polled yet" and saying "no sensors are reporting" on a fresh
         # boot would be alarming and wrong. A plant with no sample at all falls
         # through to the gathering case below.
+        #
+        # From here on only the pots that are turned on count: an off pot is
+        # not read, watered or worth a word.
+        active = self._active_plants()
+        if not active:
+            return state("info", "Every pot is turned off.")
         dead = [
             plant.name
-            for plant in self.plants
+            for plant in active
             if self._has_polled
             and (latest := self._latest.get(plant.sensor_address)) is not None
             and latest.moisture_raw < 0
         ]
-        if len(dead) == len(self.plants) and dead:
+        if len(dead) == len(active) and dead:
             return state("problem", "No sensors are reporting. Check the hub connection.")
         if dead:
             return state("attention", f"No reading from {', '.join(dead)}. Check the probe.")
@@ -1471,7 +1493,7 @@ class GreenThumbAutomation:
         # 5. Working, but not yet able to act.
         filling = [
             plant.name
-            for plant in self.plants
+            for plant in active
             if len(self._history.get(plant.sensor_address) or ()) < settings.moisture_window_size
         ]
         if filling:
@@ -1485,7 +1507,7 @@ class GreenThumbAutomation:
         # Pots with no soil cannot be judged at all, and saying so is the
         # point: automatic watering is held for them, and silence would read
         # as "nothing to do" rather than "cannot tell".
-        unset = [plant.name for plant in self.plants if not plant.soil]
+        unset = [plant.name for plant in active if not plant.soil]
         if unset and self.auto_watering_enabled:
             return state(
                 "attention",
@@ -1498,7 +1520,7 @@ class GreenThumbAutomation:
         # every cycle. Without this it fell through to "all plants are happy".
         unmeasured = [
             plant
-            for plant in self.plants
+            for plant in active
             if plant.soil and self.scale_problem(plant) is not None
         ]
         if unmeasured and self.auto_watering_enabled:
@@ -1513,10 +1535,10 @@ class GreenThumbAutomation:
         # Said as a fact, not a warning: idle is where the motor spends most
         # of the hour.
         idle = " Motor idle." if self.motor_status(movement)["state"] == "idle" else ""
-        thirsty = [plant.name for plant in self.plants if self.thirsty(plant)]
+        thirsty = [plant.name for plant in active if self.thirsty(plant)]
         if thirsty:
             return state("ok", f"{', '.join(thirsty)} due a drink at the next hourly patrol.{idle}")
-        count = len(self.plants)
+        count = len(active)
         return state("ok", f"All {count} plants are happy.{idle}")
 
     # --- automatic watering ----------------------------------------------
@@ -2024,6 +2046,7 @@ class GreenThumbAutomation:
                 window_size=settings.moisture_window_size,
                 scale_problem=self.scale_problem(spec),
                 last_soak=soaks.get(spec.plant_id),
+                enabled=spec.enabled,
             )
             for spec in self.plants
         ]
@@ -2073,6 +2096,8 @@ class GreenThumbAutomation:
                     # "" when no plant profile is loaded, which the chart
                     # leaves out: an empty pot's probe is not a plant's line.
                     "profile": plant.profile,
+                    # An off pot's past readings are kept; the chart hides them.
+                    "enabled": plant.enabled,
                     **series[plant.sensor_address],
                 }
                 for plant in self.plants
@@ -2100,7 +2125,8 @@ class GreenThumbAutomation:
             plant = self.plant_for_address(address)
             entries.append(
                 {
-                    **self._latest[address].__dict__,
+                    # Missing for an off pot's probe, which is not read.
+                    **(self._latest.get(address) or unavailable_sample(address)).__dict__,
                     "plant_id": plant.plant_id if plant else None,
                     "sample_count": len(self._history[address]),
                 }
@@ -2111,6 +2137,8 @@ class GreenThumbAutomation:
         plant = self.get_plant(plant_id)
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
+        if not plant.enabled:
+            raise ValueError(f"{plant.name} is turned off. Turn it on from its card to water it.")
 
         # Moves first, like the automatic path. Pumping without moving waters
         # whatever the nozzle happens to be parked over.
@@ -2729,7 +2757,7 @@ class GreenThumbAutomation:
         if held:
             logger.info("Hourly patrol without watering: %s", held)
         due = set() if held else {
-            plant.plant_id for plant in self.plants if self._due_on_patrol(plant, moment)
+            plant.plant_id for plant in self._active_plants() if self._due_on_patrol(plant, moment)
         }
 
         travel = self.usable_travel_mm()
@@ -3236,6 +3264,31 @@ class GreenThumbAutomation:
 
     def get_plant(self, plant_id: str) -> PlantSpec | None:
         return next((plant for plant in self.plants if plant.plant_id == plant_id), None)
+
+    def set_plant_enabled(self, plant_id: str, enabled: bool) -> dict[str, object]:
+        """Turn a pot off (not read, watered or lit on the schedule) or on."""
+        plant = self.get_plant(plant_id)
+        if plant is None:
+            raise ValueError(f"Unknown plant_id: {plant_id}")
+        plant.enabled = bool(enabled)
+        if not plant.enabled:
+            # Forgotten, so turning it back on starts with "getting to know"
+            # rather than a reading from before it was off. The pending soak
+            # checks follow in _check_soaks.
+            address = plant.sensor_address
+            if address in self._history:
+                self._history[address].clear()
+            self._latest.pop(address, None)
+            try:
+                self._check_soaks()
+            except Exception:
+                logger.exception("Could not settle the soak checks for %s", plant.name)
+        self._persist()
+        try:
+            self._apply_lighting()
+        except Exception:
+            logger.exception("Could not update the lights for %s", plant.name)
+        return {"status": "ok", "plant_id": plant_id, "name": plant.name, "enabled": plant.enabled}
 
     def update_plant_name(self, plant_id: str, name: str) -> dict[str, object]:
         plant = self.get_plant(plant_id)

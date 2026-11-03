@@ -593,6 +593,7 @@ async def list_plants() -> list[dict[str, object]]:
             "led_start_index": plant.led_start_index,
             "led_end_index": plant.led_end_index,
             "light_color": list(plant.light_color),
+            "enabled": plant.enabled,
         }
         for plant in plants
     ]
@@ -785,6 +786,15 @@ def clear_plant_profile(plant_id: str) -> dict[str, object]:
     """Take the plant profile off this pot. Placement and soil are kept."""
     result = automation.clear_plant_profile(plant_id)
     log_event(f"Cleared the plant profile from {plant_id}")
+    return result
+
+
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/enabled")
+def set_plant_enabled(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Turn a pot off or back on: {"enabled": false}. An off pot is not read,
+    watered or lit on the schedule."""
+    result = automation.set_plant_enabled(plant_id, _require_enabled(payload))
+    log_event(f"{result['name']} turned {'on' if result['enabled'] else 'off'}")
     return result
 
 

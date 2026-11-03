@@ -162,7 +162,9 @@ export function HistoryPanel() {
     () =>
       (history?.plants || [])
         .map((plant, index) => ({ ...plant, color: PLANT_COLORS[index % PLANT_COLORS.length] }))
-        .filter((plant) => plant.profile),
+        // A pot turned off keeps its readings but is not drawn until it is
+        // turned back on.
+        .filter((plant) => plant.profile && plant.enabled !== false),
     [history],
   )
 

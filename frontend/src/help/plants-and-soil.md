@@ -30,6 +30,20 @@ To set a position, move the arm over the pot with the buttons on the card, then
 press **Use current position**. Each field shows the part of the rail it
 accepts.
 
+### Turning a pot off
+For a pot with nothing planted in it, or a probe you've taken out, open its
+card and press **Turn off** at the bottom. While it's off:
+- its probe isn't read, so a missing probe isn't reported;
+- the hourly patrol doesn't visit or water it, and it can't be watered from
+  **Controls** (moving the arm to it still works);
+- its lights stay dark on the schedule, though lighting it by hand on
+  **Controls** still works;
+- its line is hidden on **History**. Its past readings are kept.
+
+The card stays gray, and you can still change its settings. Press
+**Turn on** to start using it again. It takes a few minutes of readings before
+it can be watered.
+
 ### Plant Profile Editor
 Where you make or change plant profiles. A profile holds:
 - **Water at:** how low the soil water gets before the plant is watered,
@@ -85,6 +99,6 @@ memory card can be damaged and your profiles lost.
 |---|---|
 | "No plant profile loaded" | Load one from the list on the card. |
 | "No soil profile set" | Choose the mix that's in the pot. |
-| The moisture reading shows a dash | The probe isn't being read. Check its cable is plugged in at both ends. |
+| The moisture reading shows a dash | The probe isn't being read. Check its cable is plugged in at both ends. If the pot is empty, [turn it off](#turning-a-pot-off). |
 | The moisture reading never changes | Check the probe is pushed into the soil and not touching the pot's side. |
 | A position won't save | It's outside the range shown in the field's name. Move the arm over the right pot and try again. |

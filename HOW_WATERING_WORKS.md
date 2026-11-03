@@ -121,6 +121,9 @@ On each hourly patrol, for each pot, the planter asks six questions in order.
 **All six must be yes** or that pot just gets a visit, and is asked again on the
 next hour's patrol.
 
+A pot turned off on its card isn't asked at all. Its probe isn't read, and the
+patrol passes it by without a visit.
+
 1. **Am I allowed to make noise right now?** See quiet hours below. If not, the
    whole patrol waits for the next hour.
 2. **Did the last watering, on any pot, show up on its moisture probe?** Until it

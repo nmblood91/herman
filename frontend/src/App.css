@@ -295,6 +295,20 @@ button:disabled.working {
   padding: 16px;
 }
 
+/* A pot that is turned off: grayed rather than hidden, and its settings stay
+   usable so it can be set up before it is turned on. Only the title bar is
+   dimmed, so the fields do not look disabled. */
+.plant-card.off {
+  background: rgba(22, 24, 23, 0.95);
+  border-color: #3a3f3c;
+  border-style: dashed;
+}
+
+.plant-card.off .plant-header {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+
 .plant-header {
   display: flex;
   align-items: center;
