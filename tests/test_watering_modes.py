@@ -28,7 +28,6 @@ from greenthumb.services.automation import GreenThumbAutomation
 from tests.helpers import CalibrationSurface, give_every_plant_soil, temp_state, temp_store
 
 settings.auto_watering_enabled = True
-settings.auto_patrol_enabled = False
 
 ACCEL = 1000.0
 TOP_SPEED = 100.0

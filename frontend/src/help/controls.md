@@ -2,12 +2,13 @@
 
 ### Gantry
 The [gantry](#gantry-arm) is the arm that carries the watering nozzle along the
-rail from plant to plant. It has to be [homed](#homing) before it can move:
-press **Home Gantry**, and the arm moves to the end of the rail to establish
-position. Once it has homed, the planter can water on its own.
+rail from plant to plant. **Home Gantry** moves the arm to the end of the rail
+to establish its position ([homing](#homing)).
 
-After homing you can also move the arm yourself. The move buttons shift it 10
-or 50 mm at a time, or send it to either end of the rail.
+A minute after the arm last moved, its motor switches off and the position
+reads **motor idle**. That's normal. Sending the arm to either end, to a
+plant, or watering a plant homes it first by itself. The buttons that shift it
+10 or 50 mm need you to press **Home Gantry** first.
 
 ### Dances
 Short routines that move the nozzle for fun or for testing. The arm homes first
@@ -39,7 +40,7 @@ running can damage its memory card. Press and keep holding
 ### If something looks wrong
 | What you see | What to do |
 |---|---|
-| The move buttons are grayed out | Press **Home Gantry** first. |
+| The 10 and 50 mm buttons are grayed out | Press **Home Gantry** first. |
 | **Home Gantry** is grayed out | Test the motor direction on the Calibration tab first. See [Motor direction](#motor-direction). |
 | "The motion board is not responding" | The arm's control board can't be reached. Switch the planter off and on again. If that doesn't help, contact support. |
 | The lights don't come on in Zone Schedule | Check the **System Time** on the Calibration tab, and the light hours in that pot's plant profile. |

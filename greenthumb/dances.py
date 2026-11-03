@@ -3,7 +3,8 @@
 A gantry that only moves when it waters spends almost all its time perfectly
 still, which reads as broken rather than idle. These routines exist so it
 visibly does something between waterings. All of them can be run by hand from
-Controls; Patrol is also what the hourly auto-patrol runs after its re-home.
+Controls. The hourly live patrol visits pots the same way Patrol does (see
+visit_steps), watering the ones that are due instead of pausing over them.
 
 The re-home is the part that earns its keep. Steppers are open-loop: nothing
 tells Klipper the carriage is where it thinks it is, so a belt that slips or a
@@ -168,22 +169,37 @@ def steps_for(
         # trip down the rail rather than criss-crossing it.
         steps = []
         for stop in sorted(stops, key=lambda s: s.position_mm):
-            if stop.sweep_to_mm is None or stop.feedrate <= 0:
-                steps.append((clamp(stop.position_mm), CRUISE, POINT_DWELL_MS))
-                continue
-            near, far = clamp(stop.position_mm), clamp(stop.sweep_to_mm)
-            steps.append((near, CRUISE, 0))
-            for index in range(PATROL_SWEEP_PASSES):
-                last = index == PATROL_SWEEP_PASSES - 1
-                steps.append((
-                    far if index % 2 == 0 else near,
-                    stop.feedrate,
-                    SWEEP_DWELL_MS if last else 0,
-                ))
+            steps.extend(visit_steps(stop, travel_mm))
         steps.append((0, CRUISE, 0))
         return steps
 
     return [(clamp(step.at * limit), step.feedrate, step.dwell_ms) for step in dance.steps]
+
+
+def visit_steps(stop: PatrolStop, travel_mm: float) -> list[tuple[int, int, int]]:
+    """One patrol stop on its own, with no park at the end.
+
+    The live patrol sends the rail one pot at a time, watering some and
+    visiting the rest, so it needs a visit it can send by itself. Clamped to
+    the rail like the rest of the patrol.
+    """
+    limit = max(float(travel_mm), 1.0)
+
+    def clamp(mm: float) -> int:
+        return min(round(max(mm, 0.0)), int(limit))
+
+    if stop.sweep_to_mm is None or stop.feedrate <= 0:
+        return [(clamp(stop.position_mm), CRUISE, POINT_DWELL_MS)]
+    near, far = clamp(stop.position_mm), clamp(stop.sweep_to_mm)
+    steps = [(near, CRUISE, 0)]
+    for index in range(PATROL_SWEEP_PASSES):
+        last = index == PATROL_SWEEP_PASSES - 1
+        steps.append((
+            far if index % 2 == 0 else near,
+            stop.feedrate,
+            SWEEP_DWELL_MS if last else 0,
+        ))
+    return steps
 
 
 def gcode_for(steps: list[tuple[float, int, int]]) -> str:

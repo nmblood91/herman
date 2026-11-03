@@ -63,6 +63,15 @@ class FakeKlipper:
     def status(self):
         return {"ok": True, "position": 0.0, "homed": True}
 
+    def home_gantry(self):
+        return {"ok": True}
+
+    def send_gcode(self, gcode, timeout=5.0):
+        return {"ok": True}
+
+    def release_motors(self):
+        return {"ok": True}
+
 
 class FakeLeds:
     mode = "schedule"
@@ -86,33 +95,37 @@ def build(raw):
     return auto, pump
 
 
-# 1. window must fill before anything waters
+# 1. the tick never waters; the patrol waters, but only on a full window
 auto, pump = build(settings.moisture_raw_dry)
 for _ in range(9):
     auto.tick()
+auto.live_patrol()
 assert pump.calls == [], f"watered before window filled: {pump.calls}"
 auto.tick()
+assert pump.calls == [], f"the tick watered: {pump.calls}"
+auto.live_patrol()
 assert len(pump.calls) == 1, f"expected one watering at full window, got {pump.calls}"
-print("ok: no watering until window is full, then waters once")
+print("ok: no watering until window is full, then the patrol waters once")
 
 # 2. cooldown blocks repeat watering while still dry
-for _ in range(5):
-    auto.tick()
+auto.live_patrol()
 assert len(pump.calls) == 1, f"cooldown did not hold: {pump.calls}"
+auto.live_patrol(now=datetime.now() + timedelta(minutes=30))
+assert len(pump.calls) == 1, f"cooldown did not hold at 30 minutes: {pump.calls}"
 print("ok: cooldown suppresses repeat watering")
 
-# 3. cooldown expiry allows watering again
-auto._last_watered["plant_1"] = datetime.now() - timedelta(
-    minutes=settings.watering_cooldown_minutes + 1
-)
-auto.tick()
-assert len(pump.calls) == 2, f"expected watering after cooldown, got {pump.calls}"
-print("ok: waters again once cooldown expires")
+# 3. the next hour's patrol waters again, even a little inside the cooldown:
+# patrols and the cooldown are both an hour, and a dose a minute into one
+# patrol must not push the pot past the next.
+auto.live_patrol(now=datetime.now() + timedelta(minutes=settings.watering_cooldown_minutes - 2))
+assert len(pump.calls) == 2, f"expected watering at the next patrol, got {pump.calls}"
+print("ok: waters again at the next hour's patrol")
 
 # 4. wet soil never waters
 auto, pump = build(FIELD_CAPACITY)
 for _ in range(15):
     auto.tick()
+auto.live_patrol()
 assert pump.calls == [], f"watered wet soil: {pump.calls}"
 assert auto.percent_for_plant(auto.plant_for_address(0x36)) == 100.0
 print("ok: saturated soil is left alone")

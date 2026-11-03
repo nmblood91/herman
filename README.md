@@ -80,9 +80,9 @@ Everything is under `/api/v1`, grouped roughly as:
 | `/water/{plant_id}` | move to a plant and dose it |
 | `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
-| `/watering/auto` | the master switch for unattended watering |
+| `/watering/auto` | the master switch for unattended watering, which is the hourly live patrol |
 | `/dances`, `/dances/run/{name}` | the routines, run by hand |
-| `/patrol/auto`, `/gantry/home-on-startup` | the hourly auto-patrol and the startup home, each on or off |
+| `/gantry/home-on-startup` | the startup home, on or off; held on while automatic watering is on |
 | `/quiet`, `/quiet/hours`, `/quiet/snooze`, `/quiet/resume` | quiet hours and the snooze |
 | `/lights/...` | mode (Zone Schedule, Manual, Rainbow, Off), brightness, color, Manual for all zones or each zone (`/lights/manual-scope`, `/lights/zones/{plant_id}`), rainbow speed, strip type, color order |
 | `/sensors/calibration...` | read, measure and reset per-sensor moisture calibration |

@@ -1,4 +1,4 @@
-"""Routines, the hourly auto-patrol, and the startup home.
+"""Routines and the startup home.
 
 Two things matter here and neither is the choreography. A routine must never
 hand Klipper a move outside the rail, and it must never be the reason
@@ -20,7 +20,6 @@ from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyErr
 from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 settings.auto_watering_enabled = False
-settings.auto_patrol_enabled = False
 settings.home_on_startup = False
 
 TRAVEL = 890.0
@@ -206,127 +205,15 @@ assert all(stop.sweep_to_mm is None for stop in auto._patrol_stops())
 print("ok: no motion limits from Klipper, no sweep in the patrol either")
 
 
-# --- the hourly auto-patrol ---
-#
-# auto_patrol is what the scheduler calls at minute 0. Called directly here
-# with a fixed time, so nothing below depends on what the clock says while
-# the test runs.
+# The hourly live patrol, which waters, has its own file: test_live_patrol.py.
 
-AT_TWO = datetime(2026, 10, 14, 14, 0)
-
-
-def patrol_gcode(auto):
-    return dances.gcode_for(dances.steps_for(
-        "patrol", auto.usable_travel_mm(), auto._patrol_stops()
-    ))
-
-
-# Off by default, for the same reason as the startup home: nobody assembling
-# a planter should have the arm set off before they are ready for it.
-assert type(settings).model_fields["auto_patrol_enabled"].default is False
-auto, klip = build()
-auto.auto_patrol(now=AT_TWO)
-assert klip.gcode == [] and klip.homes == 0, (klip.gcode, klip.homes)
-print("ok: the hourly patrol is off by default, and off means off")
-
-auto, klip = build()
-auto.set_auto_patrol(True)
-for hour in range(3):
-    auto.auto_patrol(now=AT_TWO + timedelta(hours=hour))
-assert klip.homes == 3, f"homed {klip.homes} times for 3 patrols"
-assert klip.gcode == [patrol_gcode(auto)] * 3, klip.gcode
-assert auto.auto_patrol_status()["last"] == {"at": "2026-10-14T16:00", "ok": True, "error": None}
-print("ok: every run homes first and then patrols -- always the patrol, never a rotation")
-
-# The control loop no longer moves the arm on a timer: on the hour is the
-# scheduler's job, and a tick a minute apart could not land on it.
-auto, klip = build()
-auto.set_auto_patrol(True)
-for _ in range(3):
-    auto.tick()
-assert klip.gcode == [] and klip.homes == 0, (klip.gcode, klip.homes)
-print("ok: the control loop never patrols by itself")
-
-# A manual routine is never held, and has no bearing on the schedule.
-auto, klip = build()
-auto.set_auto_patrol(True)
-auto.run_dance("shuffle")
-auto.auto_patrol(now=AT_TWO)
-assert len(klip.gcode) == 2, "a manual routine suppressed the hourly patrol"
-print("ok: a manual routine does not push the hourly patrol back")
-
-
-# --- it yields to quiet hours and a snooze ---
-
-auto, klip = build()
-auto.set_auto_patrol(True)
-auto.set_quiet_hours(True, "21:00", "08:00")
-auto.auto_patrol(now=datetime(2026, 10, 14, 23, 0))
-assert klip.gcode == [] and klip.homes == 0, "patrolled during quiet hours"
-assert auto.auto_patrol_status()["last"] is None, "a skipped hour was reported as a run"
-auto.auto_patrol(now=datetime(2026, 10, 15, 9, 0))
-assert len(klip.gcode) == 1, "did not patrol once quiet hours were over"
-print("ok: quiet hours skip the hour, and the next hour after the window runs")
-
-auto, klip = build()
-auto.set_auto_patrol(True)
-auto.snooze_watering(2)
-auto.auto_patrol()
-assert klip.gcode == [], "patrolled while snoozed"
-print("ok: a snooze skips it too")
-
-
-# --- busy hardware is waited out, briefly ---
-
-import threading
-import greenthumb.services.automation as automation_module
-
-automation_module.PATROL_BUSY_POLL_SECONDS = 0.02
-
-auto, klip = build()
-auto.set_auto_patrol(True)
-auto._hardware_lock.acquire()
-try:
-    auto.auto_patrol(now=AT_TWO, busy_wait_seconds=0)
-finally:
-    auto._hardware_lock.release()
-assert klip.gcode == [], klip.gcode
-last = auto.auto_patrol_status()["last"]
-assert last["ok"] is False and last["error"] == "hardware was busy", last
-print("ok: hardware that stays busy past the wait gives up the hour and says so")
-
-auto, klip = build()
-auto.set_auto_patrol(True)
-auto._hardware_lock.acquire()
-threading.Timer(0.1, auto._hardware_lock.release).start()
-auto.auto_patrol(now=AT_TWO, busy_wait_seconds=5)
-assert len(klip.gcode) == 1, "gave up instead of waiting for a dose to finish"
-print("ok: hardware that frees up within the wait gets its patrol")
-
-
-class NoHome(Klip):
-    def home_gantry(self):
-        self.homes += 1
-        return {"ok": False, "error": "endstop not triggered"}
-
-
-auto, klip = build(klip=NoHome())
-auto.set_auto_patrol(True)
-auto.auto_patrol(now=AT_TWO)
-assert klip.gcode == [], "patrolled without a home"
-last = auto.auto_patrol_status()["last"]
-assert last["ok"] is False and "endstop not triggered" in last["error"], last
-print("ok: a failed home stops the patrol, and the reason reaches the UI")
-
-
-# --- settings survive a restart ---
-
-shared = temp_state()
-first, _ = build(shared)
-first.set_auto_patrol(True)
-restored, _ = build(shared)
-assert restored.auto_patrol_enabled is True
-print("ok: the patrol switch survives a restart")
+# A single stop on its own is the same visit the patrol makes, without the park.
+point = dances.visit_steps(dances.PatrolStop(600.0), TRAVEL)
+assert point == [(600, dances.CRUISE, dances.POINT_DWELL_MS)], point
+swept = dances.visit_steps(dances.PatrolStop(100.0, sweep_to_mm=250.0, feedrate=2400), TRAVEL)
+assert swept == steps[:4], (swept, steps)
+assert dances.visit_steps(dances.PatrolStop(950.0), TRAVEL)[0][0] == int(TRAVEL)
+print("ok: one stop's visit matches the patrol's, with no park, and stays on the rail")
 
 
 # --- the startup home ---

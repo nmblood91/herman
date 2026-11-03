@@ -20,6 +20,8 @@ class Klip:
         self.gcode.append(g); return {"ok": True}
     def move_gantry_absolute(self, p): self.moves.append(p); return {"ok": True}
     def status(self): return {"ok": True}
+    def home_gantry(self): return {"ok": True}
+    def release_motors(self): return {"ok": True}
 
 class Hub(CalibrationSurface):
     addresses = [0x36, 0x37, 0x38, 0x39]
@@ -55,25 +57,23 @@ print("ok: run then stop drives the pin on and off")
 assert not any("G4" in g for g in klip.gcode), klip.gcode
 print("ok: no G4 dwell queued, so stop takes effect immediately")
 
-# the control loop cannot water while a manual run holds the hardware
+# the hourly patrol cannot water while a manual run holds the hardware
 auto, klip = build()
 for _ in range(10):
     auto.tick()
-watered_before = len(klip.moves)
 auto.run_pump()
 klip.gcode.clear()
-for _ in range(5):
-    auto.tick()
-assert len(klip.moves) == watered_before, "control loop watered during a manual pump run"
-print("ok: control loop skips while a manual run holds the lock")
+auto.live_patrol(busy_wait_seconds=0)
+assert klip.moves == [], "the patrol watered during a manual pump run"
+assert auto.patrol_status()["last"]["error"] == "hardware was busy"
+print("ok: the patrol gives up the hour while a manual run holds the lock")
 
-# and resumes once stopped, proving the lock was really released
+# and runs once stopped, proving the lock was really released
 auto.stop_pump()
 assert not auto._hardware_lock.locked(), "lock leaked after stop"
-auto._last_watered.clear()  # plants are in cooldown from the first ticks
-auto.tick()
-assert len(klip.moves) > watered_before, "control loop did not resume after stop"
-print("ok: control loop resumes after stop, lock was released")
+auto.live_patrol()
+assert klip.moves, "the patrol did not water after stop"
+print("ok: the next patrol waters after stop, lock was released")
 
 # stop is idempotent and safe when nothing is running
 auto, klip = build()

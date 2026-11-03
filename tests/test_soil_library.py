@@ -21,7 +21,6 @@ from greenthumb.soil_library import LIBRARY
 from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 settings.auto_watering_enabled = False
-settings.auto_patrol_enabled = False
 
 
 class Klip:

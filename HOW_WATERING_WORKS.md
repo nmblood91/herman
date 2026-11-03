@@ -6,10 +6,11 @@ thirsty and what it does about it. No programming knowledge needed.
 ## The short version
 
 Every minute, the planter checks how wet the soil is in each pot. It doesn't act
-on any single check — it looks at the average of the last ten. If that average
-says a plant is drier than you asked it to be, the watering arm slides over to
-that pot and runs the pump for a measured number of seconds. Then it leaves that
-plant alone for an hour before it will consider watering it again, and watches
+on any single check — it looks at the average of the last ten. Once an hour, on
+the hour, the arm homes and makes one trip along the rail: every pot whose
+average says it is drier than you asked gets the pump run over it for a
+measured number of seconds, and the others get a brief visit. A pot watered on
+one patrol can be watered again on the next, and in between the planter watches
 that pot's probe to make sure the water actually arrived.
 
 That's the whole idea. The rest of this document explains why each of those
@@ -116,26 +117,29 @@ no history, and no history means no way to tell a real trend from a fluke.
 
 ## What has to be true before it waters
 
-Every minute, for each pot, the planter asks six questions in order. **All six
-must be yes** or it moves on and tries again next minute.
+On each hourly patrol, for each pot, the planter asks six questions in order.
+**All six must be yes** or that pot just gets a visit, and is asked again on the
+next hour's patrol.
 
-1. **Am I allowed to make noise right now?** See quiet hours below.
+1. **Am I allowed to make noise right now?** See quiet hours below. If not, the
+   whole patrol waits for the next hour.
 2. **Did the last watering, on any pot, show up on its moisture probe?** Until it
-   does, nothing else is watered. See *Checking it reached the soil* below.
+   does, the patrol visits every pot but waters none. See *Checking it reached
+   the soil* below.
 3. **Do I have ten readings yet?** If it just started up, no — wait.
 4. **Is the ten-minute average below the target for this plant?** Each pot has
    its own target, because a fern and a succulent don't want the same thing.
-5. **Has it been at least an hour since I last watered this pot?** See below.
-6. **Did the arm actually reach the pot?** If the arm can't move — it isn't
-   homed, something is in the way — the planter refuses to run the pump.
-   Watering the wrong spot is worse than not watering.
+5. **Has it been about an hour since I last watered this pot?** See below. The
+   patrol allows five minutes either side, so a pot watered on one patrol is
+   not made to wait a second hour.
+6. **Did the arm actually reach the pot?** If the arm can't move — it can't
+   home, something is in the way — the planter refuses to run the pump.
+   Watering the wrong spot is worse than not watering. It carries on to the
+   next pot.
 
-On that last one: until the arm homes, the board reports a position relative
-to wherever the arm happened to be when the power went on, which is a
-meaningless number that looks like a real one. Home it from Controls after
-each start, or switch on **Home after startup** under Automation, which does it
-within a minute of the planter coming up and keeps retrying until it lands.
-See *Homing* below.
+On that last one: every patrol homes first, because until the arm homes the
+board reports a position relative to wherever the arm happened to be, which is
+a meaningless number that looks like a real one. See *Homing* below.
 
 Only then does the pump run.
 
@@ -285,9 +289,9 @@ Two things worth knowing about both:
 or running a routine, happens immediately, quiet hours or not. You are standing
 there; you already know the noise is coming.
 
-**A thirsty plant is deferred, not skipped.** The check runs every minute
+**A thirsty plant is deferred, not skipped.** The soil is read every minute
 regardless, so a pot that crosses its threshold at midnight is watered on the
-first pass after the window ends rather than waiting another full day. The
+first patrol after the window ends rather than waiting another full day. The
 Controls tab says which of the two is in force and until when, so a planter
 that is deliberately not watering never looks like one that is broken.
 
@@ -301,29 +305,34 @@ at some arbitrary later date.
 The motor is open-loop: nothing tells the planter where the carriage actually
 is, only where it has been told to go. A belt that slips a tooth, or a carriage
 nudged while you are watering a plant by hand, leaves every saved position
-quietly wrong until the next home. Two switches in the Automation tab handle
-that, and **both start off**, so a planter being put together never sets off
-across the rail before you are ready for it.
+quietly wrong until the next home. So the planter homes before it waters, every
+time. Both switches in the Automation tab **start off**, so a planter being put
+together never sets off across the rail before you are ready for it.
 
-**Home after startup.** Homes shortly after the planter comes up. Until it
-does, the board does not know where the arm is and watering is refused
-outright. If the home fails, usually because Klipper is still starting up,
-it tries again every minute until it lands, and the Automation tab shows the
-reason. Switching it on takes effect the next time the planter starts, not
-right away.
+**The hourly patrol.** This is what **Water plants automatically** switches on.
+Every hour, on the hour, the arm homes and then visits each plant in turn,
+left to right. A plant that is due gets its dose. Any other plant is visited
+the way it is watered: a point plant gets a short pause over its position, and
+a sweep plant gets three passes across its span at the speed its own dose would
+use, finishing at the far end before moving on. If a plant is set to sweep but
+its dose would fall back to a point (the span is off the rail, or the dose is
+too short to cross it), it is visited at its point position instead, so the
+patrol never shows a motion the watering would not make. A plant whose stop
+fails is reported, and the patrol carries on to the next one.
 
-**Hourly auto-patrol.** Every hour, on the hour, the arm homes and then visits
-each plant in turn, moving the way that plant is watered. A point plant gets a
-short pause over its position. A sweep plant gets three passes across its span
-at the speed its own dose would use, finishing at the far end before moving
-on. A real dose runs as many passes as fit the pump time, so three is a
-preview, not the whole thing. If a plant is set to sweep but its dose would
-fall back to a point (the span is off the rail, or the dose is too short to
-cross it), the patrol pauses over its point position instead, so it never shows
-a motion the watering would not make. Homing is the point; the patrol shows you
-where the planter now thinks each plant is.
+**Home after startup.** Homes shortly after the planter comes up. If the home
+fails, usually because Klipper is still starting up, it tries again every
+minute until it lands, and the Automation tab shows the reason. Switching it on
+takes effect the next time the planter starts, not right away. Automatic
+watering switches it on and keeps it on.
 
-Rules both follow:
+**Motor idle.** Once the patrol parks, the planter switches the motor off, and
+it does the same a minute after any other move. That saves power and keeps the
+motor cool, but the board forgets where the arm is, so the arm homes again
+before its next move. The app shows this as **motor idle**, which is normal,
+not a fault. Klipper's own idle timeout (10 minutes) stays as a backstop.
+
+Rules the patrol and the startup home follow:
 
 - **Held during quiet hours and a snooze**, same as watering. The arm is the
   other noisy part. The startup home waits for the window to close; the patrol

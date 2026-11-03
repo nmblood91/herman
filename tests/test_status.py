@@ -96,8 +96,28 @@ assert auto.system_status()["level"] == "problem"
 print("ok: every probe silent points at the hub instead of four plants")
 
 auto = settled(build(klip=Klip(homed=False)))
-assert "homed" in auto.system_status()["message"]
-print("ok: an unhomed arm is reported, since nothing can be watered")
+assert auto.system_status()["level"] == "ok", auto.system_status()
+assert "idle" not in auto.system_status()["message"], auto.system_status()
+print("ok: not homed yet is not a fault: the arm homes before its first move")
+
+auto._startup_home_error = "endstop not triggered"
+state = auto.system_status()
+assert state["level"] == "attention" and "couldn't home" in state["message"], state
+assert "endstop not triggered" in state["message"], state
+print("ok: an arm that tried to home and could not is reported, with the reason")
+
+# Homed once, then the motor switched off: the normal state between patrols.
+auto = settled(build(klip=Klip(homed=False)))
+auto._has_homed = True
+auto._mark_motor_idle()
+state = auto.system_status()
+assert state["level"] == "ok" and state["message"].endswith("Motor idle."), state
+assert auto.motor_status()["state"] == "idle", auto.motor_status()
+print("ok: an idle motor is said as a fact on a normal status, not raised as a warning")
+
+auto = settled(build(Hub(raw=400.0)))
+assert "due a drink at the next hourly patrol" in auto.system_status()["message"]
+print("ok: a dry pot is due a drink at the next hourly patrol")
 
 auto = settled(build(klip=Klip(ok=False)))
 state = auto.system_status()
@@ -131,12 +151,13 @@ judged(auto, "plant_3", "soaked")
 assert auto.system_status()["level"] == "ok", auto.system_status()
 print("ok: Resume and a dose that reaches the soil clear the empty-reservoir state")
 
-# An empty reservoir outranks a merely unhomed arm.
+# An empty reservoir outranks an arm that cannot home.
 auto = settled(build(klip=Klip(homed=False)))
+auto._startup_home_error = "endstop not triggered"
 judged(auto, "plant_1", "missed")
 judged(auto, "plant_2", "missed")
 assert "reservoir" in auto.system_status()["message"].lower()
-print("ok: an empty reservoir outranks an unhomed arm")
+print("ok: an empty reservoir outranks an arm that cannot home")
 
 
 # --- paused states are information, not faults ---

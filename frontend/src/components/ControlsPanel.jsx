@@ -86,10 +86,10 @@ export function ControlsPanel({
 }) {
   const lighting = overview?.lighting
 
-  // Klipper refuses every move until the axis has a reference, so an unhomed
-  // gantry turns each of these buttons into a guaranteed failure. Disabled
-  // rather than left to fail, since the error arrives a second later in a
-  // status bar the user may not be looking at.
+  // Klipper refuses a jog until the axis has a reference, so an unhomed gantry
+  // turns those buttons into a guaranteed failure. Disabled rather than left
+  // to fail, since the error arrives a second later in a status bar the user
+  // may not be looking at.
   //
   // Undefined overview counts as not ready, so the buttons stay disabled until
   // the first poll answers rather than flickering enabled for a moment.
@@ -100,6 +100,11 @@ export function ControlsPanel({
   // passed, so the button is locked rather than left to fail. Undefined counts
   // as untested, like movement above.
   const directionChecked = overview?.motor_direction?.checked === true
+  // Moving to a pot or a rail end, and watering, home first by themselves when
+  // the motor is idle, so they only need a board that answers and a motor that
+  // may home. The jogs still need a home: a jog from an unknown place means
+  // nothing, and Klipper refuses it.
+  const canHomeAndGo = Boolean(movement) && !boardDown && directionChecked
 
   // Defaulted here rather than at each use: a failed dashboard load leaves the
   // prop an empty array today, but a crash on undefined would take the whole
@@ -338,6 +343,14 @@ export function ControlsPanel({
           </p>
         )}
 
+        {canHomeAndGo && !motionReady && (
+          <p className="field-hint">
+            {overview?.motor?.state === 'idle' ? 'Motor idle. ' : ''}
+            The jog buttons need a home first. Moving to a pot or an end, or
+            watering, homes by itself.
+          </p>
+        )}
+
         <div className="motion-grid two-up">
           <button disabled={!motionReady} onClick={() => onMove(-10)}>Move Left 10 mm</button>
           <button disabled={!motionReady} onClick={() => onMove(10)}>Move Right 10 mm</button>
@@ -351,10 +364,10 @@ export function ControlsPanel({
         {/* The far end is resolved by the API from Klipper's axis_maximum, so
             this does not need to know how long the rail is. */}
         <div className="motion-grid two-up">
-          <button disabled={!motionReady} onClick={() => onMoveToEnd('left')}>
+          <button disabled={!canHomeAndGo} onClick={() => onMoveToEnd('left')}>
             All the way left
           </button>
-          <button disabled={!motionReady} onClick={() => onMoveToEnd('right')}>
+          <button disabled={!canHomeAndGo} onClick={() => onMoveToEnd('right')}>
             All the way right
           </button>
         </div>
@@ -389,7 +402,7 @@ export function ControlsPanel({
               plantList.map((plant) => (
                 <button
                   key={plant.plant_id}
-                  disabled={!motionReady}
+                  disabled={!canHomeAndGo}
                   onClick={() => onMoveToPlant(plant.plant_id)}
                 >
                   {plant.name}
@@ -409,7 +422,7 @@ export function ControlsPanel({
               plantList.map((plant) => (
                 <button
                   key={plant.plant_id}
-                  disabled={!motionReady}
+                  disabled={!canHomeAndGo}
                   onClick={() => onWaterPlant(plant.plant_id)}
                 >
                   {plant.name}

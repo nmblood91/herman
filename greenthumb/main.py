@@ -52,12 +52,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_instances=1,
         coalesce=True,
     )
-    # On the hour, every hour. Scheduled whether or not the patrol is on, so
-    # switching it on needs no rescheduling -- auto_patrol checks the switch.
-    # The grace covers a thread pool that starts the job a little late; past
-    # it, the hour is skipped rather than run at some arbitrary minute.
+    # The live patrol: on the hour, every hour, and the only place automatic
+    # watering happens. Scheduled whether or not watering is on, so switching
+    # it on needs no rescheduling -- live_patrol checks the switch. The grace
+    # covers a thread pool that starts the job a little late; past it, the
+    # hour is skipped rather than run at some arbitrary minute.
     scheduler.add_job(
-        automation.auto_patrol,
+        automation.live_patrol,
         "cron",
         minute=0,
         max_instances=1,
@@ -287,17 +288,12 @@ def _require_enabled(payload: dict[str, object]) -> bool:
     return enabled
 
 
-@app.post(f"{settings.api_prefix}/patrol/auto")
-def set_auto_patrol(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-    """Switch the hourly auto-patrol: a re-home and a pass over every plant."""
-    result = automation.set_auto_patrol(_require_enabled(payload))
-    log_event(f"Hourly auto-patrol {'on' if result['enabled'] else 'off'}")
-    return result
-
-
 @app.post(f"{settings.api_prefix}/gantry/home-on-startup")
 def set_home_on_startup(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
-    """Switch homing after startup. Takes effect on the next start."""
+    """Switch homing after startup. Takes effect on the next start.
+
+    Switching it off is a 400 while automatic watering is on, which needs it.
+    """
     result = automation.set_home_on_startup(_require_enabled(payload))
     log_event(f"Home on startup {'on' if result['enabled'] else 'off'}")
     return result

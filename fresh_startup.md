@@ -238,8 +238,9 @@ Optional extras, each covered in [deploy/README.md](deploy/README.md):
 - **Camera:** the service account needs the `video` group:
   `sudo usermod -aG video pi`.
 - **Homing:** once the endstop is confirmed and the rail is clear, switch on
-  *Home after startup* and *Hourly auto-patrol* in the Automation tab. Both
-  start off so the arm never moves before you are ready for it.
+  *Home after startup* in the Automation tab. It starts off so the arm never
+  moves before you are ready for it. Turning on automatic watering, which runs
+  as the hourly patrol, switches it on too.
 - **Quiet hours:** hold automatic watering and the hourly patrol overnight.
 
 ## Day-to-day

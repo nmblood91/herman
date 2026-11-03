@@ -32,7 +32,6 @@ from greenthumb.services.automation import GreenThumbAutomation, HardwareBusyErr
 from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 settings.auto_watering_enabled = False
-settings.auto_patrol_enabled = False
 settings.home_on_startup = False
 
 
@@ -95,7 +94,6 @@ assert soils_before, "the soil library did not install"
 auto.set_auto_watering(True)
 auto.pump.flow_ml_per_second = 2.5
 auto._flow_measured_at = "2026-10-01T12:00:00"
-auto.set_auto_patrol(True)
 auto.set_home_on_startup(True)
 auto.set_quiet_hours(True, "22:30", "06:15")
 auto.snooze_until = datetime.now() + timedelta(hours=2)
@@ -158,7 +156,6 @@ print("ok: every pot is back to its default name, spot, sweep and soil profile")
 assert auto.auto_watering_enabled is settings.auto_watering_enabled
 assert auto.pump.flow_ml_per_second == settings.pump_flow_ml_per_second
 assert auto._flow_measured_at is None, "the flow still claims to have been measured"
-assert auto.auto_patrol_enabled is settings.auto_patrol_enabled
 assert auto.home_on_startup is settings.home_on_startup
 assert auto.quiet_hours_enabled is settings.quiet_hours_enabled
 assert auto.quiet_hours_start == time.fromisoformat(settings.quiet_hours_start)

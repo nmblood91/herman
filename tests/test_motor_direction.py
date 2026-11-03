@@ -22,7 +22,6 @@ from greenthumb.services.automation import DIRECTION_FILE, GreenThumbAutomation
 from tests.helpers import CalibrationSurface, temp_state, temp_store
 
 settings.auto_watering_enabled = False
-settings.auto_patrol_enabled = False
 settings.home_on_startup = True
 # helpers.py passes the test for every other script; this one is about the lock.
 settings.motor_direction_checked = False

@@ -256,7 +256,9 @@ function App() {
     // Klipper invents a position for the homing move (negative, counting up),
     // so there is no real number to show until the switch trips.
     if (movement.homing) return 'homing…'
-    if (!movement.homed) return 'not homed'
+    // Idle is the normal state between moves: the motor is switched off, so
+    // Klipper has forgotten the home, and the arm homes again before it moves.
+    if (!movement.homed) return overview?.motor?.state === 'idle' ? 'motor idle' : 'not homed'
 
     // Whole millimeters: Klipper reports tenths, and the decimal flickers on a
     // readout polled every second without telling anyone anything.

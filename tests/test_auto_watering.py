@@ -1,8 +1,8 @@
-"""The master switch for unattended watering.
+"""The master switch for unattended watering, which is the hourly patrol's.
 
 This is the one setting that decides whether the pump can run with nobody
-watching, so it is checked in both directions: that off really means the loop
-never waters, and that the choice survives a restart. A switch that silently
+watching, so it is checked in both directions: that off really means nothing
+waters or moves on the hour, and that the choice survives a restart. A switch that silently
 reverts to the compiled-in default after a power cut would be worse than no
 switch at all -- the planter would look armed and not be, or the reverse.
 """
@@ -55,6 +55,8 @@ class FakePump:
 class FakeKlipper:
     def __init__(self):
         self.moves = []
+        self.homes = 0
+        self.gcode = []
 
     def move_gantry_absolute(self, pos):
         self.moves.append(pos)
@@ -63,6 +65,16 @@ class FakeKlipper:
     def status(self):
         return {"ok": True, "position": 0.0, "homed": True}
 
+    def home_gantry(self):
+        self.homes += 1
+        return {"ok": True}
+
+    def send_gcode(self, gcode, timeout=5.0):
+        self.gcode.append(gcode)
+        return {"ok": True}
+
+    def release_motors(self):
+        return {"ok": True}
 
 
 class FakeLeds:
@@ -83,18 +95,20 @@ def build(state=None):
 
 
 def run_loop(auto, ticks=None):
-    """Tick enough times to fill the moisture window and then act."""
+    """Tick enough times to fill the moisture window, then run the hour's patrol."""
     for _ in range(ticks or settings.moisture_window_size + 2):
         auto.tick()
+    auto.live_patrol()
 
 
-# --- off means the pump never runs on its own ---
+# --- off means the pump never runs on its own, and nothing moves ---
 
 auto, pump = build()
 auto.set_auto_watering(False)
 run_loop(auto)
 assert pump.doses == [], f"watered with the switch off: {pump.doses}"
-print("ok: with automatic watering off, a bone-dry planter is never watered")
+assert auto.klipper.homes == 0 and auto.klipper.gcode == [], "moved on the hour with watering off"
+print("ok: with automatic watering off, a bone-dry planter is never watered and nothing moves")
 
 # Sensors and history keep running, which is what makes "watching only" honest.
 assert len(auto._history.get(0x36) or ()) > 0, "stopped polling sensors when off"
@@ -121,7 +135,36 @@ auto.set_auto_watering(False)
 auto._last_watered.clear()  # clear the cooldown, so only the switch can stop it
 run_loop(auto)
 assert len(pump.doses) == before, "kept watering after being switched off"
-print("ok: switching it off stops the very next cycle")
+print("ok: switching it off stops the very next patrol")
+
+
+# --- it needs the startup home, and takes it with it ---
+
+auto, _ = build()
+auto.set_home_on_startup(False)
+auto.set_auto_watering(True)
+assert auto.home_on_startup is True, "watering on left the startup home off"
+assert auto.startup_home_status()["required"] is True
+try:
+    auto.set_home_on_startup(False)
+except ValueError as exc:
+    assert "Automatic watering" in str(exc), exc
+else:
+    raise AssertionError("switched the startup home off under automatic watering")
+assert auto.home_on_startup is True
+auto.set_auto_watering(False)
+auto.set_home_on_startup(False)
+assert auto.home_on_startup is False
+print("ok: watering on turns the startup home on, and it stays on until watering is off")
+
+# A stored or configured "watering on, startup home off" is put right at start.
+shared = temp_state()
+shared.parent.mkdir(parents=True, exist_ok=True)
+shared.write_text(json.dumps({
+    "watering": {"auto_enabled": True}, "startup_home": {"enabled": False},
+}), encoding="utf-8")
+assert build(shared)[0].home_on_startup is True
+print("ok: a saved watering-on with the startup home off comes back with it on")
 
 
 # --- the choice outlives a restart ---

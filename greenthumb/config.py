@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     # pump_flow_ml_per_second against a real dose, since that figure is what
     # converts a requested volume into a run time -- get it wrong and every
     # watering is scaled by the same factor while still reporting success.
+    #
+    # Watering happens on the hourly live patrol, so this is also the switch
+    # for the patrol: off, nothing moves on the hour.
     auto_watering_enabled: bool = False
     # How long a pot waits before it can be watered again, and also how long
     # its moisture probe is given to show the water arriving before the dose
@@ -121,13 +124,13 @@ class Settings(BaseSettings):
     soak_check_enabled: bool = True
     soak_rise_percent: float = 5.0
 
-    # Hourly auto-patrol: on the hour, every hour, home and then visit each
-    # plant. The home is what earns it -- an open-loop stepper has no other way
-    # to notice the carriage is not where Klipper thinks it is. Off by default
-    # for the same reason as home_on_startup: nobody assembling a planter
-    # should have the arm set off across the rail before they are ready for it.
-    # Starting value only; the Automation tab owns it and persists it.
-    auto_patrol_enabled: bool = False
+    # How long the gantry motor stays switched on after its last move. Klipper
+    # forgets the home when the motor goes off, so the arm homes again before
+    # its next move; the hourly patrol homes first anyway and switches the
+    # motor off itself once it parks. This covers the startup home and moves
+    # from Controls. Checked once a tick, so the real wait is up to a tick
+    # longer.
+    motor_idle_seconds: int = 60
 
     # Quiet hours. The pump and the gantry are the only loud parts of this
     # machine, and it lives in a room people sit in. Suppresses *automatic*
@@ -143,6 +146,7 @@ class Settings(BaseSettings):
     # Off by default: a planter being put together for the first time should
     # not move until someone has checked the endstop and the rail are clear.
     # Only the value a planter starts life with; the stored choice wins.
+    # Automatic watering switches it on and keeps it on.
     home_on_startup: bool = False
 
     # Whether the motor direction test on the Calibration tab has passed. Until

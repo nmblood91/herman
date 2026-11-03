@@ -49,6 +49,11 @@ NEAR_SWITCH_MM = 15.0
 # hour, and how often it looks. A dose finishes well inside this.
 PATROL_BUSY_WAIT_SECONDS = 300.0
 PATROL_BUSY_POLL_SECONDS = 5.0
+# Taken off the cooldown when the hourly patrol judges a pot. Patrols are an
+# hour apart and so is the cooldown, so a dose 40 s into one patrol would
+# otherwise still be 20 s short of it at the next, and the pot would wait a
+# second hour.
+PATROL_COOLDOWN_SLACK = timedelta(minutes=5)
 
 # The motor direction test turns the motor this far toward the switch: enough
 # to see clearly, little enough that a reversed motor near the far end cannot
@@ -108,6 +113,13 @@ def care_fields(plant: PlantSpec) -> dict[str, object]:
         ).isoformat(timespec="minutes"),
         "notes": plant.notes,
     }
+
+
+def _join(items: list[str]) -> str:
+    """"A", "A and B", "A, B and C"."""
+    if len(items) <= 2:
+        return " and ".join(items)
+    return f"{', '.join(items[:-1])} and {items[-1]}"
 
 
 def within_window(now: time, start: time, stop: time) -> bool:
@@ -181,6 +193,13 @@ class GreenThumbAutomation:
         self._powering_down = False
         # True for the length of a G28. See _home.
         self._homing = False
+        # Klipper forgets its home whenever the motor is switched off, so its
+        # "homed" alone cannot tell a motor idling between patrols from an arm
+        # that has never homed. These can. See _maybe_idle_motor.
+        self._has_homed = False
+        self._motor_on = False
+        self._last_motion_at = 0.0
+        self._motor_idle_since: datetime | None = None
         self._history: dict[int, deque[float]] = {
             address: deque(maxlen=settings.moisture_window_size)
             for address in self.sensor_hub.addresses
@@ -223,18 +242,12 @@ class GreenThumbAutomation:
         # off the datasheet", because only one of those is trustworthy.
         self._flow_measured_at: str | None = None
 
-        # The master switch for unattended watering. Seeded from the
-        # environment, then owned by the UI and persisted like every other
-        # user choice: editing .env and restarting the service is not
+        # The master switch for unattended watering, which is also the switch
+        # for the hourly live patrol that does it (see live_patrol). Seeded
+        # from the environment, then owned by the UI and persisted like every
+        # other user choice: editing .env and restarting the service is not
         # something the person who owns a planter should have to do.
         self.auto_watering_enabled = settings.auto_watering_enabled
-
-        # Hourly auto-patrol: a re-home and a pass over every plant, on the
-        # hour. The re-home is the useful half -- steppers are open-loop, so a
-        # slipped belt or a nudged carriage leaves every plant position wrong
-        # until the next home, and doing it hourly caps how long that can go
-        # unnoticed. Run by its own scheduler job; see main.lifespan.
-        self.auto_patrol_enabled = settings.auto_patrol_enabled
         self._last_patrol: dict[str, object] | None = None
 
         self.quiet_hours_enabled = settings.quiet_hours_enabled
@@ -252,6 +265,7 @@ class GreenThumbAutomation:
         # user choices that used to live only in memory, so every restart reset
         # them to the literals above. Restore whatever was saved last.
         self._restore_state()
+        self._require_startup_home()
         # After the restore: the saved strip type sets the pixel count the
         # zones are split from.
         self.apply_default_led_ranges()
@@ -443,10 +457,6 @@ class GreenThumbAutomation:
                 # millimeters comes back at the nearest one, not the one below.
                 setattr(plant, field_name, round(value))
 
-        patrol = stored.get("auto_patrol")
-        if isinstance(patrol, dict) and isinstance(patrol.get("enabled"), bool):
-            self.auto_patrol_enabled = patrol["enabled"]
-
         startup_home = stored.get("startup_home")
         if isinstance(startup_home, dict) and isinstance(startup_home.get("enabled"), bool):
             self.home_on_startup = startup_home["enabled"]
@@ -582,7 +592,6 @@ class GreenThumbAutomation:
                 "flow_measured_at": self._flow_measured_at,
                 "soak_reset_at": self._soak_reset_at,
             },
-            "auto_patrol": {"enabled": self.auto_patrol_enabled},
             "startup_home": {"enabled": self.home_on_startup},
             # A fact about how this unit is wired, not a preference, so a
             # restore to defaults keeps it.
@@ -706,12 +715,106 @@ class GreenThumbAutomation:
             result = self.klipper.home_gantry()
         finally:
             self._homing = False
+        if result.get("ok"):
+            self._has_homed = True
+            self._moved()
         # Any home that lands settles the startup one: a patrol or the button
         # getting there first should not be followed by a second home.
         if result.get("ok") and self._startup_home_pending:
             self._startup_home_pending = False
             self._startup_homed = True
         return result
+
+    def _ensure_homed(self, before: str) -> dict[str, object]:
+        """Home first if Klipper has forgotten where the carriage is.
+
+        The caller holds the hardware lock. Klipper forgets the home every time
+        the motor is switched off, which happens a minute after the last move
+        (see _maybe_idle_motor), so most moves start from an idle motor. A move
+        sent anyway is refused with "Must home axis first".
+        """
+        status = self.klipper.status()
+        if not status.get("ok"):
+            return {"ok": False, "error": status.get("error") or "Klipper is not responding"}
+        if status.get("homed"):
+            return {"ok": True}
+        if self._has_homed:
+            logger.info("Gantry motor idle, homing before %s", before)
+        else:
+            logger.info("Homing before %s", before)
+        return self._home()
+
+    def _moved(self) -> None:
+        """Note that the motor is on and has just moved, for the idle timer."""
+        self._motor_on = True
+        self._motor_idle_since = None
+        self._last_motion_at = monotonic()
+
+    def _maybe_idle_motor(self) -> None:
+        """Switch the motor off once nothing has moved for motor_idle_seconds.
+
+        Done here, on the planter's own timing, rather than left to Klipper's
+        idle timeout: the hourly patrol switches it off as it finishes, and
+        this covers the startup home and anything done from Controls. A motor
+        left on draws holding current around the clock, for a carriage nothing
+        is pushing on. Busy hardware skips it; the next tick tries again.
+        """
+        if not self._motor_on:
+            return
+        if monotonic() - self._last_motion_at < settings.motor_idle_seconds:
+            return
+        try:
+            with self._exclusive("Switching the gantry motor off"):
+                self._idle_motor_locked(
+                    f"after {settings.motor_idle_seconds} s without a move"
+                )
+        except HardwareBusyError:
+            logger.debug("Leaving the gantry motor on, hardware is busy")
+
+    def _idle_motor_locked(self, why: str) -> None:
+        """Switch the motor off and say so. The caller holds the lock."""
+        status = self.klipper.status()
+        if status.get("ok") and not status.get("homed"):
+            # Klipper got there first: its own idle timeout, or a restart.
+            self._mark_motor_idle()
+            logger.info("Gantry motor went idle (Klipper switched it off)")
+            return
+        result = self.klipper.release_motors()
+        if not result.get("ok"):
+            logger.warning("Could not switch the gantry motor off: %s", result.get("error"))
+            return
+        self._mark_motor_idle()
+        logger.info("Gantry motor idle %s", why)
+
+    def _mark_motor_idle(self) -> None:
+        self._motor_on = False
+        self._motor_idle_since = datetime.now()
+
+    def motor_status(self, movement: dict[str, object] | None = None) -> dict[str, object]:
+        """Whether the gantry motor is on, idle, or has never homed.
+
+        Idle is the normal state between patrols and is not a fault: the arm
+        homes again before its next move. `movement` is a klipper.status()
+        result the caller already has, to save asking twice.
+        """
+        movement = self.klipper.status() if movement is None else movement
+        if movement.get("ok") and movement.get("homed"):
+            phase = "active"
+        elif self._has_homed:
+            phase = "idle"
+        else:
+            phase = "unhomed"
+        since = self._motor_idle_since if phase == "idle" else None
+        return {
+            "state": phase,
+            "since": since.isoformat(timespec="minutes") if since else None,
+            "idle_after_seconds": settings.motor_idle_seconds,
+        }
+
+    def _require_startup_home(self) -> None:
+        """Automatic watering needs the startup home, so it forces it on."""
+        if self.auto_watering_enabled and not self.home_on_startup:
+            self.home_on_startup = True
 
     def usable_travel_mm(self) -> float:
         """Reachable X range, where 0 is the first position the carriage can occupy.
@@ -1000,19 +1103,23 @@ class GreenThumbAutomation:
         a point, is a pause at its point position. Asked of _resolve_sweep so
         the patrol cannot show a motion the watering would not make.
         """
-        stops = []
+        return [stop for _, stop in self._patrol_visits()]
+
+    def _patrol_visits(self) -> list[tuple[PlantSpec, dances.PatrolStop]]:
+        """Each pot the patrol visits, with how it visits it (_patrol_stops)."""
+        visits = []
         for plant in self.plants:
             resolved = self._resolve_sweep(plant, plant.watering_volume_ml)
             if isinstance(resolved, tuple):
                 low, high, plan = resolved
-                stops.append(dances.PatrolStop(
+                visits.append((plant, dances.PatrolStop(
                     low, sweep_to_mm=high, feedrate=plan.feedrate_mm_min,
-                ))
+                )))
             elif not self._outside_zone(plant, float(plant.position_mm)):
-                stops.append(dances.PatrolStop(plant.position_mm))
+                visits.append((plant, dances.PatrolStop(plant.position_mm)))
             # A spot outside its zone is skipped: watering refuses it, so
             # visiting it would show a stop the planter will never water at.
-        return stops
+        return visits
 
     def _busy_error(self, what: str) -> HardwareBusyError:
         holder = self._lock_holder
@@ -1051,7 +1158,11 @@ class GreenThumbAutomation:
             self._drop_lock()
 
     def tick(self) -> None:
-        """One pass of the control loop: read every sensor, then water what needs it."""
+        """One pass of the control loop: read every sensor and judge the doses.
+
+        It waters nothing. Watering is the hourly live patrol's job, which
+        homes first and visits every pot in one trip down the rail.
+        """
         # Lighting first and outside the lock: the strip is on its own SPI bus,
         # so it should keep following its schedule even while the gantry is busy.
         try:
@@ -1062,22 +1173,11 @@ class GreenThumbAutomation:
         try:
             with self._exclusive("Checking the plants"):
                 self._poll_sensors()
-                # After the poll, so a verdict sees this tick's reading, and
-                # before deciding to water, so a dose just confirmed releases
-                # the hold on the same tick.
+                # After the poll, so a verdict sees this tick's reading.
                 try:
                     self._check_soaks()
                 except Exception:
                     logger.exception("Could not check whether the last watering reached the soil")
-                if self.auto_watering_enabled:
-                    held = self.watering_suppressed()
-                    if held:
-                        # Debug rather than info: this fires every minute for
-                        # hours, and at info it would bury the log the user
-                        # reads to find out what actually happened.
-                        logger.debug("Not watering automatically, %s", held)
-                    else:
-                        self._run_watering_cycle()
         except HardwareBusyError:
             logger.info("Skipping control loop tick, hardware is busy")
         except Exception:
@@ -1086,10 +1186,14 @@ class GreenThumbAutomation:
             logger.exception("Control loop tick failed")
 
         # Outside the block above so it takes the lock on its own terms: it
-        # should never be the reason a watering cycle was skipped. The hourly
-        # patrol is not here -- it has its own job pinned to the top of the
-        # hour, which a tick a minute apart could not land on.
+        # should never be the reason a reading was skipped. The hourly patrol
+        # is not here -- it has its own job pinned to the top of the hour,
+        # which a tick a minute apart could not land on.
         self._maybe_home_on_startup()
+        try:
+            self._maybe_idle_motor()
+        except Exception:
+            logger.exception("Could not switch the gantry motor off")
 
     def _apply_lighting(self) -> None:
         now = datetime.now().time()
@@ -1340,8 +1444,15 @@ class GreenThumbAutomation:
         # 4. Able to water, but not yet allowed to.
         if not self.motor_direction_checked:
             return state("attention", DIRECTION_UNCHECKED)
-        if not movement.get("homed"):
-            return state("attention", "The arm has not been homed, so watering is held.")
+        # Not homed is the normal state between patrols: the motor is switched
+        # off and the arm homes again before its next move. Only an arm that
+        # has tried to home and could not is worth a word.
+        if not movement.get("homed") and not self._has_homed and self._startup_home_error:
+            return state(
+                "attention",
+                f"The arm couldn't home ({self._startup_home_error}). "
+                "Trying again every minute.",
+            )
 
         held = self.watering_suppressed()
         if held:
@@ -1392,11 +1503,14 @@ class GreenThumbAutomation:
                 "Set it up in the Soil Profile Editor.",
             )
 
+        # Said as a fact, not a warning: idle is where the motor spends most
+        # of the hour.
+        idle = " Motor idle." if self.motor_status(movement)["state"] == "idle" else ""
         thirsty = [plant.name for plant in self.plants if self.thirsty(plant)]
         if thirsty:
-            return state("ok", f"{', '.join(thirsty)} due a drink shortly.")
+            return state("ok", f"{', '.join(thirsty)} due a drink at the next hourly patrol.{idle}")
         count = len(self.plants)
-        return state("ok", f"All {count} plants are happy.")
+        return state("ok", f"All {count} plants are happy.{idle}")
 
     # --- automatic watering ----------------------------------------------
 
@@ -1407,8 +1521,15 @@ class GreenThumbAutomation:
         whether the loop waters at all, and system_status() words the two
         differently for that reason: "switched off" is a standing choice,
         "paused" resolves itself.
+
+        Also the switch for the hourly live patrol, and it turns the startup
+        home on with it: a patrol is only as good as the home before it, and an
+        arm that never homed after a power cut would sit idle until the hour.
         """
         self.auto_watering_enabled = bool(enabled)
+        if self.auto_watering_enabled and not self.home_on_startup:
+            self.home_on_startup = True
+            logger.info("Home on startup switched on, which automatic watering needs")
         self._persist()
         logger.info(
             "Automatic watering %s",
@@ -1645,12 +1766,13 @@ class GreenThumbAutomation:
         """Why automatic watering is being held back, or None if it is not.
 
         Returns the reason rather than a bare bool so the UI and the log can
-        say which of the two is in force. A plant that comes due during a quiet
-        period is not skipped, only deferred: the loop runs every minute and
-        waters it on the first tick after the window closes.
+        say which is in force. A plant that comes due during a quiet period is
+        not skipped, only deferred to the first patrol after the window closes.
         """
-        moment = now or datetime.now()
+        return self._doses_held() or self._motion_held(now)
 
+    def _doses_held(self) -> str | None:
+        """Why the patrol may move but must not pump, or None."""
         if self.soak_pause_reason():
             return "2 waterings in a row didn't reach the soil. Press Resume once it's sorted"
 
@@ -1666,7 +1788,11 @@ class GreenThumbAutomation:
             if pending:
                 name = self._plant_name(pending[-1]["plant_id"])
                 return f"waiting to confirm the last watering reached {name}"
+        return None
 
+    def _motion_held(self, now: datetime | None = None) -> str | None:
+        """Why nothing may move on its own at all (snooze, quiet hours), or None."""
+        moment = now or datetime.now()
         if self.snooze_until and moment < self.snooze_until:
             return f"snoozed until {self.snooze_until.strftime('%H:%M')}"
 
@@ -1714,35 +1840,17 @@ class GreenThumbAutomation:
             "suppressed_because": self.watering_suppressed(),
         }
 
-    def _run_watering_cycle(self) -> None:
-        for plant in self.plants:
-            window = self._history.get(plant.sensor_address)
-            # Only act on a full window, so neither a single bad reading nor the
-            # first minutes after a restart can start the pump.
-            if not window or len(window) < window.maxlen:
-                continue
-
-            if not self.thirsty(plant):
-                continue
-            if not self._cooldown_elapsed(plant.plant_id):
-                continue
-
-            logger.info(
-                "Plant %s is at %.0f%% soil water against a target of %s%%, watering",
-                plant.plant_id,
-                self.percent_for_plant(plant),
-                plant.target_available,
-            )
-            self._move_and_water(plant)
-
-    def _cooldown_elapsed(self, plant_id: str) -> bool:
+    def _cooldown_elapsed(
+        self, plant_id: str, now: datetime | None = None, slack: timedelta = timedelta(0)
+    ) -> bool:
         # Soil needs time to wick, and the window needs a full cycle to reflect
-        # the change. Without this the loop would water every tick until the
-        # average caught up, which is how a plant drowns.
+        # the change. Without this a pot could be dosed again before the last
+        # dose had even shown on its probe, which is how a plant drowns.
         last = self._last_watered.get(plant_id)
         if last is None:
             return True
-        return datetime.now() - last >= timedelta(minutes=settings.watering_cooldown_minutes)
+        moment = now or datetime.now()
+        return moment - last >= timedelta(minutes=settings.watering_cooldown_minutes) - slack
 
     def run_pump(self) -> dict[str, object]:
         """Start the pump and leave it running, for bench testing."""
@@ -1818,6 +1926,10 @@ class GreenThumbAutomation:
                 )
                 logger.warning("Not watering %s: %s", plant.plant_id, error)
                 return {"status": "error", "plant_id": plant.plant_id, "error": error}
+        homed = self._ensure_homed(f"watering {plant.name}")
+        if not homed.get("ok"):
+            logger.warning("Not watering %s: could not home (%s)", plant.plant_id, homed.get("error"))
+            return {"status": "error", "plant_id": plant.plant_id, "error": homed.get("error")}
         move = self.klipper.move_gantry_absolute(start_mm)
         if not move.get("ok"):
             logger.warning(
@@ -1826,6 +1938,7 @@ class GreenThumbAutomation:
             return {"status": "error", "plant_id": plant.plant_id, "error": move.get("error")}
 
         self.pump.deliver_ml(volume, motion=motion)
+        self._moved()
 
         self._last_watered[plant.plant_id] = datetime.now()
         try:
@@ -1892,9 +2005,11 @@ class GreenThumbAutomation:
             for spec in self.plants
         ]
 
+        movement = self.klipper.status()
         return {
             "app": settings.app_name,
-            "movement": self.klipper.status(),
+            "movement": movement,
+            "motor": self.motor_status(movement),
             "lighting": {
                 **self.leds.status(),
                 # The pots' own manual settings, for the zone picker.
@@ -1904,7 +2019,7 @@ class GreenThumbAutomation:
             # So the UI can say why nothing is watering rather than leaving it
             # looking broken.
             "watering": self.watering_status(),
-            "auto_patrol": self.auto_patrol_status(),
+            "patrol": self.patrol_status(),
             "startup_home": self.startup_home_status(),
             "motor_direction": self.motor_direction_status(),
             "quiet": self.quiet_status(),
@@ -2269,8 +2384,8 @@ class GreenThumbAutomation:
         self.pump.flow_ml_per_second = float(settings.pump_flow_ml_per_second)
         self._flow_measured_at = None
 
-        self.auto_patrol_enabled = settings.auto_patrol_enabled
         self.home_on_startup = settings.home_on_startup
+        self._require_startup_home()
 
         self.quiet_hours_enabled = settings.quiet_hours_enabled
         self.quiet_hours_start = time.fromisoformat(settings.quiet_hours_start)
@@ -2383,7 +2498,7 @@ class GreenThumbAutomation:
     # --- routines ---------------------------------------------------------
 
     def run_dance(self, name: str, home_first: bool = False) -> dict[str, object]:
-        """Run one routine now. Not gated by quiet hours -- see auto_patrol."""
+        """Run one routine now. Not gated by quiet hours -- see live_patrol."""
         # Only a routine that visits the plants needs them resolved, and doing
         # so asks Klipper for its motion limits once per sweeping plant.
         dance = dances.DANCES.get(name)
@@ -2401,6 +2516,8 @@ class GreenThumbAutomation:
             # starting. Homing anyway is also the honest thing for a routine
             # whose job is partly to re-establish where the carriage is.
             if home_first or not status.get("homed"):
+                if not home_first and self._has_homed:
+                    logger.info("Gantry motor idle, homing before the %s routine", name)
                 homed = self._home()
                 if not homed.get("ok"):
                     return {"ok": False, "error": f"Homing failed: {homed.get('error')}"}
@@ -2411,6 +2528,8 @@ class GreenThumbAutomation:
             result = self.klipper.send_gcode(
                 dances.gcode_for(steps), timeout=MOTION_TIMEOUT
             )
+            if result.get("ok"):
+                self._moved()
 
         if not result.get("ok"):
             return {"ok": False, "error": result.get("error")}
@@ -2478,6 +2597,11 @@ class GreenThumbAutomation:
         )
 
     def set_home_on_startup(self, enabled: bool) -> dict[str, object]:
+        if not enabled and self.auto_watering_enabled:
+            raise ValueError(
+                "Automatic watering needs the planter to home at startup. "
+                "Switch automatic watering off first."
+            )
         self.home_on_startup = bool(enabled)
         self._persist()
         return self.startup_home_status()
@@ -2501,31 +2625,34 @@ class GreenThumbAutomation:
             "attempts": self._startup_home_attempts,
             "error": self._startup_home_error,
             "held": self.watering_suppressed() if phase in ("waiting", "retrying") else None,
+            # Automatic watering forces it on, so the UI can lock the switch.
+            "required": self.auto_watering_enabled,
         }
 
-    # --- hourly auto-patrol -----------------------------------------------
+    # --- the hourly live patrol --------------------------------------------
 
-    def auto_patrol(
+    def live_patrol(
         self,
         now: datetime | None = None,
         busy_wait_seconds: float = PATROL_BUSY_WAIT_SECONDS,
     ) -> None:
-        """Home and patrol the plants. Called by the scheduler on the hour.
+        """Home, then one trip down the rail, watering each pot that is due.
 
-        Its own job rather than part of tick: the loop runs a minute apart
-        from wherever the service happened to start, so it could only ever
-        land somewhere in the first minute of the hour.
+        Called by the scheduler on the hour, and the only place automatic
+        watering happens. Pots that do not need water are still visited, the
+        way their dose would move, so the hour's trip is the same shape every
+        time. The motor is switched off once the carriage is parked.
 
-        Quiet hours or a snooze skip the hour rather than defer it, so the
-        patrol only ever happens on the hour. Busy hardware is waited out
-        for a few minutes instead -- that is nearly always a dose in
-        progress, and skipping a whole hour for one would be a waste.
+        Off with automatic watering. Quiet hours or a snooze skip the hour
+        rather than defer it. A soak pause, or a dose still waiting on its
+        probe, makes it a dry patrol. Busy hardware is waited out for a few
+        minutes -- nearly always someone watering by hand.
         """
-        if not self.auto_patrol_enabled:
+        if not self.auto_watering_enabled:
             return
 
         moment = now or datetime.now()
-        held = self.watering_suppressed(moment)
+        held = self._motion_held(moment)
         if held:
             logger.debug("Skipping the hourly patrol, %s", held)
             return
@@ -2533,7 +2660,8 @@ class GreenThumbAutomation:
         deadline = monotonic() + busy_wait_seconds
         while True:
             try:
-                result = self.run_dance("patrol", home_first=True)
+                with self._exclusive("Hourly patrol"):
+                    result = self._live_patrol_locked(moment)
                 break
             except HardwareBusyError:
                 if monotonic() >= deadline:
@@ -2542,34 +2670,127 @@ class GreenThumbAutomation:
                         "at": moment.isoformat(timespec="minutes"),
                         "ok": False,
                         "error": "hardware was busy",
+                        "watered": [],
                     }
                     return
                 sleep(PATROL_BUSY_POLL_SECONDS)
             except Exception as exc:
                 logger.exception("Hourly patrol failed")
-                result = {"ok": False, "error": str(exc) or type(exc).__name__}
+                result = {"ok": False, "error": str(exc) or type(exc).__name__, "watered": []}
                 break
 
         self._last_patrol = {
             "at": moment.isoformat(timespec="minutes"),
             "ok": bool(result.get("ok")),
             "error": None if result.get("ok") else result.get("error"),
+            "watered": result.get("watered", []),
         }
-        if result.get("ok"):
-            logger.info("Homed and patrolled the plants")
+        if not result.get("ok"):
+            logger.warning("Hourly patrol had a problem: %s", result.get("error"))
+
+    def _live_patrol_locked(self, moment: datetime) -> dict[str, object]:
+        """The patrol itself. The caller holds the hardware lock.
+
+        Planned for the whole rail, then sent one pot at a time: each dose is
+        then confirmed and recorded as it lands, so a stop that fails partway
+        down the rail still leaves an honest record of which pots got water.
+        The carriage stops at every pot anyway, so nothing is lost in motion.
+        """
+        homed = self._home()
+        if not homed.get("ok"):
+            return {"ok": False, "error": f"Homing failed: {homed.get('error')}", "watered": []}
+
+        held = self._doses_held()
+        if held:
+            logger.info("Hourly patrol without watering: %s", held)
+        due = set() if held else {
+            plant.plant_id for plant in self.plants if self._due_on_patrol(plant, moment)
+        }
+
+        travel = self.usable_travel_mm()
+        stops = {plant.plant_id: stop for plant, stop in self._patrol_visits()}
+        # Every pot that is due, even one whose spot the visits leave out:
+        # _move_and_water refuses that spot itself and says why.
+        route = [plant for plant in self.plants if plant.plant_id in due or plant.plant_id in stops]
+        # Left to right, so it is one trip down the rail.
+        route.sort(key=lambda plant: (
+            stops[plant.plant_id].position_mm if plant.plant_id in stops else plant.position_mm
+        ))
+
+        watered: list[str] = []
+        visited = 0
+        failures: list[str] = []
+        for plant in route:
+            try:
+                if plant.plant_id in due:
+                    logger.info(
+                        "Plant %s is at %.0f%% soil water against a target of %s%%, watering",
+                        plant.plant_id, self.percent_for_plant(plant), plant.target_available,
+                    )
+                    dose = self._move_and_water(plant)
+                    if dose.get("status") == "ok":
+                        watered.append(f"{plant.name} ({dose['volume_ml']} mL)")
+                    else:
+                        failures.append(f"{plant.name}: {dose.get('error')}")
+                    continue
+                steps = dances.visit_steps(stops[plant.plant_id], travel)
+                visit = self.klipper.send_gcode(dances.gcode_for(steps), timeout=MOTION_TIMEOUT)
+                if visit.get("ok"):
+                    visited += 1
+                    self._moved()
+                else:
+                    failures.append(f"{plant.name}: {visit.get('error')}")
+            except Exception as exc:
+                # One pot's trouble is not a reason to leave the rest dry.
+                logger.exception("Patrol stop at %s failed", plant.name)
+                failures.append(f"{plant.name}: {str(exc) or type(exc).__name__}")
+
+        park = self.klipper.send_gcode(
+            dances.gcode_for([(0, dances.CRUISE, 0)]), timeout=MOTION_TIMEOUT
+        )
+        if park.get("ok"):
+            self._moved()
         else:
-            logger.warning("Hourly patrol did not run: %s", result.get("error"))
+            failures.append(f"parking: {park.get('error')}")
 
-    def set_auto_patrol(self, enabled: bool) -> dict[str, object]:
-        self.auto_patrol_enabled = bool(enabled)
-        self._persist()
-        return self.auto_patrol_status()
+        others = f"visited {visited} other{'' if visited == 1 else 's'}"
+        if watered:
+            logger.info("Hourly patrol: homed, watered %s, %s", _join(watered), others)
+        else:
+            logger.info("Hourly patrol: homed, nothing needed water, %s", others)
+        self._idle_motor_locked("after the hourly patrol")
 
-    def auto_patrol_status(self) -> dict[str, object]:
+        return {
+            "ok": not failures,
+            "error": "; ".join(failures) or None,
+            "watered": watered,
+        }
+
+    def _due_on_patrol(self, plant: PlantSpec, moment: datetime) -> bool:
+        """Whether this hour's patrol waters this pot."""
+        window = self._history.get(plant.sensor_address)
+        # Only on a full window, so neither a single bad reading nor the
+        # first minutes after a restart can start the pump.
+        if not window or len(window) < window.maxlen:
+            return False
+        if not self.thirsty(plant):
+            return False
+        return self._cooldown_elapsed(plant.plant_id, now=moment, slack=PATROL_COOLDOWN_SLACK)
+
+    def next_patrol(self, now: datetime | None = None) -> datetime:
+        """The top of the next hour."""
+        moment = now or datetime.now()
+        return moment.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+
+    def patrol_status(self) -> dict[str, object]:
         """Cheap enough for /overview -- asks Klipper nothing."""
         return {
-            "enabled": self.auto_patrol_enabled,
+            "enabled": self.auto_watering_enabled,
             "last": self._last_patrol,
+            "next": (
+                self.next_patrol().isoformat(timespec="minutes")
+                if self.auto_watering_enabled else None
+            ),
         }
 
     def dance_catalog(self) -> list[dict]:
@@ -2582,8 +2803,16 @@ class GreenThumbAutomation:
             return self._home()
 
     def move_gantry_relative(self, distance_mm: float) -> dict[str, object]:
+        # Not homed first: a jog from wherever an idle motor left the carriage
+        # means nothing, so Klipper refusing it is the right answer.
         with self._exclusive("Gantry move"):
-            return self.klipper.move_gantry_relative(distance_mm)
+            return self._noting_motion(self.klipper.move_gantry_relative(distance_mm))
+
+    def _noting_motion(self, result: dict[str, object]) -> dict[str, object]:
+        """Pass a move's result through, starting the idle timer if it moved."""
+        if result.get("ok"):
+            self._moved()
+        return result
 
     def move_gantry_to_end(self, end: str) -> dict[str, object]:
         """Send the carriage to one end of the rail.
@@ -2601,8 +2830,11 @@ class GreenThumbAutomation:
             raise ValueError(f"Unknown end: {end!r}. Use 'left' or 'right'.")
 
         with self._exclusive(f"Move gantry all the way {end}"):
+            homed = self._ensure_homed(f"moving all the way {end}")
+            if not homed.get("ok"):
+                return homed
             target = 0.0 if end == "left" else self.usable_travel_mm()
-            return self.klipper.move_gantry_absolute(round(target, 1))
+            return self._noting_motion(self.klipper.move_gantry_absolute(round(target, 1)))
 
     def move_to_plant(self, plant_id: str) -> dict[str, object]:
         plant = next((item for item in self.plants if item.plant_id == plant_id), None)
@@ -2610,7 +2842,10 @@ class GreenThumbAutomation:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
         with self._exclusive(f"Move to {plant_id}"):
-            return self.klipper.move_gantry_absolute(plant.position_mm)
+            homed = self._ensure_homed(f"moving to {plant.name}")
+            if not homed.get("ok"):
+                return homed
+            return self._noting_motion(self.klipper.move_gantry_absolute(plant.position_mm))
 
     # --- motor direction ---------------------------------------------------
     #
@@ -2667,6 +2902,9 @@ class GreenThumbAutomation:
                     "Move it toward the middle of the rail first.",
                 }
             result = self.klipper.test_direction(DIRECTION_TEST_MM)
+            if result.get("ok") and self._motor_on:
+                # The test ends with M84.
+                self._mark_motor_idle()
         if not result.get("ok"):
             return {"ok": False, "error": result.get("error")}
         return {"ok": True, **self.motor_direction_status()}
@@ -2674,7 +2912,11 @@ class GreenThumbAutomation:
     def release_motors(self) -> dict[str, object]:
         """Switch the motors off so the carriage slides by hand. Unhomes it."""
         with self._exclusive("Release motors"):
-            return self.klipper.release_motors()
+            result = self.klipper.release_motors()
+            if result.get("ok") and self._motor_on:
+                self._mark_motor_idle()
+                logger.info("Gantry motor idle, released by hand")
+            return result
 
     def answer_motor_direction(self, toward_switch: bool) -> dict[str, object]:
         """Record which way the test turned the motor.

@@ -26,12 +26,30 @@ function startupLine(status) {
   }
 }
 
+// The last hourly patrol, and what it watered. Null until one has run.
 function patrolLine(status) {
   const last = status?.last
   if (!status?.enabled || !last) return null
-  return last.ok
-    ? `Last patrol at ${clock(last.at)}.`
-    : `The ${clock(last.at)} patrol did not run: ${last.error}.`
+  if (!last.ok) return `The ${clock(last.at)} patrol had a problem: ${last.error}.`
+  const watered = last.watered?.length
+    ? `watered ${last.watered.join(', ')}`
+    : 'nothing needed water'
+  return `Last patrol at ${clock(last.at)}: ${watered}.`
+}
+
+// The gantry motor between moves. Idle is normal, not a fault: the arm homes
+// again before it next moves. Null before the first home, which the startup
+// home line already covers.
+function motorLine(motor) {
+  if (motor?.state === 'idle') {
+    return motor.since
+      ? `Motor idle since ${clock(motor.since)}. It homes again before the next move.`
+      : 'Motor idle. It homes again before the next move.'
+  }
+  if (motor?.state === 'active') {
+    return `Motor on. It switches off after ${motor.idle_after_seconds} s without a move.`
+  }
+  return null
 }
 
 // Everything the planter does on its own, and the windows in which it is
@@ -52,10 +70,8 @@ export function AutomationPanel({ overview, onRefresh }) {
   const [startupMsg, setStartupMsg] = useState('')
   const [savingStartup, setSavingStartup] = useState(false)
 
-  const patrol = overview?.auto_patrol
-  const [patrolOn, setPatrolOn] = useState(false)
-  const [patrolMsg, setPatrolMsg] = useState('')
-  const [savingPatrol, setSavingPatrol] = useState(false)
+  const patrol = overview?.patrol
+  const motor = overview?.motor
 
   const quiet = overview?.quiet
   const [quietOn, setQuietOn] = useState(false)
@@ -72,7 +88,6 @@ export function AutomationPanel({ overview, onRefresh }) {
   const served = JSON.stringify([
     watering?.auto_watering_enabled,
     startupHome?.enabled,
-    patrol?.enabled,
     quiet?.quiet_hours_enabled,
     quiet?.quiet_hours_start,
     quiet?.quiet_hours_stop,
@@ -82,7 +97,6 @@ export function AutomationPanel({ overview, onRefresh }) {
     setSyncedServed(served)
     setAutoOn(watering?.auto_watering_enabled ?? autoOn)
     setHomeOnStartup(startupHome?.enabled ?? homeOnStartup)
-    setPatrolOn(patrol?.enabled ?? patrolOn)
     setQuietOn(quiet?.quiet_hours_enabled ?? quietOn)
     setQuietStart(quiet?.quiet_hours_start ?? quietStart)
     setQuietStop(quiet?.quiet_hours_stop ?? quietStop)
@@ -136,17 +150,6 @@ export function AutomationPanel({ overview, onRefresh }) {
       setOn: setHomeOnStartup,
       setMsg: setStartupMsg,
       setSaving: setSavingStartup,
-      readBack: (data) => data.enabled,
-    })
-
-  const saveAutoPatrol = (enabled) =>
-    saveToggle({
-      path: '/patrol/auto',
-      enabled,
-      previous: patrolOn,
-      setOn: setPatrolOn,
-      setMsg: setPatrolMsg,
-      setSaving: setSavingPatrol,
       readBack: (data) => data.enabled,
     })
 
@@ -213,8 +216,15 @@ export function AutomationPanel({ overview, onRefresh }) {
               Water plants automatically
             </label>
             <p className="field-hint">
-              Measure the pump&apos;s flow rate under Calibration first.
+              Every hour, on the hour, the arm homes, then visits each pot and
+              waters the ones that need it.
             </p>
+            {patrolLine(patrol) && (
+              <p className={`field-hint${patrol?.last?.ok === false ? ' warning' : ''}`}>
+                {patrolLine(patrol)}
+              </p>
+            )}
+            {patrol?.next && <p className="field-hint">Next patrol at {clock(patrol.next)}.</p>}
             {autoMsg && <p className="field-hint warning">{autoMsg}</p>}
           </div>
 
@@ -240,9 +250,10 @@ export function AutomationPanel({ overview, onRefresh }) {
           )}
         </div>
 
-        {/* Both switches move the arm without anyone pressing a button, so
-            both start off: a planter being assembled should not set off
-            across the rail before someone has checked it is clear. */}
+        {/* Moves the arm without anyone pressing a button, so it starts off:
+            a planter being assembled should not set off across the rail
+            before someone has checked it is clear. Automatic watering turns
+            it on and holds it there, since the patrol depends on it. */}
         <div className="settings-group">
           <h3>Homing</h3>
 
@@ -251,33 +262,21 @@ export function AutomationPanel({ overview, onRefresh }) {
               <input
                 type="checkbox"
                 checked={homeOnStartup}
-                disabled={savingStartup}
+                disabled={savingStartup || startupHome?.required}
                 onChange={(event) => saveHomeOnStartup(event.target.checked)}
               />
               Home after startup
             </label>
+            {startupHome?.required && (
+              <p className="field-hint">Automatic watering needs this.</p>
+            )}
             {startupLine(startupHome) && (
               <p className={`field-hint${startupHome?.phase === 'retrying' ? ' warning' : ''}`}>
                 {startupLine(startupHome)}
               </p>
             )}
+            {motorLine(motor) && <p className="field-hint">{motorLine(motor)}</p>}
             {startupMsg && <p className="field-hint warning">{startupMsg}</p>}
-
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={patrolOn}
-                disabled={savingPatrol}
-                onChange={(event) => saveAutoPatrol(event.target.checked)}
-              />
-              Hourly auto-patrol
-            </label>
-            {patrolLine(patrol) && (
-              <p className={`field-hint${patrol?.last?.ok === false ? ' warning' : ''}`}>
-                {patrolLine(patrol)}
-              </p>
-            )}
-            {patrolMsg && <p className="field-hint warning">{patrolMsg}</p>}
           </div>
         </div>
 
