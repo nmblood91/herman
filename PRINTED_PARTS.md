@@ -8,11 +8,14 @@ whether a part is worth redesigning. Inserts and screws are here because they
 are the parts that get ordered in the wrong size, and because a part that has
 already been printed cannot be re-tapped for a different insert.
 
-**One planter is 1,434 g of printed parts**, everything but the camera mount.
-At typical PETG pricing that is roughly $30–36 of filament per unit, which is
-enough to be worth watching — three parts are 44% of it: the main electronics
-rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
-150 g, which is 50 links of 3 g rather than one big part.
+**One planter is 1,284 g of printed parts**, everything but the camera mount.
+At typical PETG pricing that is roughly $27–32 of filament per unit, which is
+enough to be worth watching — two parts are 37% of it: the main electronics
+rear at 270 g and the right gantry holder rear at 205 g.
+
+The water tube's cable chain is bought, not printed: an S10 chain, 1 m for
+$10, in [BOM.md](BOM.md) under the watering system. The printed one couldn't
+be made to run right. Going back to it is on the [ROADMAP.md](ROADMAP.md).
 
 ## Conventions
 
@@ -45,7 +48,7 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 | Right gantry holder, front | 1 | 85 g | 1 × M4 (long), 2 × M3 (long) | 2 × M3×10 (pump, into inserts), 4 × M3×10 (motor, into motor) | 2 | 1 | 0 | 0 |
 | Left gantry cover | 1 | 10 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
 | Right gantry cover | 1 | 35 g | 0 | 2 × M5×16 | 0 | 0 | 0 | 0 |
-| Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short), 1 × M4 (short), 6 × M3 (long) | 4 × M5×16, 1 × M4×12 | 0 | 0 | 4 × M5×10 | 0 |
+| Gantry V-slot adapter | 1 | 100 g | 4 × M5 (short), 3 × M4 (short), 6 × M3 (long) | 4 × M5×16, 1 × M4×12, 2 × M4×8 (cable chain) | 0 | 0 | 4 × M5×10 | 0 |
 | Gantry face top | 1 | 50 g | 0 | 4 × M3 | 0 | 0 | 0 | 0 |
 | Gantry face bottom (nozzle holder) | 1 | 50 g | 0 | 2 × M3 | 0 | 0 | 0 | 0 |
 | Main electronics, rear | 1 | 270 g | 4 × M4 (long) | 4 × M4×16 | 12 | 0 | 0 | 2 × 5-slot |
@@ -54,7 +57,6 @@ rear at 270 g, the right gantry holder rear at 205 g, and the cable chain at
 | Left STEMMA QT sub hub, fronts | 1 | 21 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Right STEMMA QT sub hub, rear | 1 | 85 g | 4 × M4 (long) | 4 × M4×16 | 4 | 0 | 0 | 0 |
 | Right STEMMA QT sub hub, fronts | 1 | 30 g | 0 | 0 | 0 | 0 | 0 | 0 |
-| Cable chain for water tube | 50 links | 150 g | 0 | 0 | 0 | 0 | 0 | 0 |
 | Cable chain anchor | 1 | 3 g | 0 | 0 | 2 | 0 | 0 | 0 |
 | Camera module mount | 1 | — | — | — | — | — | — | — |
 
@@ -66,11 +68,12 @@ by hand, so re-total it if the table changes.
 | Fastener | Qty | Unit | Line total | Goes into |
 |---|---|---|---|---|
 | M4 heat-set insert (long) | 25 | $0.25 | $6.25 | gantry holders 13, electronics rear 4, sub hubs 8 |
-| M4 heat-set insert (short) | 1 | $0.25 | $0.25 | V-slot adapter |
+| M4 heat-set insert (short) | 3 | $0.25 | $0.75 | V-slot adapter — 1, plus 2 for the cable chain |
 | M3 heat-set insert (long) | 8 | $0.24 | $1.92 | V-slot adapter 6, right gantry holder front 2 |
 | M5 heat-set insert (short) | 4 | $0.25 | $1.00 | V-slot adapter |
 | M4×16 socket cap | 22 | $0.07 | $1.54 | M4 inserts — gantry holders 10, electronics rear 4, sub hubs 8 |
-| M4×12 socket cap | 1 | $0.07 | $0.07 | the V-slot adapter's single M4 insert |
+| M4×12 socket cap | 1 | $0.07 | $0.07 | the V-slot adapter's first M4 insert |
+| M4×8 socket cap | 2 | $0.07 | $0.14 | the bought cable chain's end, into the V-slot adapter's other two M4 inserts |
 | M5×16 socket cap | 10 | $0.08 | $0.80 | 2 into the VITTSJÖ frame, one per rear holder · 8 into T-nuts in the V-slot rail, 4 from the adapter and 2 from each cover |
 | M3×10 socket cap | 6 | $0.05 | $0.30 | 2 into the right gantry holder front's inserts, holding the pump · 4 into the motor's own tapped holes |
 | M3 socket cap, length TBD | 6 | $0.05 | $0.30 | the adapter's six M3 inserts, from the two gantry faces — 4 from the top, 2 from the bottom |
@@ -79,12 +82,12 @@ by hand, so re-total it if the table changes.
 | M5 shoulder bolt | 3 | $1.00 | $3.00 | M4 inserts — left gantry holder front 2, right gantry holder front 1 |
 | Wago 5-slot | 2 | $0.50 | $1.00 | main electronics rear |
 | Wago 3-slot | 2 | $0.30 | $0.60 | right gantry holder rear |
-| **Total** | **118** | | **$20.55** | |
+| **Total** | **122** | | **$21.19** | |
 
-**38 heat-set inserts, 76 fasteners and 4 Wago connectors per planter —
-$20.55 of hardware.**
+**40 heat-set inserts, 78 fasteners and 4 Wago connectors per planter —
+$21.19 of hardware.**
 
-The heat-set inserts are $9.42 of that: 46% of the cost from 32% of the
+The heat-set inserts are $9.92 of that: 47% of the cost from 33% of the
 pieces, and the single biggest line at $6.25 for the long M4s alone. That is
 what a $0.25 part does sitting next to a $0.05 screw, and it is worth knowing
 before a redesign adds two more bosses to something.
@@ -92,15 +95,15 @@ before a redesign adds two more bosses to something.
 The idler wheels the shoulder bolts carry are not counted here — they are a
 drive component and sit in [BOM.md](BOM.md) under core structure.
 
-Against the filament: 1,434 g is roughly $30–36 at typical PETG pricing, so
-**$51–57 of raw material per planter** for everything printed and everything
+Against the filament: 1,284 g is roughly $27–32 at typical PETG pricing, so
+**$48–53 of raw material per planter** for everything printed and everything
 holding it together.
 
 **The thread-by-thread check**, worth re-running after any edit:
 
-- **M4 balances at 26.** 26 inserts — 25 long plus the adapter's one short —
-  against 26 screws: 22 M4×16, 1 M4×12, and the 3 shoulder bolts, which are
-  M4 at the thread.
+- **M4 balances at 28.** 28 inserts — 25 long plus the adapter's three
+  short — against 28 screws: 22 M4×16, 1 M4×12, 2 M4×8, and the 3 shoulder
+  bolts, which are M4 at the thread.
 - **M5 balances.** The adapter's 4 inserts take the 4 M5×10 flat heads; all
   10 M5×16 go elsewhere — 2 into the VITTSJÖ frame, 8 into rail T-nuts.
 - **M3 balances.** 8 inserts against 12 screws, and the 4 over are
@@ -200,11 +203,10 @@ Only the parts with a constraint worth recording.
   two on each cover — eight of the ten M5×16 land in the extrusion rather than
   in anything printed.
 
-- **Cable chain for water tube** — carries the outlet tube to the moving
-  carriage. Fifty links at 3 g, which
-  makes it the third-heaviest item in the build at 150 g — more than either
-  gantry cover and more than both sub hub fronts together. The anchor is a
-  separate part and takes the two `#4`.
+- **Cable chain anchor** — holds the fixed end of the bought S10 chain that
+  carries the outlet tube to the moving carriage, and takes the two `#4`. The
+  chain's moving end screws into the V-slot adapter's two extra M4 inserts
+  with M4×8. The chain itself is in [BOM.md](BOM.md).
 
 ## Still to come
 

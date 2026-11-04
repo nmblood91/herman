@@ -13,21 +13,21 @@ cannot be subtotalled yet.
 | Section | Priced so far | Lines still to price |
 |---|---|---|
 | Core structure | $156.00 | complete |
-| Printed parts — filament | ~$30–36 | complete |
-| Printed parts — fasteners and inserts | $20.55 | complete |
+| Printed parts — filament | ~$27–32 | complete |
+| Printed parts — fasteners and inserts | $21.19 | complete |
 | Motion and control | $43.00 | 1 — wiring harness |
 | Compute and monitoring | $40.00 | complete for the base build |
 | Sensing | $69.00 | complete |
-| Watering system | $35.00 | 1 — intake weight |
+| Watering system | $45.00 | 1 — intake weight |
 | Lighting | $10.00 | 2 — hook-up wire, connectors |
 | Power and electronics | $27.00 | 8 — fuses, fuse holders, wire, heat shrink |
-| **Running total** | **~$431–437** | **12 lines outstanding** |
+| **Running total** | **~$438–443** | **12 lines outstanding** |
 
 Close to final. The frame, motion, compute and sensing are all fully costed.
 What is left is small electrical hardware — three fuses and their holders,
 wire, connectors and heat shrink — plus the intake weight. Call
 it another $25, which puts a finished prototype
-around **$457**.
+around **$463**.
 
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
 there is no bought nozzle — the tube is held by a printed part.
@@ -52,10 +52,11 @@ needs a printed mount that does not exist yet, so budget that separately.
 ## Printed parts
 
 Weights, heat-set inserts, screws and their costs are tracked in
-**[PRINTED_PARTS.md](PRINTED_PARTS.md)** — 18 parts at 1,434 g, plus $20.55 of
-fasteners across 118 pieces. Covers the gantry holders and covers, the V-slot
+**[PRINTED_PARTS.md](PRINTED_PARTS.md)** — 17 parts at 1,284 g, plus $21.19 of
+fasteners across 122 pieces. Covers the gantry holders and covers, the V-slot
 adapter, the two gantry faces, the electronics holder, the STEMMA QT sub hubs
-and the water-tube cable chain.
+and the cable chain anchor. The chain itself is bought, under the watering
+system.
 
 ## Motion and control
 
@@ -138,7 +139,7 @@ loses:
   saving, and this is the one component the whole stack runs on.
 - **The saving is small and partly eaten.** $15 against $30, less $3–5 for the
   USB OTG adapter it needs — the Zero has no USB-A, and Klipper reaches the SKR
-  over USB serial. Call it $10–12 on a ~$457 build, under 3%.
+  over USB serial. Call it $10–12 on a ~$463 build, under 3%.
 - **It costs a third mounting pattern** (65 × 30 mm) on top of the two below,
   and runs at 1 GHz rather than 1.4, which makes the prebuilt frontend bundle
   more necessary rather than less.
@@ -153,7 +154,7 @@ between the Klipper host, the API and nginx, and Klipper's host loop is
 latency-sensitive.
 
 **If unit cost is the goal, the board is the wrong line.** Compute is $40 of
-~$457 with the SD card, and the Pi itself is $30 — 6.6%. The VITTSJÖ frame and
+~$463 with the SD card, and the Pi itself is $30 — 6.5%. The VITTSJÖ frame and
 the rail together are $130, nearly a third of the build, and neither has been
 shopped. Sensing is another $69.
 
@@ -210,6 +211,7 @@ are solder pads on the sensors rather than a purchased part.
 | Reservoir | 1 | BYO | — | top-loaded; a Nalgene works |
 | Intake weight | 1 | TBD | TBD | only if dipping a tube from the top |
 | Tubing and barb fittings | 1 set | $5.00 | $5.00 | |
+| Cable chain, S10, 1 m | 1 | $10.00 | $10.00 | Amazon; carries the tube to the carriage. Moving end takes 2 × M4×8 into the V-slot adapter, fixed end sits in the printed anchor. Was printed — see [ROADMAP.md](ROADMAP.md) |
 
 **There is no bought nozzle.** The tube dribbles straight out, held by the
 lower gantry face — which PRINTED_PARTS.md already calls the nozzle holder and

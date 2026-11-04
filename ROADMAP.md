@@ -23,6 +23,7 @@
 - harden the physical design and wiring harness
 - simplify installation and setup steps
 - replace `git pull` with a real update mechanism — see below
+- maybe print the cable chain again instead of buying it — see below
 - build a service and support process
 - create a replacement parts catalog
 - define quality control and calibration procedures
@@ -353,6 +354,27 @@ change, which is the reason the capture command was made injectable.
 Prerequisites whenever this starts: there is no CI yet, and the two version
 strings (`pyproject.toml`, `frontend/package.json`) are unmanaged — a release
 artifact needs one source of truth for version.
+
+### The cable chain, maybe printed again
+
+The water tube's cable chain was a printed part: 50 links at 3 g each, plus
+an anchor. The printed version couldn't be made to work right, so the build
+now uses a bought S10 chain from Amazon instead: 1 m for $10. Its end screws
+into the gantry V-slot adapter with 2 × M4×8, which added two M4 inserts to
+the adapter.
+
+Going back to a printed chain is worth another look later:
+- it would take a bought part off the BOM, and a part someone else's listing
+  can change or drop;
+- the printed chain was 150 g, about $3–4 of filament against $10;
+- the chain could be sized to this rail and carriage exactly, rather than the
+  design fitting the chain.
+
+It only comes back once a printed chain runs as smoothly as the bought one
+over the full travel, and for as long. A chain that binds or drops a link
+stalls the carriage or pulls on the water tube. Until then the bought chain
+stays. A printed chain would also need to fit the adapter's two M4 inserts,
+or the adapter changes with it.
 
 ## Phase 4: Commercial launch
 - package the product as a sellable smart planter system
