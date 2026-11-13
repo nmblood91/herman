@@ -31,6 +31,14 @@ VALID_HW_IDS = (0x55, 0x87)
 MOISTURE_TOUCH_PIN = 0
 NOT_READY = 0xFFFF
 
+# How long an address that did not answer is left alone before it is probed
+# again. Probing is a reset and a half-second wait, with the hardware lock held,
+# and a calibration or the live check reads several times a second: an empty
+# address cost every one of those reads half a second and left the probes that
+# were there with a fraction of their samples. Shorter than the control loop's
+# poll, so a probe plugged in still shows up on the next reading.
+PROBE_RETRY_SECONDS = 30.0
+
 
 class SensorReadError(RuntimeError):
     """Raised when the sensing stack is unavailable."""
@@ -76,6 +84,8 @@ class SoilSensorHub:
         self.wilting_point = wilting_point or {}
         self.bus: smbus2.SMBus | None = None
         self._initialized_sensors: set[int] = set()
+        # When each address last failed to answer a probe (time.monotonic).
+        self._probe_failed_at: dict[int, float] = {}
 
         try:
             self.bus = smbus2.SMBus(I2C_BUS)
@@ -94,8 +104,10 @@ class SoilSensorHub:
                 raise SensorReadError(f"unexpected seesaw hardware id 0x{hw_id:02x}")
         except Exception as exc:
             logger.debug("No STEMMA sensor at 0x%02x: %s", address, exc)
+            self._probe_failed_at[address] = time.monotonic()
             return False
 
+        self._probe_failed_at.pop(address, None)
         self._initialized_sensors.add(address)
         logger.info("Initialized STEMMA sensor at 0x%02x (hw id 0x%02x)", address, hw_id)
         return True
@@ -200,8 +212,13 @@ class SoilSensorHub:
     def read_one(self, address: int) -> SensorSample:
         # Sensors get plugged in after startup, so re-probe addresses that have
         # not answered yet instead of writing them off until the next restart.
-        if address not in self._initialized_sensors and not self._try_initialize(address):
-            return unavailable_sample(address)
+        if address not in self._initialized_sensors:
+            failed_at = self._probe_failed_at.get(address)
+            if failed_at is not None and time.monotonic() - failed_at < PROBE_RETRY_SECONDS:
+                # Probed and absent a moment ago; see PROBE_RETRY_SECONDS.
+                return unavailable_sample(address)
+            if not self._try_initialize(address):
+                return unavailable_sample(address)
 
         try:
             moisture = self._read_moisture(address)

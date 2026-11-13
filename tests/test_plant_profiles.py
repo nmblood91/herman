@@ -99,7 +99,7 @@ cleared.update_target_available(first, 35)
 cleared.update_watering_volume(first, 250)
 cleared.save_plant_profile(first)
 cleared.apply_plant_profile(second, "Fern")
-cleared.set_plant_position(second, 300)
+cleared.save_pot(second, position_mm=300)
 position, soil = pot.position_mm, pot.soil
 
 cleared.clear_plant_profile(second)
@@ -123,8 +123,8 @@ print("ok: clearing a profile resets the pot's plant settings, keeps its placeme
 auto = build()
 first, second = ids(auto)[0], ids(auto)[1]
 auto.update_plant_name(first, "Basil")
-auto.set_plant_position(first, 130)
-auto.set_plant_position(second, 350)
+auto.save_pot(first, position_mm=130)
+auto.save_pot(second, position_mm=350)
 auto.save_plant_profile(first)
 
 auto.apply_plant_profile(second, "Basil")

@@ -130,7 +130,7 @@ first, second = auto.plants[0].plant_id, auto.plants[1].plant_id
 assert auto.get_plant(first).soil == "", "a plant started with a soil already set"
 print("ok: a plant starts with no soil, which is distinct from a bad one")
 
-auto.update_plant_soil(first, "rich & retentive mix")
+auto.save_pot(first, soil="rich & retentive mix")
 assert auto.get_plant(first).soil == "Rich & Retentive Mix", auto.get_plant(first).soil
 print("ok: setting a soil matches case-insensitively and stores the library's spelling")
 
@@ -138,7 +138,7 @@ print("ok: setting a soil matches case-insensitively and stores the library's sp
 # behaving exactly like "not set".
 for bad in ("Moon dust", "rich retentive mix"):
     try:
-        auto.update_plant_soil(second, bad)
+        auto.save_pot(second, soil=bad)
     except ValueError:
         pass
     else:
@@ -146,15 +146,15 @@ for bad in ("Moon dust", "rich retentive mix"):
 assert auto.get_plant(second).soil == ""
 print("ok: an unknown soil is refused rather than stored as a dead name")
 
-auto.update_plant_soil(first, "")
+auto.save_pot(first, soil="")
 assert auto.get_plant(first).soil == ""
 print("ok: an empty name clears it, which is how you say the mix is unknown")
 
 
 # --- a plant profile's preferred soil ---
 
-auto.update_plant_soil(first, "Rich & Retentive Mix")
-auto.update_plant_soil(second, "Rich & Retentive Mix")
+auto.save_pot(first, soil="Rich & Retentive Mix")
+auto.save_pot(second, soil="Rich & Retentive Mix")
 auto.update_plant_name(first, "Fern")
 auto.get_plant(first).preferred_soil = "Fast-Draining Mix"
 auto.save_plant_profile(first)
@@ -222,8 +222,8 @@ else:
     raise AssertionError("stored a preferred soil that names no soil profile")
 print("ok: a preferred soil that names no soil profile is refused")
 
-auto.update_plant_soil(first, "Fast-Draining Mix")
-auto.update_plant_soil(second, "Rich & Retentive Mix")
+auto.save_pot(first, soil="Fast-Draining Mix")
+auto.save_pot(second, soil="Rich & Retentive Mix")
 restored = build(shared)
 assert restored.get_plant(first).soil == "Fast-Draining Mix"
 assert restored.get_plant(second).soil == "Rich & Retentive Mix"
@@ -393,7 +393,7 @@ print("ok: the VWC figures and the note survive, so the mix still bands")
 
 # And a pot reads against it the way it reads against a measured one.
 own = build(path)
-own.update_plant_soil("plant_1", "Fast-Draining Mix")
+own.save_pot("plant_1", soil="Fast-Draining Mix")
 plant = own.plants[0]
 assert own.sensor_hub.field_capacity[plant.sensor_address] == 742, own.sensor_hub.field_capacity
 print("ok: a pot reads against a hand-entered figure like any other")
@@ -420,7 +420,7 @@ try:
     print("ok: install writes the default field capacity reading, marked as not measured")
 
     fresh = build(path)
-    fresh.update_plant_soil("plant_1", "Rich & Retentive Mix")
+    fresh.save_pot("plant_1", soil="Rich & Retentive Mix")
     assert fresh.scale_problem(fresh.plants[0]) is None, fresh.scale_problem(fresh.plants[0])
     print("ok: with the defaults a pot can be judged as soon as its soil profile is chosen")
 
@@ -456,9 +456,9 @@ from greenthumb.services.automation import UNCHANGED
 typed = build()
 typed.save_soil("Typed mix", 30, 14)
 first, second, third = (p.plant_id for p in typed.plants[:3])
-typed.update_plant_soil(first, "Typed mix")
-typed.update_plant_soil(second, "Typed mix")
-typed.update_plant_soil(third, "Typed mix")
+typed.save_pot(first, soil="Typed mix")
+typed.save_pot(second, soil="Typed mix")
+typed.save_pot(third, soil="Typed mix")
 
 def capacity_of(plant_id):
     return typed.sensor_hub.field_capacity.get(typed.get_plant(plant_id).sensor_address)

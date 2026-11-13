@@ -247,6 +247,10 @@ class GreenThumbAutomation:
         self._pump_timer: threading.Timer | None = None
         self._pump_lock_held = False
         self._pump_release_lock = threading.Lock()
+        # Answers worked out once per /overview. See _once.
+        self._overview_memo = threading.local()
+        # motor-direction.cfg's verdict, kept until the file changes.
+        self._direction_cache: tuple[object, bool] | None = None
         # How long the last manual run actually lasted, which is the
         # denominator of a flow calibration. Measured rather than assumed to be
         # the dead-man limit: the run can be stopped early, and the timer that
@@ -895,21 +899,22 @@ class GreenThumbAutomation:
             return None
         return f"{plant.name} waters between {low} and {high} mm"
 
-    def set_plant_position(self, plant_id: str, position_mm: float) -> dict[str, object]:
-        """Record a pot's watering spot.
+    def _checked_position(self, plant: PlantSpec, position_mm: object) -> int:
+        """A watering spot for this pot as it would be stored, or ValueError.
 
         Refused outside the plant's zone rather than clamped into it. A spot
         out there is nearly always captured over the wrong pot, and clamping
         would quietly water the edge of the zone instead.
         """
-        plant = next((item for item in self.plants if item.plant_id == plant_id), None)
-        if plant is None:
-            raise ValueError(f"Unknown plant_id: {plant_id}")
-
         # Whole millimeters, rounded before the range check so the value
         # checked is the value stored. Infinity and not-a-number have no whole
         # millimeter, and round() raises on both with a message nobody wants.
-        raw = float(position_mm)
+        if isinstance(position_mm, bool):
+            raise ValueError("The watering position must be a number")
+        try:
+            raw = float(position_mm)
+        except (TypeError, ValueError):
+            raise ValueError("The watering position must be a number") from None
         if not math.isfinite(raw):
             raise ValueError("The watering position must be a number")
         position = round(raw)
@@ -919,30 +924,83 @@ class GreenThumbAutomation:
                 f"{problem}, so {position} mm is out of range. "
                 "Is this the right plant?"
             )
-        plant.position_mm = position
-        self._persist()
+        return position
 
+    def save_pot(
+        self,
+        plant_id: str,
+        position_mm: object = UNCHANGED,
+        soil: object = UNCHANGED,
+        sweep_min_mm: object = UNCHANGED,
+        sweep_max_mm: object = UNCHANGED,
+        watering_mode: object = UNCHANGED,
+    ) -> dict[str, object]:
+        """Save a pot's own settings together: all of them, or none.
+
+        The one way a pot's watering spot, soil profile, sweep span and
+        watering mode are set. They used to be four requests in a row, so a
+        sweep refused at the third left the new watering spot and soil already
+        stored under a card saying the save had failed -- and each request
+        rewrote the state file. Here everything is checked before anything is
+        changed, and the file is written once.
+
+        A field left out keeps what the pot has. The two sweep edges go
+        together, and the mode is checked against the span being saved with
+        it, so a pot can be given a span and switched to sweep in one go.
+        """
+        plant = self._plant_or_error(plant_id)
+
+        position = (
+            plant.position_mm if position_mm is UNCHANGED
+            else self._checked_position(plant, position_mm)
+        )
+        wanted_soil = plant.soil if soil is UNCHANGED else self._checked_soil(soil)
+        if (sweep_min_mm is UNCHANGED) != (sweep_max_mm is UNCHANGED):
+            raise ValueError("Give both sweep edges or neither")
+        if sweep_min_mm is UNCHANGED:
+            low, high = plant.sweep_min_mm, plant.sweep_max_mm
+        else:
+            low, high = self._checked_sweep(plant, sweep_min_mm, sweep_max_mm)
+        mode = (
+            plant.watering_mode if watering_mode is UNCHANGED
+            else self._checked_mode(watering_mode, abs(high - low))
+        )
+
+        # Nothing above raised, so nothing below can leave the pot half saved.
+        plant.position_mm = position
+        plant.soil = wanted_soil
+        plant.sweep_min_mm, plant.sweep_max_mm = low, high
+        plant.watering_mode = mode
+        self._persist()
+        if soil is not UNCHANGED:
+            # The pot's scale is its soil profile's, so it is read again, even
+            # for the same name: the profile's readings may have changed.
+            self._sync_scales()
         return {
             "status": "ok",
             "plant_id": plant_id,
+            "name": plant.name,
             "position_mm": plant.position_mm,
+            "soil": plant.soil,
+            "field_capacity_raw": self.sensor_hub.field_capacity.get(plant.sensor_address),
+            "sweep_min_mm": plant.sweep_min_mm,
+            "sweep_max_mm": plant.sweep_max_mm,
+            "sweep_span_mm": plant.sweep_max_mm - plant.sweep_min_mm,
+            "watering_mode": plant.watering_mode,
         }
 
-    def set_plant_sweep(
-        self, plant_id: str, min_mm: float, max_mm: float
-    ) -> dict[str, object]:
-        """Record the span an oscillating dose travels across.
+    def _checked_sweep(
+        self, plant: PlantSpec, min_mm: object, max_mm: object
+    ) -> tuple[int, int]:
+        """The span an oscillating dose travels across, as it would be
+        stored, or ValueError.
 
-        Refused rather than clamped, like set_plant_position: a span clamped to
+        Refused rather than clamped, like a watering spot: a span clamped to
         fit would water a different stretch of the planter than the one asked
         for, and report success. Both edges have to sit inside the plant's
         zone. The bounds are swapped if given the wrong way round, which is an
         ordering, not a value.
         """
-        plant = self.get_plant(plant_id)
-        if plant is None:
-            raise ValueError(f"Unknown plant_id: {plant_id}")
-
         # Before float(), which turns True into 1.0 and would accept a boolean
         # as a rail coordinate.
         if isinstance(min_mm, bool) or isinstance(max_mm, bool):
@@ -984,37 +1042,25 @@ class GreenThumbAutomation:
                 "Use point watering for a pot narrower than that."
             )
 
-        plant.sweep_min_mm = low
-        plant.sweep_max_mm = high
-        self._persist()
-        return {
-            "status": "ok",
-            "plant_id": plant_id,
-            "sweep_min_mm": plant.sweep_min_mm,
-            "sweep_max_mm": plant.sweep_max_mm,
-            "sweep_span_mm": plant.sweep_max_mm - plant.sweep_min_mm,
-        }
+        return low, high
 
-    def set_watering_mode(self, plant_id: str, mode: str) -> dict[str, object]:
-        """Switch a pot between a fixed point and an oscillating sweep.
+    @staticmethod
+    def _checked_mode(mode: object, span: float) -> str:
+        """A watering mode, a fixed point or an oscillating sweep, as it
+        would be stored for a pot whose sweep span is `span` mm, or ValueError.
 
-        Turning on sweep is refused while the span is too narrow to be one. The
-        mode and the span are separate settings, so the alternative is a pot
-        labeled "sweep" that waters as a point every time -- configured for
-        something it never does, which is the failure mode this codebase keeps
-        running into and the reason for the refusal rather than a default span.
+        Sweep is refused while the span is too narrow to be one. The mode and
+        the span are separate settings, so the alternative is a pot labeled
+        "sweep" that waters as a point every time -- configured for something
+        it never does, which is the failure mode this codebase keeps running
+        into and the reason for the refusal rather than a default span.
         """
-        plant = self.get_plant(plant_id)
-        if plant is None:
-            raise ValueError(f"Unknown plant_id: {plant_id}")
-
         wanted = str(mode).strip().casefold()
         if wanted not in sweep.MODES:
             raise ValueError(
                 "Watering mode has to be one of: " + ", ".join(sweep.MODES)
             )
         if wanted == sweep.SWEEP:
-            span = abs(plant.sweep_max_mm - plant.sweep_min_mm)
             if span < sweep.MIN_SPAN_MM:
                 raise ValueError(
                     "Set the sweep span first -- it needs at least "
@@ -1022,13 +1068,7 @@ class GreenThumbAutomation:
                     f"{span:.0f} mm."
                 )
 
-        plant.watering_mode = wanted
-        self._persist()
-        return {
-            "status": "ok",
-            "plant_id": plant_id,
-            "watering_mode": plant.watering_mode,
-        }
+        return wanted
 
     def _pump_flow(self) -> float:
         """The flow rate every dose is timed against, in mL/s.
@@ -1401,9 +1441,39 @@ class GreenThumbAutomation:
             else:
                 logger.warning("Could not confirm the watering of %s: its probe went quiet", plant.name)
 
+    def _once(self, key: str, compute):
+        """compute(), or what it gave earlier in this /overview.
+
+        The overview is built from half a dozen status methods that each ask
+        the history the same two questions, so one page poll ran the same
+        queries three or four times over. While get_overview is running on
+        this thread the first answer is kept; anywhere else this just calls
+        compute, so nothing outside an overview can see a stale answer.
+        """
+        values = getattr(self._overview_memo, "values", None)
+        if values is None:
+            return compute()
+        if key not in values:
+            values[key] = compute()
+        return values[key]
+
     def _soak_misses(self) -> list[dict[str, object]]:
         """The unbroken run of misses at the end of the history, newest first,
         since the last Resume."""
+        return self._once("soak_misses", self._read_soak_misses)
+
+    def _pending_soaks(self) -> list[dict[str, object]]:
+        """Doses still waiting on their probe, or [] if that cannot be read."""
+        return self._once("pending_soaks", self._read_pending_soaks)
+
+    def _read_pending_soaks(self) -> list[dict[str, object]]:
+        try:
+            return self.history.pending_soaks()
+        except Exception:
+            logger.exception("Could not read pending soak checks")
+            return []
+
+    def _read_soak_misses(self) -> list[dict[str, object]]:
         if not settings.soak_check_enabled:
             return []
         try:
@@ -1860,11 +1930,7 @@ class GreenThumbAutomation:
         # is empty, watering the next pot and the next would run the pump dry
         # on each of them before the first miss was even known.
         if settings.soak_check_enabled:
-            try:
-                pending = self.history.pending_soaks()
-            except Exception:
-                logger.exception("Could not read pending soak checks")
-                pending = []
+            pending = self._pending_soaks()
             if pending:
                 name = self._plant_name(pending[-1]["plant_id"])
                 return f"waiting to confirm the last watering reached {name}"
@@ -2100,6 +2166,14 @@ class GreenThumbAutomation:
         return care.water_level_for(percent) if percent >= 0 else None
 
     def get_overview(self) -> dict[str, object]:
+        # Each history question asked once for the whole overview (_once).
+        self._overview_memo.values = {}
+        try:
+            return self._build_overview()
+        finally:
+            self._overview_memo.values = None
+
+    def _build_overview(self) -> dict[str, object]:
         soaks = self._last_soaks()
         plant_status = [
             PlantStatus(
@@ -2806,6 +2880,23 @@ class GreenThumbAutomation:
             logger.debug("Skipping the hourly patrol, %s", held)
             return
 
+        # The startup home ran and failed STARTUP_HOME_MAX_FAILURES times, and
+        # a patrol starts with the same home. Sending the carriage down the
+        # rail on the hour would be the retrying that was stopped, at a slower
+        # beat. A home by hand clears it.
+        if self._startup_home_gave_up:
+            logger.info("Skipping the hourly patrol, the arm could not home at startup")
+            self._last_patrol = {
+                "at": moment.isoformat(timespec="minutes"),
+                "ok": False,
+                "error": (
+                    f"the arm could not home ({self._startup_home_error}). "
+                    "Home the gantry by hand once it is sorted"
+                ),
+                "watered": [],
+            }
+            return
+
         deadline = monotonic() + busy_wait_seconds
         while True:
             try:
@@ -3010,12 +3101,24 @@ class GreenThumbAutomation:
         return Path(settings.klipper_config_dir) / DIRECTION_FILE
 
     def _direction_reversed(self) -> bool:
-        """Whether motor-direction.cfg overrides the template's dir_pin."""
+        """Whether motor-direction.cfg overrides the template's dir_pin.
+
+        Asked on every /overview, so the file is read again only when its size
+        or modified time says it changed.
+        """
+        path = self._direction_file()
         try:
-            text = self._direction_file().read_text(encoding="utf-8")
+            stamp = path.stat()
+            key = (str(path), stamp.st_mtime_ns, stamp.st_size)
+            if self._direction_cache is not None and self._direction_cache[0] == key:
+                return self._direction_cache[1]
+            text = path.read_text(encoding="utf-8")
         except OSError:
+            self._direction_cache = None
             return False
-        return any(line.strip().startswith("dir_pin") for line in text.splitlines())
+        found = any(line.strip().startswith("dir_pin") for line in text.splitlines())
+        self._direction_cache = (key, found)
+        return found
 
     def motor_direction_status(self) -> dict[str, object]:
         """Cheap enough for /overview -- asks Klipper nothing."""
@@ -3423,39 +3526,26 @@ class GreenThumbAutomation:
             **{k: fields[k] for k in ("light_start_time", "light_hours", "light_brightness", "light_stop_time")},
         }
 
-    def update_plant_soil(self, plant_id: str, soil: str) -> dict[str, object]:
-        """Record which mix this pot is filled with.
+    def _checked_soil(self, soil: object) -> str:
+        """The mix a pot is filled with: a soil profile's name as stored, ""
+        for none, or ValueError when it names no soil profile.
 
         An unknown name is refused rather than stored: a soil that is not in
         the library supplies no wilting-point ratio, so it would read as "set"
         while behaving exactly like "not set". Empty clears it, which is the
         honest way to say the mix is unknown.
         """
-        plant = self.get_plant(plant_id)
-        if plant is None:
-            raise ValueError(f"Unknown plant_id: {plant_id}")
-
-        wanted = str(soil).strip()
-        if wanted:
-            soils = state.load_soils(self._state_path)
-            key = next((k for k in soils if k.casefold() == wanted.casefold()), None)
-            if key is None:
-                raise ValueError(
-                    f"No soil profile called {wanted!r}. Install the library with "
-                    f"python -m greenthumb.soil_library --install"
-                )
-            wanted = key
-
-        plant.soil = wanted
-        self._persist()
-        # The pot's scale is its soil profile's, so a new soil is a new scale.
-        self._sync_scales()
-        return {
-            "status": "ok",
-            "plant_id": plant_id,
-            "soil": plant.soil,
-            "field_capacity_raw": self.sensor_hub.field_capacity.get(plant.sensor_address),
-        }
+        wanted = str(soil or "").strip()
+        if not wanted:
+            return ""
+        soils = state.load_soils(self._state_path)
+        key = next((k for k in soils if k.casefold() == wanted.casefold()), None)
+        if key is None:
+            raise ValueError(
+                f"No soil profile called {wanted!r}. Install the library with "
+                f"python -m greenthumb.soil_library --install"
+            )
+        return key
 
     def list_soils(self) -> list[dict[str, object]]:
         """Every soil profile, widest published window first."""

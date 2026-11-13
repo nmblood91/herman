@@ -124,11 +124,11 @@ state.save_soil(soil, {"field_capacity_raw": 777}, path)
 soils_before = state.load_soils(path)  # a reading is library data, so it stays
 for plant in auto.plants:
     auto.update_plant_name(plant.plant_id, f"Renamed {plant.plant_id}")
-    auto.update_plant_soil(plant.plant_id, soil)
+    auto.save_pot(plant.plant_id, soil=soil)
 assert auto.sensor_hub.field_capacity, "the pots never got a scale to lose"
-auto.set_plant_position("plant_2", 300)
-auto.set_plant_sweep("plant_3", 450, 680)
-auto.set_watering_mode("plant_3", "sweep")
+auto.save_pot("plant_2", position_mm=300)
+auto.save_pot("plant_3", sweep_min_mm=450, sweep_max_mm=680)
+auto.save_pot("plant_3", watering_mode="sweep")
 auto._persist()
 auto._sync_scales()
 auto.save_plant_profile("plant_1")

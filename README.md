@@ -74,9 +74,9 @@ Everything is under `/api/v1`, grouped roughly as:
 | Group | What it covers |
 |---|---|
 | `/overview`, `/sensors`, `/history`, `/logs` | reading current state, readings and history |
-| `/plants/...` | per-plant name, light window and scheduled light color, moisture target, dose volume, rail position, watering mode and sweep span, move-to, and turning a pot off or on (`/plants/{id}/enabled`) |
+| `/plants/...` | per-plant name, light window and scheduled light color, moisture target, dose volume, move-to, turning a pot off or on (`/plants/{id}/enabled`), and the pot itself in one save (`/plants/{id}/pot`): rail position, soil profile, watering mode and sweep span |
 | `/plant-profiles`, `/plants/{id}/profile` | the plant profile library: list, read one, write one from a body, snapshot a pot, load onto a pot, delete |
-| `/soils`, `/plants/{id}/soil` | the soil library — list, add, remove — and which mix a pot is filled with |
+| `/soils` | the soil library — list, add, remove. Which mix a pot is filled with is part of `/plants/{id}/pot` |
 | `/water/{plant_id}` | move to a plant and dose it |
 | `/gantry/home`, `/gantry/move`, `/gantry/end` | homing, jogging, and running to either end of the rail |
 | `/pump/run`, `/pump/stop` | the pump directly, for bench testing |
@@ -205,14 +205,17 @@ settings.
 A pot either takes its dose in one place or has it swept across a span:
 
 ```bash
-curl -X POST http://herman.local/api/v1/plants/plant_1/sweep -H 'Content-Type: application/json' -d '{"sweep_min_mm":120,"sweep_max_mm":320}'
-curl -X POST http://herman.local/api/v1/plants/plant_1/watering-mode -H 'Content-Type: application/json' -d '{"watering_mode":"sweep"}'
+curl -X POST http://herman.local/api/v1/plants/plant_1/pot -H 'Content-Type: application/json' -d '{"sweep_min_mm":20,"sweep_max_mm":180,"watering_mode":"sweep"}'
 ```
 
-The span goes first, because switching a pot to `sweep` is refused while its
-span is narrower than 10 mm. The two are separate settings, so the alternative
-is a pot labeled "sweep" that waters as a point for ever — configured for
-something it never does.
+`/plants/{id}/pot` saves a pot's watering spot (`position_mm`), soil profile
+(`soil`), sweep span and watering mode in one request. A field left out keeps
+what the pot has, and if any field is refused nothing is saved.
+
+Switching a pot to `sweep` is refused while its span is narrower than 10 mm,
+so the span is sent with it or set beforehand. The two are separate settings,
+so the alternative is a pot labeled "sweep" that waters as a point for ever —
+configured for something it never does.
 
 **The sweep's passes replace the pump's dwell, and that is forced rather than
 chosen.** A dose is one gcode block — pin on, time passes, pin off — and the

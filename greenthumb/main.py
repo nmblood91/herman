@@ -702,16 +702,6 @@ def delete_soil(name: str) -> dict[str, object]:
     return result
 
 
-@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/soil")
-def set_plant_soil(
-    plant_id: str, payload: dict[str, str] = Body(default_factory=dict)
-) -> dict[str, object]:
-    """Record the mix in this pot. An empty name clears it."""
-    result = automation.update_plant_soil(plant_id, str(payload.get("soil", "")))
-    log_event(f"Set {plant_id} soil to {result.get('soil') or 'unset'}")
-    return result
-
-
 @app.get(f"{settings.api_prefix}/plant-profiles")
 def list_plant_profiles() -> dict[str, object]:
     return {"profiles": automation.list_plant_profiles()}
@@ -799,6 +789,27 @@ def clear_plant_profile(plant_id: str) -> dict[str, object]:
     return result
 
 
+POT_FIELDS = ("position_mm", "soil", "sweep_min_mm", "sweep_max_mm", "watering_mode")
+
+
+@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/pot")
+def save_pot(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+    """Save a pot's own settings in one go, all or none.
+
+    {"position_mm", "soil", "sweep_min_mm", "sweep_max_mm", "watering_mode"},
+    each optional: one left out keeps what the pot has. The two sweep edges go
+    together. If any of them is refused, none is saved.
+    """
+    result = automation.save_pot(
+        plant_id, **{field: payload[field] for field in POT_FIELDS if field in payload}
+    )
+    log_event(
+        f"Saved {result['name']}'s pot: {result['position_mm']} mm, "
+        f"soil {result['soil'] or 'unset'}, {result['watering_mode']} watering"
+    )
+    return result
+
+
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/enabled")
 def set_plant_enabled(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """Turn a pot off or back on: {"enabled": false}. An off pot is not read,
@@ -855,35 +866,6 @@ def update_watering_volume(plant_id: str, payload: dict[str, int] = Body(default
     volume_ml = int(payload.get("watering_volume_ml", 100))
     result = automation.update_watering_volume(plant_id, volume_ml)
     log_event(f"Plant {plant_id} watering volume set to {result['watering_volume_ml']} mL")
-    return result
-
-
-@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/position")
-def set_plant_position(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
-    position_mm = float(payload.get("position_mm", 0.0))
-    result = automation.set_plant_position(plant_id, position_mm)
-    log_event(f"Plant {plant_id} position set to {result['position_mm']} mm")
-    return result
-
-
-@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/sweep")
-def set_plant_sweep(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
-    """The span an oscillating dose travels across, in rail coordinates."""
-    result = automation.set_plant_sweep(
-        plant_id, payload.get("sweep_min_mm"), payload.get("sweep_max_mm")
-    )
-    log_event(
-        f"Plant {plant_id} sweep set to {result['sweep_min_mm']}"
-        f"-{result['sweep_max_mm']} mm"
-    )
-    return result
-
-
-@app.post(f"{settings.api_prefix}/plants/{{plant_id}}/watering-mode")
-def set_watering_mode(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
-    """Lay the dose down at one point, or sweep it across a span."""
-    result = automation.set_watering_mode(plant_id, payload.get("watering_mode", ""))
-    log_event(f"Plant {plant_id} watering mode set to {result['watering_mode']}")
     return result
 
 

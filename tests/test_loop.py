@@ -279,7 +279,7 @@ before = fresh(shared)
 default_target = before.get_plant("plant_1").target_available
 before.update_target_available("plant_1", 15)
 before.update_watering_volume("plant_2", 250)
-before.set_plant_position("plant_3", 550)
+before.save_pot("plant_3", position_mm=550)
 before.update_plant_name("plant_4", "Monstera")
 before.update_light_schedule("plant_4", "06:30", 15, 100)
 

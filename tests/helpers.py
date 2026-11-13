@@ -83,7 +83,7 @@ def give_every_plant_soil(
         auto._state_path,
     )
     for plant in auto.plants:
-        auto.update_plant_soil(plant.plant_id, soil)
+        auto.save_pot(plant.plant_id, soil=soil)
     auto._persist()
     auto._sync_scales()
 

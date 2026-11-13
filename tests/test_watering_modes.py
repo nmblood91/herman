@@ -264,7 +264,7 @@ print("ok: a plant waters at a point until told otherwise")
 
 # --- setting the span ---
 
-result = auto.set_plant_sweep(pot.plant_id, 650, 450)
+result = auto.save_pot(pot.plant_id, sweep_min_mm=650, sweep_max_mm=450)
 assert (result["sweep_min_mm"], result["sweep_max_mm"]) == (450.0, 650.0), result
 assert result["sweep_span_mm"] == 200.0, result
 print("ok: bounds given the wrong way round are ordered, since that is an ordering not a value")
@@ -284,7 +284,7 @@ for low, high, why in (
     (500, float("inf"), "infinite"),
 ):
     try:
-        auto.set_plant_sweep(pot.plant_id, low, high)
+        auto.save_pot(pot.plant_id, sweep_min_mm=low, sweep_max_mm=high)
     except ValueError:
         pass
     else:
@@ -328,7 +328,7 @@ assert all(p.watering_mode == sweep.POINT for p in fresh.plants)
 print("ok: every default sweep span is 50 mm either side of its zone's middle")
 
 # So switching a fresh pot to sweep works without setting a span first.
-assert fresh.set_watering_mode("plant_1", "sweep")["watering_mode"] == "sweep"
+assert fresh.save_pot("plant_1", watering_mode="sweep")["watering_mode"] == "sweep"
 print("ok: a fresh pot can be switched to Sweep Range straight away")
 
 for plant_id, inside, outside in (
@@ -339,9 +339,9 @@ for plant_id, inside, outside in (
     ("plant_4", 690, 689),
     ("plant_4", 890, 891),
 ):
-    auto.set_plant_position(plant_id, inside)
+    auto.save_pot(plant_id, position_mm=inside)
     try:
-        auto.set_plant_position(plant_id, outside)
+        auto.save_pot(plant_id, position_mm=outside)
     except ValueError as error:
         assert "Is this the right plant?" in str(error), error
     else:
@@ -351,16 +351,16 @@ print("ok: a fixed spot is refused outside its zone and accepted on the boundary
 
 # Whole millimeters, rounded before the range check so the value checked is
 # the value stored.
-assert auto.set_plant_position("plant_1", 120.4)["position_mm"] == 120
+assert auto.save_pot("plant_1", position_mm=120.4)["position_mm"] == 120
 assert type(auto.get_plant("plant_1").position_mm) is int
-assert auto.set_plant_position("plant_1", 200.4)["position_mm"] == 200
+assert auto.save_pot("plant_1", position_mm=200.4)["position_mm"] == 200
 try:
-    auto.set_plant_position("plant_1", 200.6)
+    auto.save_pot("plant_1", position_mm=200.6)
 except ValueError:
     pass
 else:
     raise AssertionError("200.6 rounds to 201, which is out of range, and was accepted")
-result = auto.set_plant_sweep("plant_1", 10.4, 189.6)
+result = auto.save_pot("plant_1", sweep_min_mm=10.4, sweep_max_mm=189.6)
 assert (result["sweep_min_mm"], result["sweep_max_mm"]) == (10, 190), result
 assert all(type(result[key]) is int for key in ("sweep_min_mm", "sweep_max_mm", "sweep_span_mm"))
 print("ok: positions and sweep edges are stored as whole millimeters")
@@ -376,7 +376,7 @@ assert type(again.get_plant("plant_2").position_mm) is int
 print("ok: a stored decimal position is restored rounded to a whole millimeter")
 
 # The default span is a starting point: the edges can go anywhere in the zone.
-assert auto.set_plant_sweep("plant_1", 0, 200)["sweep_span_mm"] == 200
+assert auto.save_pot("plant_1", sweep_min_mm=0, sweep_max_mm=200)["sweep_span_mm"] == 200
 print("ok: sweep edges may use the whole zone")
 
 # But neither edge may sit within 50 mm of the far end of its zone: Plant 2's
@@ -384,15 +384,15 @@ print("ok: sweep edges may use the whole zone")
 for low, high, side in ((396, 445, "left edge"), (200, 249, "right edge")):
     before = (auto.get_plant("plant_2").sweep_min_mm, auto.get_plant("plant_2").sweep_max_mm)
     try:
-        auto.set_plant_sweep("plant_2", low, high)
+        auto.save_pot("plant_2", sweep_min_mm=low, sweep_max_mm=high)
     except ValueError as exc:
         assert side in str(exc), exc
     else:
         raise AssertionError(f"accepted a {side} past its limit: {low}-{high}")
     assert (auto.get_plant("plant_2").sweep_min_mm, auto.get_plant("plant_2").sweep_max_mm) == before
-result = auto.set_plant_sweep("plant_2", 395, 445)
+result = auto.save_pot("plant_2", sweep_min_mm=395, sweep_max_mm=445)
 assert (result["sweep_min_mm"], result["sweep_max_mm"]) == (395, 445), result
-result = auto.set_plant_sweep("plant_2", 200, 250)
+result = auto.save_pot("plant_2", sweep_min_mm=200, sweep_max_mm=250)
 assert (result["sweep_min_mm"], result["sweep_max_mm"]) == (200, 250), result
 print("ok: the left edge stops 50 mm short of the zone's top, the right edge 50 mm above its bottom")
 
@@ -404,7 +404,7 @@ assert sweep_edge_limits(0, 30) == (0, 30)
 print("ok: and a zone narrower than 50 mm is not left with nowhere to put an edge")
 
 try:
-    auto.set_plant_position("plant_4", float("nan"))
+    auto.save_pot("plant_4", position_mm=float("nan"))
 except ValueError:
     print("ok: not-a-number is outside every zone")
 else:
@@ -417,7 +417,7 @@ spare = auto.plants[1]
 # Cleared, since every pot now starts with a default span.
 spare.sweep_min_mm = spare.sweep_max_mm = 0
 try:
-    auto.set_watering_mode(spare.plant_id, "sweep")
+    auto.save_pot(spare.plant_id, watering_mode="sweep")
 except ValueError as error:
     assert "span" in str(error), error
 else:
@@ -427,14 +427,14 @@ print("ok: sweep cannot be switched on before the span is set, so no pot is labe
 
 for bad in ("spray", "", "oscillate"):
     try:
-        auto.set_watering_mode(pot.plant_id, bad)
+        auto.save_pot(pot.plant_id, watering_mode=bad)
     except ValueError:
         pass
     else:
         raise AssertionError(f"accepted watering mode {bad!r}")
 print("ok: an unknown mode is refused")
 
-assert auto.set_watering_mode(pot.plant_id, "  SWEEP ")["watering_mode"] == "sweep"
+assert auto.save_pot(pot.plant_id, watering_mode="  SWEEP ")["watering_mode"] == "sweep"
 print("ok: the mode is matched case-insensitively, like the other names")
 
 
@@ -442,7 +442,7 @@ print("ok: the mode is matched case-insensitively, like the other names")
 
 auto, klip = build()
 pot, spare = auto.plants[POT], auto.plants[1]
-auto.set_plant_position(pot.plant_id, 600)
+auto.save_pot(pot.plant_id, position_mm=600)
 auto.water_plant(pot.plant_id, 100)
 
 script = dose_script(klip)
@@ -455,8 +455,8 @@ print("ok: a point dose still dwells at the pot, unchanged")
 # still at its default of zero this is indistinguishable from the case above.
 auto, klip = build()
 pot = auto.plants[POT]
-auto.set_plant_position(pot.plant_id, 600)
-auto.set_plant_sweep(pot.plant_id, 450, 650)
+auto.save_pot(pot.plant_id, position_mm=600)
+auto.save_pot(pot.plant_id, sweep_min_mm=450, sweep_max_mm=650)
 auto.water_plant(pot.plant_id, 100)
 script = dose_script(klip)
 assert "G1 " not in script, script
@@ -465,9 +465,9 @@ print("ok: a span on its own does not start sweeping, it takes the mode too")
 
 auto, klip = build()
 pot = auto.plants[POT]
-auto.set_plant_position(pot.plant_id, 600)
-auto.set_plant_sweep(pot.plant_id, 450, 650)
-auto.set_watering_mode(pot.plant_id, "sweep")
+auto.save_pot(pot.plant_id, position_mm=600)
+auto.save_pot(pot.plant_id, sweep_min_mm=450, sweep_max_mm=650)
+auto.save_pot(pot.plant_id, watering_mode="sweep")
 auto.water_plant(pot.plant_id, 100)
 
 script = dose_script(klip)
@@ -508,9 +508,9 @@ print(f"ok: the script runs for {running:.2f}s against a dose of {asked:.2f}s")
 # differently, so this has to be caught here.
 auto, klip = build()
 pot = auto.plants[POT]
-auto.set_plant_position(pot.plant_id, 600)
-auto.set_plant_sweep(pot.plant_id, 480, 680)
-auto.set_watering_mode(pot.plant_id, "sweep")
+auto.save_pot(pot.plant_id, position_mm=600)
+auto.save_pot(pot.plant_id, sweep_min_mm=480, sweep_max_mm=680)
+auto.save_pot(pot.plant_id, watering_mode="sweep")
 pot.sweep_max_mm = 2000.0          # as if position_max had been reduced
 auto.water_plant(pot.plant_id, 100)
 assert "G4 P" in dose_script(klip) and klip.moves[-1] == 600.0, klip.moves
@@ -519,9 +519,9 @@ print("ok: a span that has fallen off the rail waters as a point, rather than no
 # A dose too short to cross the span.
 auto, klip = build()
 pot = auto.plants[POT]
-auto.set_plant_position(pot.plant_id, 600)
-auto.set_plant_sweep(pot.plant_id, 445, 690)
-auto.set_watering_mode(pot.plant_id, "sweep")
+auto.save_pot(pot.plant_id, position_mm=600)
+auto.save_pot(pot.plant_id, sweep_min_mm=445, sweep_max_mm=690)
+auto.save_pot(pot.plant_id, watering_mode="sweep")
 auto.water_plant(pot.plant_id, 2)
 assert "G1 " not in dose_script(klip), dose_script(klip)
 assert klip.moves[-1] == 600.0, klip.moves
@@ -531,9 +531,9 @@ print("ok: a dose too small to sweep waters as a point, rather than over-waterin
 # too high would leave the pump running through ramps nobody budgeted for.
 auto, klip = build(limits=False)
 pot = auto.plants[POT]
-auto.set_plant_position(pot.plant_id, 600)
-auto.set_plant_sweep(pot.plant_id, 450, 650)
-auto.set_watering_mode(pot.plant_id, "sweep")
+auto.save_pot(pot.plant_id, position_mm=600)
+auto.save_pot(pot.plant_id, sweep_min_mm=450, sweep_max_mm=650)
+auto.save_pot(pot.plant_id, watering_mode="sweep")
 auto.water_plant(pot.plant_id, 100)
 assert "G1 " not in dose_script(klip), dose_script(klip)
 print("ok: with no motion limits reported there is no sweep, rather than a mistimed one")
@@ -561,9 +561,9 @@ print(f"ok: a watering spot outside its zone is refused, not watered -> {result.
 
 auto, klip = build()
 pot = auto.plants[POT]
-auto.set_plant_position(pot.plant_id, 600)
-auto.set_plant_sweep(pot.plant_id, 450, 650)
-auto.set_watering_mode(pot.plant_id, "sweep")
+auto.save_pot(pot.plant_id, position_mm=600)
+auto.save_pot(pot.plant_id, sweep_min_mm=450, sweep_max_mm=650)
+auto.save_pot(pot.plant_id, watering_mode="sweep")
 pot.sweep_min_mm = 300.0           # as if stored before the zones existed
 auto.water_plant(pot.plant_id, 100)
 assert "G1 " not in dose_script(klip) and klip.moves[-1] == 600.0, klip.moves
@@ -575,8 +575,8 @@ print("ok: a sweep reaching outside its zone waters as a point instead")
 shared = temp_state()
 auto, _ = build(path=shared)
 pot, spare = auto.plants[POT], auto.plants[1]
-auto.set_plant_sweep(pot.plant_id, 450, 650)
-auto.set_watering_mode(pot.plant_id, "sweep")
+auto.save_pot(pot.plant_id, sweep_min_mm=450, sweep_max_mm=650)
+auto.save_pot(pot.plant_id, watering_mode="sweep")
 
 restored, _ = build(path=shared)
 kept = restored.get_plant(pot.plant_id)
@@ -614,6 +614,67 @@ assert survivor.watering_mode == sweep.POINT, survivor.watering_mode
 # The span is left alone, so the figures are still there to switch back on.
 assert (survivor.sweep_min_mm, survivor.sweep_max_mm) == (450.0, 650.0)
 print("ok: an unrecognized stored mode falls back to point, and the span is kept")
+
+
+# --- a pot is saved in one go, all or none ---
+#
+# The card sent position, soil, span and mode as four requests, so a span
+# refused at the third left the new position stored under a "not saved" note.
+
+def pot_fields(plant):
+    return (
+        plant.position_mm, plant.soil, plant.sweep_min_mm, plant.sweep_max_mm,
+        plant.watering_mode,
+    )
+
+
+def refused(call):
+    try:
+        call()
+    except ValueError:
+        return True
+    return False
+
+
+shared = temp_state()
+auto, klip = build(path=shared)
+pot = auto.plants[POT]
+result = auto.save_pot(
+    pot.plant_id, position_mm=600, soil=pot.soil.upper(),
+    sweep_min_mm=650, sweep_max_mm=450, watering_mode="sweep",
+)
+assert (result["position_mm"], result["sweep_min_mm"], result["sweep_max_mm"]) == (600, 450, 650), result
+assert result["watering_mode"] == "sweep" and result["soil"] == pot.soil, result
+again, _ = build(path=shared)
+assert pot_fields(again.get_plant(pot.plant_id))[2:] == (450, 650, "sweep"), pot_fields(
+    again.get_plant(pot.plant_id)
+)
+print("ok: a span and the switch to sweep are saved together, and persist")
+
+before = pot_fields(pot)
+for label, fields in (
+    ("a span too narrow to sweep", dict(position_mm=500, sweep_min_mm=450, sweep_max_mm=455)),
+    ("a spot in another pot's zone", dict(position_mm=100, sweep_min_mm=460, sweep_max_mm=660)),
+    ("a soil profile that does not exist", dict(position_mm=500, soil="No Such Mix")),
+    ("an unknown mode", dict(position_mm=500, watering_mode="drizzle")),
+    ("one sweep edge without the other", dict(position_mm=500, sweep_min_mm=460)),
+):
+    assert refused(lambda: auto.save_pot(pot.plant_id, **fields)), label
+    assert pot_fields(pot) == before, f"{label} left the pot half saved: {pot_fields(pot)}"
+print("ok: a refused field saves nothing, the position included")
+
+auto.save_pot(pot.plant_id, position_mm=610)
+assert pot_fields(pot) == (610, *before[1:]), pot_fields(pot)
+print("ok: a field left out keeps what the pot has")
+
+# The mode is judged against the span saved with it, not the one being replaced.
+auto, klip = build()
+pot = auto.plants[POT]
+pot.sweep_min_mm = pot.sweep_max_mm = 500
+assert refused(lambda: auto.save_pot(pot.plant_id, watering_mode="sweep"))
+auto.save_pot(pot.plant_id, sweep_min_mm=460, sweep_max_mm=660, watering_mode="sweep")
+assert pot.watering_mode == "sweep"
+print("ok: sweep is refused on a pot with no span, and accepted with one in the same save")
 
 
 print("\nall watering mode checks passed")

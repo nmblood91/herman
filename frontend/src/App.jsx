@@ -380,41 +380,35 @@ function App() {
   // storing a rail coordinate also wrote a plant profile -- the two are edited
   // in separate places now, and this is the pot half.
   //
+  // One request, saved all or none: as four in a row, a sweep refused at the
+  // third left the new position and soil stored under a card saying the save
+  // had failed.
+  //
   // Answers '' when saved, or why not, so the card can keep the edit on screen
   // and say so under the field rather than only in the status bar for a moment.
   const savePot = async (plant) => {
     try {
       setStatus(`Saving ${plant.name}'s pot...`, { sticky: true })
 
-      await fetchJson(`/plants/${plant.plant_id}/position`, {
-        method: 'POST',
-        body: JSON.stringify({ position_mm: Number(plant.position_mm) }),
-      })
-
-      await fetchJson(`/plants/${plant.plant_id}/soil`, {
-        method: 'POST',
-        body: JSON.stringify({ soil: plant.soil ?? '' }),
-      })
-
-      // The span goes before the mode, and the order is not arbitrary:
-      // switching a pot to sweep is refused while its span is too narrow to be
-      // one, so the span has to be in place first.
-      //
-      // Sent only when there is a span to send. The default is 0 to 0, which
-      // is not a span, and posting it would come back refused and take the
-      // rest of the save down with it.
+      const pot = {
+        position_mm: Number(plant.position_mm),
+        soil: plant.soil ?? '',
+        watering_mode: plant.watering_mode || 'point',
+      }
+      // The span is sent only when there is one to send. The default is 0 to
+      // 0, which is not a span, and posting it would come back refused and
+      // take the rest of the save down with it. Left out, the pot keeps the
+      // span it has, and the mode is checked against that.
       const low = Number(plant.sweep_min_mm)
       const high = Number(plant.sweep_max_mm)
       if (Number.isFinite(low) && Number.isFinite(high) && low !== high) {
-        await fetchJson(`/plants/${plant.plant_id}/sweep`, {
-          method: 'POST',
-          body: JSON.stringify({ sweep_min_mm: low, sweep_max_mm: high }),
-        })
+        pot.sweep_min_mm = low
+        pot.sweep_max_mm = high
       }
 
-      await fetchJson(`/plants/${plant.plant_id}/watering-mode`, {
+      await fetchJson(`/plants/${plant.plant_id}/pot`, {
         method: 'POST',
-        body: JSON.stringify({ watering_mode: plant.watering_mode || 'point' }),
+        body: JSON.stringify(pot),
       })
 
       setStatus(`Saved ${plant.name}'s pot.`)

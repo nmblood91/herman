@@ -66,4 +66,33 @@ with auto._exclusive("Watering Plant 1"):
         raise AssertionError("read the probes in the middle of a dose")
 print("ok: gives way to a dose, and says what it is waiting on")
 
+
+# --- an address with no probe is not probed again on every read ---
+#
+# Probing is a reset and a half-second wait with the hardware held, and this
+# check reads every two seconds.
+
+from greenthumb.hardware import soil_sensors  # noqa: E402
+
+# No bus here (smbus2 is a stub), so every probe fails the way an empty
+# address does.
+real_hub = soil_sensors.SoilSensorHub(addresses=[0x36])
+probes = []
+probe = real_hub._try_initialize
+real_hub._try_initialize = lambda address: probes.append(address) or probe(address)
+
+assert real_hub.read_one(0x36).moisture_raw == -1.0
+assert real_hub.read_one(0x36).moisture_raw == -1.0
+assert real_hub.read_one(0x36).moisture_raw == -1.0
+assert probes == [0x36], f"probed an absent address on every read: {probes}"
+print("ok: an address that did not answer is left alone for a while")
+
+real_hub._probe_failed_at[0x36] -= soil_sensors.PROBE_RETRY_SECONDS + 1
+real_hub.read_one(0x36)
+assert probes == [0x36, 0x36], probes
+assert soil_sensors.PROBE_RETRY_SECONDS < settings.sensor_poll_seconds, (
+    "a probe plugged in has to show up on the control loop's next reading"
+)
+print("ok: and probed again once the wait is up, so a probe plugged in is found")
+
 print("\nall live moisture checks passed")

@@ -121,7 +121,7 @@ shared = temp_state()
 auto = build(shared)
 without_readings(shared)
 pot = auto.plants[0]
-auto.update_plant_soil(pot.plant_id, "Rich & Retentive Mix")
+auto.save_pot(pot.plant_id, soil="Rich & Retentive Mix")
 auto._history[pot.sensor_address].extend([600.0] * 10)
 
 assert capacity_of(auto, pot) is None, "a soil profile with no reading handed one over"
@@ -137,8 +137,8 @@ without_readings(auto._state_path)
 state.save_soil("Rich & Retentive Mix", {"field_capacity_raw": 700}, auto._state_path)
 state.save_soil("Fast-Draining Mix", {"field_capacity_raw": 1000}, auto._state_path)
 first, second = auto.plants[0], auto.plants[1]
-auto.update_plant_soil(first.plant_id, "Rich & Retentive Mix")
-auto.update_plant_soil(second.plant_id, "Fast-Draining Mix")
+auto.save_pot(first.plant_id, soil="Rich & Retentive Mix")
+auto.save_pot(second.plant_id, soil="Fast-Draining Mix")
 for plant in (first, second):
     auto._history[plant.sensor_address].extend([600.0] * 10)
 
@@ -150,10 +150,10 @@ print(
 )
 
 # Moving a pot to another soil profile moves it onto that scale at once.
-auto.update_plant_soil(second.plant_id, "Rich & Retentive Mix")
+auto.save_pot(second.plant_id, soil="Rich & Retentive Mix")
 assert capacity_of(auto, second) == 700
 assert auto.percent_for_plant(second) == auto.percent_for_plant(first)
-auto.update_plant_soil(second.plant_id, "")
+auto.save_pot(second.plant_id, soil="")
 assert capacity_of(auto, second) is None, "a pot with no soil profile kept a scale"
 print("ok: changing a pot's soil profile changes its scale, and clearing it leaves none")
 
@@ -191,7 +191,7 @@ print("ok: a wet endpoint left by an older build is ignored, not revived")
 auto = build(temp_state())
 without_readings(auto._state_path)
 pot = auto.plants[0]
-auto.update_plant_soil(pot.plant_id, "Rich & Retentive Mix")
+auto.save_pot(pot.plant_id, soil="Rich & Retentive Mix")
 auto._history[pot.sensor_address].extend([600.0] * 10)
 
 
@@ -228,9 +228,9 @@ shared = temp_state()
 auto = build(shared)
 without_readings(shared)
 first, second, third = auto.plants[0], auto.plants[1], auto.plants[2]
-auto.update_plant_soil(first.plant_id, "Rich & Retentive Mix")
-auto.update_plant_soil(second.plant_id, "Rich & Retentive Mix")
-auto.update_plant_soil(third.plant_id, "Fast-Draining Mix")
+auto.save_pot(first.plant_id, soil="Rich & Retentive Mix")
+auto.save_pot(second.plant_id, soil="Rich & Retentive Mix")
+auto.save_pot(third.plant_id, soil="Fast-Draining Mix")
 
 try:
     soil_sensors._collect = canned([CAPACITY] * 40)
@@ -255,7 +255,7 @@ try:
     print("ok: it is stored on the soil profile beside the % figures, not instead of them")
 
     fourth = auto.plants[3]
-    auto.update_plant_soil(fourth.plant_id, "Rich & Retentive Mix")
+    auto.save_pot(fourth.plant_id, soil="Rich & Retentive Mix")
     assert capacity_of(auto, fourth) == CAPACITY, "a pot filled later did not take it"
     print("ok: a pot filled with a measured soil later reads against it too")
 
@@ -328,7 +328,7 @@ shared = temp_state()
 auto = build(shared)
 without_readings(shared)
 for plant in auto.plants:
-    auto.update_plant_soil(plant.plant_id, "Rich & Retentive Mix")
+    auto.save_pot(plant.plant_id, soil="Rich & Retentive Mix")
     auto._history[plant.sensor_address].extend([600.0] * 10)
 auto.auto_watering_enabled = True
 
@@ -389,7 +389,7 @@ auto = build(shared)
 without_readings(shared)
 state.save_soil("Fast-Draining Mix", {"field_capacity_raw": 915}, shared)
 first, second = auto.plants[0], auto.plants[1]
-auto.update_plant_soil(first.plant_id, "Fast-Draining Mix")
+auto.save_pot(first.plant_id, soil="Fast-Draining Mix")
 auto.update_plant_name(first.plant_id, "Fern")
 first.preferred_soil = "Fast-Draining Mix"
 auto.save_plant_profile(first.plant_id)

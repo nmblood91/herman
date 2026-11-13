@@ -164,8 +164,8 @@ class Limits(Klip):
 
 auto, klip = build(klip=Limits())
 swept, pointed = auto.plants[0], auto.plants[1]
-auto.set_plant_sweep(swept.plant_id, 20.0, 180.0)
-auto.set_watering_mode(swept.plant_id, sweep.SWEEP)
+auto.save_pot(swept.plant_id, sweep_min_mm=20.0, sweep_max_mm=180.0)
+auto.save_pot(swept.plant_id, watering_mode=sweep.SWEEP)
 _, _, plan = auto._resolve_sweep(swept, swept.watering_volume_ml)
 auto.run_dance("patrol")
 gcode = klip.gcode[-1]
@@ -179,8 +179,8 @@ print("ok: a sweep plant is swept at the speed its own dose would use; point pla
 # Plant 3, on a slow board, so 1 mL clearly cannot cross its whole zone.
 wide = auto.plants[2]
 klip.velocity = 100.0
-auto.set_plant_sweep(wide.plant_id, 445.0, 690.0)
-auto.set_watering_mode(wide.plant_id, sweep.SWEEP)
+auto.save_pot(wide.plant_id, sweep_min_mm=445.0, sweep_max_mm=690.0)
+auto.save_pot(wide.plant_id, watering_mode=sweep.SWEEP)
 wide.watering_volume_ml = 1
 assert isinstance(auto._resolve_sweep(wide, 1), str), "1 mL crossed 245 mm"
 auto.run_dance("patrol")

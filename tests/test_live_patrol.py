@@ -377,4 +377,56 @@ assert result["status"] == "error" and "maximum" in result["error"], result
 assert doses(klip) == [], klip.events
 print("ok: a stored volume over the maximum is not pumped")
 
+
+# --- no patrol while the startup home has given up ---
+#
+# A patrol starts with a home, so running it would be the retrying that was
+# stopped, once an hour instead of once a minute.
+
+auto, klip = build()
+auto._startup_home_gave_up = True
+auto._startup_home_error = "No trigger on x after full movement"
+auto.live_patrol(now=NOW)
+assert klip.events == [], klip.events
+last = auto.patrol_status()["last"]
+assert last["ok"] is False and "could not home" in last["error"], last
+print("ok: the hourly patrol does not move once the startup home has given up")
+
+assert auto.home_gantry()["ok"]
+auto.live_patrol(now=NOW)
+assert auto.patrol_status()["last"]["ok"] is True, auto.patrol_status()
+assert len(doses(klip)) == 2, klip.events
+print("ok: a home by hand lets the patrol run again")
+
+
+# --- the overview asks the history each question once ---
+
+settings.soak_check_enabled = True
+try:
+    auto, klip = build()
+    asked = {"pending_soaks": 0, "judged_soaks": 0}
+
+    def counting(name):
+        real = getattr(auto.history, name)
+
+        def call(*args, **kwargs):
+            asked[name] += 1
+            return real(*args, **kwargs)
+
+        setattr(auto.history, name, call)
+
+    counting("pending_soaks")
+    counting("judged_soaks")
+    auto.get_overview()
+    assert asked == {"pending_soaks": 1, "judged_soaks": 1}, asked
+    print("ok: one overview reads the pending and judged soaks once each")
+
+    # Outside an overview nothing is remembered, so no answer can go stale.
+    auto.watering_suppressed()
+    auto.watering_suppressed()
+    assert asked["pending_soaks"] == 3 and asked["judged_soaks"] == 3, asked
+    print("ok: and nothing is remembered between calls outside one")
+finally:
+    settings.soak_check_enabled = False
+
 print("\nall live patrol and motor idle checks passed")
