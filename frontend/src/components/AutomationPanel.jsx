@@ -19,6 +19,12 @@ function startupLine(status) {
         `time${status.attempts === 1 ? '' : 's'}, trying again every minute.` +
         (status.held ? ` Paused for now: ${status.held}.` : '')
       )
+    case 'failed':
+      return (
+        `Could not home after ${status.max_failures} tries (${status.error}), so it has ` +
+        'stopped trying. Check the rail is clear and the home switch works, then ' +
+        'press Home Gantry on the Controls tab.'
+      )
     case 'done':
       return 'Homed since the planter started.'
     case 'next_start':
@@ -288,7 +294,7 @@ export function AutomationPanel({ overview, onRefresh }) {
               <p className="field-hint">Automatic watering needs this.</p>
             )}
             {startupLine(startupHome) && (
-              <p className={`field-hint${startupHome?.phase === 'retrying' ? ' warning' : ''}`}>
+              <p className={`field-hint${['retrying', 'failed'].includes(startupHome?.phase) ? ' warning' : ''}`}>
                 {startupLine(startupHome)}
               </p>
             )}

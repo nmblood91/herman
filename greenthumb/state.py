@@ -18,10 +18,12 @@ Two deliberate choices:
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
 import tempfile
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -31,6 +33,14 @@ from greenthumb.paths import DATA_DIR
 logger = logging.getLogger(__name__)
 
 DEFAULT_STATE_PATH = DATA_DIR / "state.json"
+
+# Every change here is load the file, alter it, write it all back, and they
+# arrive from the API's thread pool and the control loop at once. Without this,
+# two that overlap both start from the same copy and the second write drops the
+# first -- a field capacity just measured, lost to a quiet hours save. Reentrant
+# so one locked function can call another. It covers this process only: a
+# command run by hand beside the service is still on its own.
+_WRITE_LOCK = threading.RLock()
 
 # Bumped only when a reader needs to tell old layouts apart. Unknown versions are
 # loaded on a best-effort basis rather than discarded.
@@ -191,6 +201,17 @@ SUPERSEDED_KEYS = {
 }
 
 
+def _locked(function):
+    """Run a read-modify-write of the state file under _WRITE_LOCK."""
+
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        with _WRITE_LOCK:
+            return function(*args, **kwargs)
+
+    return wrapper
+
+
 def _drop_superseded(data: dict[str, Any]) -> bool:
     """Remove dead keys, but only once their replacement exists."""
     dropped = False
@@ -205,6 +226,7 @@ def _drop_superseded(data: dict[str, Any]) -> bool:
     return dropped
 
 
+@_locked
 def update_state(
     changes: dict[str, Any], path: str | Path | None = None
 ) -> dict[str, Any]:
@@ -270,6 +292,7 @@ def load_calibration(path: str | Path | None = None) -> dict[int, dict[str, int]
     return result
 
 
+@_locked
 def save_calibration_point(
     address: int,
     endpoint: str,
@@ -312,6 +335,7 @@ def save_calibration_point(
     return entry
 
 
+@_locked
 def clear_calibration(path: str | Path | None = None) -> None:
     """Drop the dry calibration, returning every sensor to the configured dry.
 
@@ -325,6 +349,7 @@ def clear_calibration(path: str | Path | None = None) -> None:
         save_state(data, path)
 
 
+@_locked
 def keep_only(keys: tuple[str, ...], path: str | Path | None = None) -> None:
     """Drop every top-level key except these, so the code and .env defaults
     apply again to everything else -- including keys an older version wrote
@@ -384,6 +409,7 @@ def _load_named(
     return result
 
 
+@_locked
 def _save_named(
     key: str,
     fields: tuple[str, ...],
@@ -436,6 +462,7 @@ def _save_named(
     return entry
 
 
+@_locked
 def _delete_named(key: str, name: str, path: str | Path | None = None) -> bool:
     """Remove one entry. False if there was nothing by that name."""
     data = load_state(path)

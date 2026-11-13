@@ -541,7 +541,8 @@ def calibrate(
             "measured per soil mix, not per probe."
         )
 
-    measured_at = datetime.utcnow().isoformat(timespec="seconds")
+    # Local time, like every other measured_at in the state file.
+    measured_at = datetime.now().isoformat(timespec="seconds")
     results: dict[int, dict[str, object]] = {}
 
     # One window for every probe, not one window each. They were measured in

@@ -89,7 +89,7 @@ class SensorSample:
     moisture_percent: float
     moisture_raw: float = -1.0
     temperature_c: float | None = None
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat(timespec="seconds"))
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
 
 
 @dataclass

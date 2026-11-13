@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS readings (
 );
 CREATE INDEX IF NOT EXISTS idx_readings_addr_time
     ON readings(sensor_address, recorded_at);
+-- By time alone, for the prune, which deletes every probe's rows older than a
+-- cutoff and would otherwise read the whole table to find them. Built once on
+-- an existing database, the first start after this was added.
+CREATE INDEX IF NOT EXISTS idx_readings_time ON readings(recorded_at);
 
 CREATE TABLE IF NOT EXISTS waterings (
     id          INTEGER PRIMARY KEY,
@@ -219,8 +223,12 @@ class HistoryStore:
         end = int(time.time()) if now is None else now
         since = end - int(hours * 3600)
 
+        # Asked per address, so the (sensor_address, recorded_at) index goes
+        # straight to each probe's rows in the range. With the time range alone
+        # SQLite walked every reading in the table for each chart refresh.
+        wanted = [int(address) for address in addresses]
         with self._lock:
-            rows = self._db.execute(
+            rows = [] if not wanted else self._db.execute(
                 "SELECT sensor_address,"
                 "       (recorded_at / ?) * ? AS bucket,"
                 "       AVG(moisture_percent) AS moisture_percent,"
@@ -232,10 +240,11 @@ class HistoryStore:
                 # But -1 in that column is "cannot say", and averaging it into
                 # a bucket drags the line to the floor, which reads as a bone
                 # dry pot.
-                " WHERE recorded_at >= ? AND moisture_percent >= 0"
+                f" WHERE sensor_address IN ({', '.join('?' * len(wanted))})"
+                " AND recorded_at >= ? AND moisture_percent >= 0"
                 " GROUP BY sensor_address, bucket"
                 " ORDER BY bucket",
-                (bucket, bucket, since),
+                (bucket, bucket, *wanted, since),
             ).fetchall()
 
         by_address: dict[int, dict[int, sqlite3.Row]] = {}

@@ -311,6 +311,7 @@ export function PlantEditorPanel({ profiles, soils, loaded = true, onRefresh }) 
             <input
               type="number"
               min="0"
+              max="500"
               step="10"
               value={form.watering_volume_ml}
               onChange={(event) => update('watering_volume_ml', event.target.value)}

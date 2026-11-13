@@ -41,7 +41,7 @@ assert found["packaged"] is False, found
 assert Path(found["state"]) == ROOT / "data" / "state.json", found
 assert Path(found["db"]) == ROOT / "data" / "greenthumb.db", found
 assert Path(found["log"]) == ROOT / "logs" / "greenthumb.log", found
-assert found["env"] == ".env", found
+assert Path(found["env"]) == ROOT / ".env", found
 print("ok: a checkout keeps data, logs and .env inside itself")
 
 override = Path(tempfile.mkdtemp())

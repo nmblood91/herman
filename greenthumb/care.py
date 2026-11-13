@@ -51,6 +51,10 @@ DEFAULT_TARGET_AVAILABLE = 40
 # watered again almost as soon as it drained.
 MIN_TARGET_AVAILABLE = 10
 MAX_TARGET_AVAILABLE = 90
+# The most one dose may be. A pot on this planter holds a few liters of mix, so
+# a dose past this is a slipped digit rather than a choice, and the pump would
+# run for many minutes with the gantry and the sensors locked out behind it.
+MAX_WATERING_VOLUME_ML = 500
 DEFAULT_LIGHT_HOURS = 12
 DEFAULT_LIGHT_BRIGHTNESS = 75
 # White, so a pot nobody has chosen a color for lights as plain light rather
@@ -119,6 +123,23 @@ def check_target_available(value: object) -> int:
             f"{MAX_TARGET_AVAILABLE}% soil water, not {target}"
         )
     return target
+
+
+def check_watering_volume(value: object) -> int:
+    """A dose in whole milliliters, 0 to MAX_WATERING_VOLUME_ML.
+
+    Below zero is taken as zero, as it always was. Above the maximum is refused
+    rather than clamped: 5000 typed for 500 should be said, not quietly made
+    into the largest dose there is.
+    """
+    # value != value is not-a-number, which int() cannot take.
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:
+        raise ValueError("Watering volume must be a number of milliliters")
+    if value > MAX_WATERING_VOLUME_ML:
+        raise ValueError(
+            f"A watering can be at most {MAX_WATERING_VOLUME_ML} mL, not {value:g}"
+        )
+    return max(0, int(value))
 
 
 def check_light_hours(value: object) -> int:

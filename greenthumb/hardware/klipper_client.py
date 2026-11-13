@@ -336,6 +336,11 @@ class KlipperClient:
                 return {"ok": False, "error": f"Klipper did not respond within {timeout:.0f}s"}
             finally:
                 sock.close()
-        except (OSError, json.JSONDecodeError) as exc:
+        except json.JSONDecodeError as exc:
             logger.warning("Klipper request failed: %s", exc)
             return {"ok": False, "error": str(exc)}
+        except OSError as exc:
+            # No socket to talk to: Klipper is not running, or not yet. Marked
+            # so a caller can tell "not up yet" from a command Klipper refused.
+            logger.warning("Klipper request failed: %s", exc)
+            return {"ok": False, "error": str(exc), "unreachable": True}

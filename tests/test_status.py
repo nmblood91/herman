@@ -106,6 +106,15 @@ assert state["level"] == "attention" and "couldn't home" in state["message"], st
 assert "endstop not triggered" in state["message"], state
 print("ok: an arm that tried to home and could not is reported, with the reason")
 
+# Given up after three homes that ran and failed: a problem, and no longer
+# promising another try.
+auto._startup_home_gave_up = True
+auto._startup_home_failures = 3
+state = auto.system_status()
+assert state["level"] == "problem" and "after 3 tries" in state["message"], state
+assert "endstop not triggered" in state["message"] and "Trying again" not in state["message"], state
+print("ok: a startup home that gave up says so, and says what to do")
+
 # Homed once, then the motor switched off: the normal state between patrols.
 auto = settled(build(klip=Klip(homed=False)))
 auto._has_homed = True

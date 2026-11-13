@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import logging
+from logging.handlers import RotatingFileHandler
 
 from greenthumb.paths import LOG_DIR
 
 LOG_FILE = LOG_DIR / "greenthumb.log"
+# About a megabyte a file and three old ones kept: weeks of this planter's log.
+LOG_MAX_BYTES = 1_000_000
+LOG_BACKUPS = 3
 
 # Requests polled on a timer, kept out of uvicorn's access log. The Controls tab
 # reads the carriage position every second it is open, which buried every other
@@ -40,7 +44,12 @@ def setup_logging() -> logging.Logger:
     if logger.handlers:
         return logger
 
-    file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    # Rotated, so the log cannot grow until it fills the SD card, and so the
+    # Logs tab -- which reads the file to show its last lines -- never has more
+    # than LOG_MAX_BYTES to read.
+    file_handler = RotatingFileHandler(
+        LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUPS, encoding="utf-8"
+    )
     file_handler.setLevel(logging.INFO)
     # datefmt drops the ",mmm" logging appends to asctime by default. Nothing
     # here happens on a millisecond scale -- the control loop ticks once a

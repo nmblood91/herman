@@ -58,4 +58,5 @@ Quiet hours can run past midnight, for example 10:00 PM to 7:00 AM.
 | Motor idle | Nothing is wrong. The arm homes again before its next move. |
 | A pot never gets watered | Check that the pot has a plant profile and a soil profile, and that its probe shows a reading on the Plants and Soil tab. |
 | Nothing happens at night | Quiet hours are on. That's expected. |
-| Home after startup keeps retrying | The arm can't reach the end of the rail. Check nothing is blocking it, then try the home switch test on the Calibration tab. |
+| Home after startup keeps retrying | The motion board isn't answering yet, or the motor direction test hasn't been passed. It tries again every minute until it can. |
+| Home after startup stopped trying | The arm tried to home 3 times and couldn't reach the home switch. Check nothing is blocking it and try the home switch test on the Calibration tab, then press Home Gantry on the Controls tab. |

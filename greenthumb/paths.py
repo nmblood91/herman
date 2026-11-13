@@ -36,4 +36,7 @@ def _dir(variable: str, packaged: str, checkout: str) -> Path:
 
 DATA_DIR = _dir("GREENTHUMB_DATA_DIR", "/var/lib/greenthumb", "data")
 LOG_DIR = _dir("GREENTHUMB_LOG_DIR", "/var/log/greenthumb", "logs")
-ENV_FILE = Path("/etc/greenthumb/greenthumb.env") if PACKAGED else Path(".env")
+# Beside the code in a checkout, not relative to the working directory: a
+# command run by hand from anywhere else would otherwise find no .env and
+# quietly run on the defaults.
+ENV_FILE = Path("/etc/greenthumb/greenthumb.env") if PACKAGED else ROOT / ".env"

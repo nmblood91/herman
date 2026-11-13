@@ -308,6 +308,50 @@ for _ in range(3):
 assert flaky.homes == 3, f"kept homing after it succeeded ({flaky.homes})"
 print("ok: once it lands it stops")
 
+# A home Klipper ran and could not finish is a switch or a jam, not a wait:
+# three of those and it stops driving the carriage down the rail every minute.
+stuck = Flaky(["No trigger on x after full movement"] * 3)
+auto, _ = build(klip=stuck)
+auto.set_home_on_startup(True)
+for _ in range(2):
+    auto.tick()
+assert auto.startup_home_status()["phase"] == "retrying", auto.startup_home_status()
+auto.tick()
+status = auto.startup_home_status()
+assert status["phase"] == "failed" and status["max_failures"] == 3, status
+assert "No trigger" in status["error"], status
+for _ in range(3):
+    auto.tick()
+assert stuck.homes == 3, f"kept homing after giving up ({stuck.homes})"
+print("ok: three homes that ran and failed stop the startup home")
+
+auto.home_gantry()
+status = auto.startup_home_status()
+assert status["phase"] == "done" and status["error"] is None, status
+print("ok: a home by hand clears it")
+
+
+class Unreachable(Klip):
+    """Klipper's socket is not there yet, as KlipperClient reports it."""
+
+    def __init__(self):
+        super().__init__(homed=False)
+
+    def home_gantry(self):
+        self.homes += 1
+        return {"ok": False, "error": "No such file or directory", "unreachable": True}
+
+
+away = Unreachable()
+auto, _ = build(klip=away)
+auto.set_home_on_startup(True)
+for _ in range(5):
+    auto.tick()
+assert away.homes == 5 and auto.startup_home_status()["phase"] == "retrying", (
+    away.homes, auto.startup_home_status()
+)
+print("ok: Klipper not being up yet is retried past three, and never counts as a failure")
+
 # Someone else holding the arm is a wait, not a failed attempt.
 auto, klip = build(klip=Klip(homed=False))
 auto.set_home_on_startup(True)

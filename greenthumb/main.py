@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import AsyncIterator
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -25,6 +25,7 @@ from greenthumb.services.automation import (
 )
 
 setup_logging()
+logger = logging.getLogger(__name__)
 
 automation = GreenThumbAutomation()
 
@@ -66,10 +67,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         misfire_grace_time=60,
     )
     # Daily rather than per tick: pruning 90 day old rows is not urgent work.
+    # The first run is a few minutes after startup rather than a day after it,
+    # or a planter restarted more often than daily would never prune at all.
     scheduler.add_job(
         lambda: automation.history.prune(settings.history_retention_days),
         "interval",
         hours=24,
+        next_run_time=datetime.now() + timedelta(minutes=5),
         max_instances=1,
         coalesce=True,
     )
@@ -116,7 +120,11 @@ async def handle_runtime_error(request: Request, exc: RuntimeError) -> JSONRespo
     system_clock raises this with timedatectl's own explanation attached, and
     without a handler Starlette answers text/plain "Internal Server Error" --
     so the UI parsed JSON, found nothing, and showed a bare status code.
+
+    Logged with its traceback, because this also catches a RuntimeError nobody
+    raised on purpose, and a 409 with nothing in the log hid those.
     """
+    logger.warning("%s %s failed: %s", request.method, request.url.path, exc, exc_info=exc)
     return JSONResponse(status_code=409, content={"ok": False, "error": str(exc)})
 
 
@@ -149,6 +157,8 @@ async def health() -> dict[str, str]:
 
 # Endpoints that reach hardware are sync so FastAPI runs them in its threadpool;
 # as coroutines their blocking socket and I2C calls would stall the event loop.
+# The same goes for anything that saves a setting or reads the log: the state
+# file is written with an fsync, which on an SD card is not quick either.
 @app.get(f"{settings.api_prefix}/overview")
 def get_overview() -> dict[str, object]:
     return automation.get_overview()
@@ -257,7 +267,7 @@ def get_auto_watering() -> dict[str, object]:
 @app.post(f"{settings.api_prefix}/watering/auto")
 def set_auto_watering(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """Turn unattended watering on or off."""
-    result = automation.set_auto_watering(bool(payload.get("enabled", False)))
+    result = automation.set_auto_watering(_require_enabled(payload))
     log_event(
         f"Automatic watering turned {'on' if result['auto_watering_enabled'] else 'off'}"
     )
@@ -316,7 +326,7 @@ def get_quiet() -> dict[str, object]:
 def set_quiet_hours(payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """Set the nightly window in which automatic watering is held back."""
     result = automation.set_quiet_hours(
-        enabled=bool(payload.get("enabled", False)),
+        enabled=_require_enabled(payload),
         start=payload.get("start"),
         stop=payload.get("stop"),
     )
@@ -408,7 +418,7 @@ def clear_history() -> dict[str, object]:
 
 
 @app.get(f"{settings.api_prefix}/logs")
-async def get_logs(lines: int = 100) -> list[str]:
+def get_logs(lines: int = 100) -> list[str]:
     return read_recent_logs(lines)
 
 
@@ -472,7 +482,7 @@ def stop_pump() -> dict[str, object]:
 
 
 @app.post(f"{settings.api_prefix}/lights/mode")
-async def set_light_mode_from_body(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+def set_light_mode_from_body(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     mode = str(payload.get("mode", "schedule")).strip().lower()
     result = automation.set_light_mode(mode)
     log_event(f"LED mode changed to {mode}")
@@ -480,7 +490,7 @@ async def set_light_mode_from_body(payload: dict[str, str] = Body(default_factor
 
 
 @app.post(f"{settings.api_prefix}/lights/color")
-async def set_light_color(payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
+def set_light_color(payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
     red = int(payload.get("r", 0))
     green = int(payload.get("g", 255))
     blue = int(payload.get("b", 128))
@@ -491,7 +501,7 @@ async def set_light_color(payload: dict[str, int] = Body(default_factory=dict)) 
 
 
 @app.post(f"{settings.api_prefix}/lights/color-order")
-async def set_light_color_order(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+def set_light_color_order(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     # settings.led_color_order, not a literal: a request with the key missing
     # used to silently set RGB and scramble the colors on the strip.
     order = str(payload.get("color_order", settings.led_color_order))
@@ -501,7 +511,7 @@ async def set_light_color_order(payload: dict[str, str] = Body(default_factory=d
 
 
 @app.post(f"{settings.api_prefix}/lights/chip")
-async def set_light_chip(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+def set_light_chip(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     # settings.led_chip, not a literal: a request with the key missing used to
     # silently select a chip that is no longer even supported.
     chip = str(payload.get("chip", settings.led_chip))
@@ -511,7 +521,7 @@ async def set_light_chip(payload: dict[str, str] = Body(default_factory=dict)) -
 
 
 @app.post(f"{settings.api_prefix}/lights/brightness")
-async def set_light_brightness(payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
+def set_light_brightness(payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
     brightness = int(payload.get("brightness", 75))
     result = automation.set_light_brightness(brightness)
     log_event(f"LED brightness set to {result['brightness']}%")
@@ -519,7 +529,7 @@ async def set_light_brightness(payload: dict[str, int] = Body(default_factory=di
 
 
 @app.post(f"{settings.api_prefix}/lights/rainbow-speed")
-async def set_light_rainbow_speed(payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
+def set_light_rainbow_speed(payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
     result = automation.set_light_rainbow_speed(payload.get("rainbow_speed", DEFAULT_RAINBOW_SPEED))
     cycle = result["rainbow_cycle_seconds"]
     log_event(
@@ -530,7 +540,7 @@ async def set_light_rainbow_speed(payload: dict[str, int] = Body(default_factory
 
 
 @app.post(f"{settings.api_prefix}/lights/manual-scope")
-async def set_light_manual_scope(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+def set_light_manual_scope(payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     """{"scope": "all"} lights the whole strip one way; "zones" each pot its own."""
     result = automation.set_light_manual_scope(str(payload.get("scope", "all")))
     log_event(f"Manual lighting set to {'each zone separately' if result['manual_scope'] == 'zones' else 'all zones'}")
@@ -549,7 +559,7 @@ def _rgb(payload: dict) -> list[object] | None:
 
 
 @app.post(f"{settings.api_prefix}/lights/zones/{{plant_id}}")
-async def set_zone_manual(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+def set_zone_manual(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """{"r", "g", "b"} and/or {"brightness"}: this pot's own manual lighting."""
     result = automation.set_zone_manual(plant_id, _rgb(payload), payload.get("brightness"))
     log_event(
@@ -563,7 +573,7 @@ async def set_zone_manual(plant_id: str, payload: dict[str, object] = Body(defau
 # swallow /lights/mode, /lights/color, /lights/color-order, /lights/brightness,
 # /lights/rainbow-speed and /lights/manual-scope.
 @app.get(f"{settings.api_prefix}/plants")
-async def list_plants() -> list[dict[str, object]]:
+def list_plants() -> list[dict[str, object]]:
     plants = automation.plants
     # Once, not per plant: it is a round trip to Klipper.
     travel = automation.usable_travel_mm()
@@ -799,7 +809,7 @@ def set_plant_enabled(plant_id: str, payload: dict[str, object] = Body(default_f
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/name")
-async def update_plant_name(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+def update_plant_name(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     name = str(payload.get("name", "")).strip()
     result = automation.update_plant_name(plant_id, name)
     log_event(f"Plant {plant_id} plant name updated to {name}")
@@ -807,7 +817,7 @@ async def update_plant_name(plant_id: str, payload: dict[str, str] = Body(defaul
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/light-color")
-async def set_plant_light_color(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+def set_plant_light_color(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """{"r", "g", "b"}: the color this pot shows during its scheduled hours."""
     result = automation.set_plant_light_color(plant_id, _rgb(payload))
     log_event(f"Plant {plant_id} scheduled light color set to {tuple(result['light_color'])}")
@@ -815,7 +825,7 @@ async def set_plant_light_color(plant_id: str, payload: dict[str, object] = Body
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/lighting")
-async def update_light_schedule(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+def update_light_schedule(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """{"light_start_time": "07:00", "light_hours": 13, "light_brightness": 75}."""
     plant = automation.get_plant(plant_id)
     result = automation.update_light_schedule(
@@ -833,7 +843,7 @@ async def update_light_schedule(plant_id: str, payload: dict[str, object] = Body
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/moisture")
-async def update_target_available(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
+def update_target_available(plant_id: str, payload: dict[str, object] = Body(default_factory=dict)) -> dict[str, object]:
     """Set the share of available water this plant is watered at, e.g. {"target_available": 40}."""
     result = automation.update_target_available(plant_id, payload.get("target_available"))
     log_event(f"Plant {plant_id} watering target set to {result['target_available']}% soil water")
@@ -841,7 +851,7 @@ async def update_target_available(plant_id: str, payload: dict[str, object] = Bo
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/volume")
-async def update_watering_volume(plant_id: str, payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
+def update_watering_volume(plant_id: str, payload: dict[str, int] = Body(default_factory=dict)) -> dict[str, object]:
     volume_ml = int(payload.get("watering_volume_ml", 100))
     result = automation.update_watering_volume(plant_id, volume_ml)
     log_event(f"Plant {plant_id} watering volume set to {result['watering_volume_ml']} mL")
@@ -849,7 +859,7 @@ async def update_watering_volume(plant_id: str, payload: dict[str, int] = Body(d
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/position")
-async def set_plant_position(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
+def set_plant_position(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
     position_mm = float(payload.get("position_mm", 0.0))
     result = automation.set_plant_position(plant_id, position_mm)
     log_event(f"Plant {plant_id} position set to {result['position_mm']} mm")
@@ -857,7 +867,7 @@ async def set_plant_position(plant_id: str, payload: dict[str, float] = Body(def
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/sweep")
-async def set_plant_sweep(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
+def set_plant_sweep(plant_id: str, payload: dict[str, float] = Body(default_factory=dict)) -> dict[str, object]:
     """The span an oscillating dose travels across, in rail coordinates."""
     result = automation.set_plant_sweep(
         plant_id, payload.get("sweep_min_mm"), payload.get("sweep_max_mm")
@@ -870,7 +880,7 @@ async def set_plant_sweep(plant_id: str, payload: dict[str, float] = Body(defaul
 
 
 @app.post(f"{settings.api_prefix}/plants/{{plant_id}}/watering-mode")
-async def set_watering_mode(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
+def set_watering_mode(plant_id: str, payload: dict[str, str] = Body(default_factory=dict)) -> dict[str, object]:
     """Lay the dose down at one point, or sweep it across a span."""
     result = automation.set_watering_mode(plant_id, payload.get("watering_mode", ""))
     log_event(f"Plant {plant_id} watering mode set to {result['watering_mode']}")

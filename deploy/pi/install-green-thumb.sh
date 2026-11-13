@@ -206,7 +206,12 @@ echo "✓ System log kept across reboots (up to 50 MB)"
 # that restarting NetworkManager would cost an SSH session.
 if [ -d /etc/NetworkManager/conf.d ]; then
   printf '[connection]\nwifi.powersave = 2\n' | sudo tee /etc/NetworkManager/conf.d/greenthumb-wifi-powersave.conf >/dev/null
-  sudo iw dev wlan0 set power_save off 2>/dev/null || true
+  # Every wireless interface, by what the kernel lists rather than by the name
+  # wlan0, which a USB adapter or a renamed interface does not have.
+  for WIRELESS in /sys/class/net/*/wireless; do
+    [ -e "$WIRELESS" ] || continue
+    sudo iw dev "$(basename "$(dirname "$WIRELESS")")" set power_save off 2>/dev/null || true
+  done
   echo "✓ Wi-Fi power saving off"
 else
   echo "⚠️  NetworkManager not found; leaving Wi-Fi power saving as it is"
@@ -280,8 +285,12 @@ fi
 # swaps the template's Mini E3 pins for the Pico's when that is the board.
 PRINTER_CFG=/home/pi/printer_data/config/printer.cfg
 if [ -n "$KLIPPER_SERIAL" ]; then
-  python3 /opt/greenthumb/deploy/klipper/make-printer-cfg.py "$BOARD" "$KLIPPER_SERIAL" > /tmp/printer.cfg
-  if [ -f "$PRINTER_CFG" ] && ! cmp -s /tmp/printer.cfg "$PRINTER_CFG"; then
+  # A name from mktemp rather than a fixed one in /tmp, which anything on the
+  # Pi could have put a link at. Made readable, because pi copies it below.
+  NEW_PRINTER_CFG=$(mktemp)
+  chmod 644 "$NEW_PRINTER_CFG"
+  python3 /opt/greenthumb/deploy/klipper/make-printer-cfg.py "$BOARD" "$KLIPPER_SERIAL" > "$NEW_PRINTER_CFG"
+  if [ -f "$PRINTER_CFG" ] && ! cmp -s "$NEW_PRINTER_CFG" "$PRINTER_CFG"; then
     PRINTER_CFG_BACKUP="$PRINTER_CFG.$(date +%Y%m%d-%H%M%S).bak"
     sudo -u pi cp "$PRINTER_CFG" "$PRINTER_CFG_BACKUP"
     echo "⚠️  Existing printer.cfg differed from the template; backed up to:"
@@ -289,7 +298,8 @@ if [ -n "$KLIPPER_SERIAL" ]; then
     echo "    Re-apply any local tuning with:"
     echo "    diff \"$PRINTER_CFG_BACKUP\" \"$PRINTER_CFG\""
   fi
-  sudo -u pi cp /tmp/printer.cfg "$PRINTER_CFG"
+  sudo -u pi cp "$NEW_PRINTER_CFG" "$PRINTER_CFG"
+  rm -f "$NEW_PRINTER_CFG"
   echo "✓ Generated printer.cfg with device serial ID"
 else
   # Fallback: copy template as-is if device not detected yet
@@ -375,11 +385,15 @@ pip install -e .
 # a plant somebody has tuned. Pass --overwrite by hand to go back to the
 # published figures.
 #
-# Runs as root here, like the venv above; the chown below hands the state file
-# it writes back to pi.
+# As pi, not as root like the venv above. The state file is replaced on every
+# write by a new one that only its writer can read, so written as root it stays
+# unreadable to the running API until the chown below, several minutes of npm
+# later. The API reads an unreadable file as an empty one, and a setting saved
+# from the UI in that time wrote the file back without either library or the
+# probe calibration.
 echo "Installing the starter soil and plant libraries..."
-python -m greenthumb.soil_library --install
-python -m greenthumb.plant_library --install
+sudo -u pi /opt/greenthumb/.venv/bin/python -m greenthumb.soil_library --install
+sudo -u pi /opt/greenthumb/.venv/bin/python -m greenthumb.plant_library --install
 
 cd /opt/greenthumb/frontend
 # install rather than ci: the committed lockfile is generated on Windows and
@@ -437,12 +451,16 @@ fi
 echo "✓ Klipper's Python environment is ready"
 
 # Always create/update the systemd service (even if Klipper was already cloned)
-cat > /tmp/klipper.service << 'EOF'
+#
+# Not ordered after the network, which Klipper never uses: it talks to the
+# board over USB or the UART and to the API over a local socket. Waiting for
+# network-online held the gantry and the pump back on a Pi whose Wi-Fi was
+# down, and a planter has to water with or without Wi-Fi.
+KLIPPER_UNIT=$(mktemp)
+cat > "$KLIPPER_UNIT" << 'EOF'
 [Unit]
 Description=Klipper 3D Printer Firmware
 Documentation=https://www.klipper3d.org/
-After=network-online.target
-Wants=network-online.target
 
 [Install]
 WantedBy=multi-user.target
@@ -459,7 +477,8 @@ EOF
 # Unmask first. A masked unit is a symlink to /dev/null, so the cp below would
 # write the unit into /dev/null without complaint and Klipper would never start.
 sudo systemctl unmask klipper
-sudo cp /tmp/klipper.service /etc/systemd/system/klipper.service
+sudo install -o root -g root -m 0644 "$KLIPPER_UNIT" /etc/systemd/system/klipper.service
+rm -f "$KLIPPER_UNIT"
 sudo systemctl daemon-reload
 
 # Start Klipper and verify it connects.
@@ -616,7 +635,10 @@ REBOOT_NEEDED=0
 if [ -e /dev/i2c-1 ]; then
   echo "✓ I2C bus present"
   echo "  Soil sensors detected at:"
-  sudo i2cdetect -y 1 | awk 'NR>1 {for (i=2; i<=NF; i++) if ($i != "--" && $i != "") printf "    0x%s\n", $i}'
+  # A scan that fails is reported, not fatal: everything is installed by now,
+  # and exiting here would lose the summary and the reboot advice below.
+  sudo i2cdetect -y 1 | awk 'NR>1 {for (i=2; i<=NF; i++) if ($i != "--" && $i != "") printf "    0x%s\n", $i}' \
+    || echo "    ⚠️  Could not scan the bus (i2cdetect failed)"
 else
   echo "⚠️  /dev/i2c-1 missing — soil sensors will not be readable"
   REBOOT_NEEDED=1

@@ -67,6 +67,13 @@ DIRECTION_UNCHECKED = (
 # rewrites it; only the direction test does.
 DIRECTION_FILE = "motor-direction.cfg"
 
+# How many times the startup home may run and fail before it stops trying. A
+# home that Klipper ran and could not finish is a switch, a belt or something
+# on the rail, and running the carriage down the rail every minute does not fix
+# any of them. Only those count: Klipper still coming up, busy hardware and an
+# untested motor direction are waits, and are retried for as long as they last.
+STARTUP_HOME_MAX_FAILURES = 3
+
 
 # "Not given" for optional fields where None means "clear it". See save_soil.
 UNCHANGED = object()
@@ -225,6 +232,12 @@ class GreenThumbAutomation:
         self._startup_home_pending = True
         self._startup_homed = False
         self._startup_home_attempts = 0
+        # Homes Klipper ran that did not land, and whether that reached
+        # STARTUP_HOME_MAX_FAILURES and stopped the retrying.
+        self._startup_home_failures = 0
+        self._startup_home_gave_up = False
+        # Whether the last _home got as far as asking Klipper to move.
+        self._home_ran = False
         self._startup_home_error: str | None = None
         # How times of day are written, here and in the UI. See format_clock.
         self.clock_24h = settings.clock_24h
@@ -233,6 +246,7 @@ class GreenThumbAutomation:
         self.motor_direction_checked = settings.motor_direction_checked
         self._pump_timer: threading.Timer | None = None
         self._pump_lock_held = False
+        self._pump_release_lock = threading.Lock()
         # How long the last manual run actually lasted, which is the
         # denominator of a flow calibration. Measured rather than assumed to be
         # the dead-man limit: the run can be stopped early, and the timer that
@@ -289,9 +303,11 @@ class GreenThumbAutomation:
         the previous soil.
         """
         capacity, wilting = {}, {}
+        # Read once for every pot, not once each: it parses the state file.
+        soils = state.load_soils(self._state_path)
         for plant in self.plants:
             address = plant.sensor_address
-            soil = self._soil_entry(plant)
+            soil = self._soil_entry(plant, soils)
             top = soil.get("field_capacity_raw")
             if isinstance(top, bool) or not isinstance(top, (int, float)):
                 continue
@@ -302,12 +318,19 @@ class GreenThumbAutomation:
         self.sensor_hub.field_capacity = capacity
         self.sensor_hub.wilting_point = wilting
 
-    def _soil_entry(self, plant: PlantSpec) -> dict[str, object]:
-        """The stored soil profile a pot is filled with, or {} for none."""
+    def _soil_entry(
+        self, plant: PlantSpec, soils: dict[str, dict] | None = None
+    ) -> dict[str, object]:
+        """The stored soil profile a pot is filled with, or {} for none.
+
+        `soils` is the library when the caller has already loaded it.
+        """
         if not plant.soil:
             return {}
         wanted = plant.soil.casefold()
-        for name, entry in state.load_soils(self._state_path).items():
+        if soils is None:
+            soils = state.load_soils(self._state_path)
+        for name, entry in soils.items():
             if name.casefold() == wanted and isinstance(entry, dict):
                 return entry
         return {}
@@ -460,6 +483,14 @@ class GreenThumbAutomation:
                 # position stored with a decimal before positions became whole
                 # millimeters comes back at the nearest one, not the one below.
                 setattr(plant, field_name, round(value))
+            # Stored before doses had a maximum, or written by hand.
+            if plant.watering_volume_ml > care.MAX_WATERING_VOLUME_ML:
+                logger.warning(
+                    "Stored watering volume of %s mL for %s is over the %s mL maximum, using that",
+                    plant.watering_volume_ml, plant.plant_id, care.MAX_WATERING_VOLUME_ML,
+                )
+                plant.watering_volume_ml = care.MAX_WATERING_VOLUME_ML
+            plant.watering_volume_ml = max(0, plant.watering_volume_ml)
 
         startup_home = stored.get("startup_home")
         if isinstance(startup_home, dict) and isinstance(startup_home.get("enabled"), bool):
@@ -718,9 +749,11 @@ class GreenThumbAutomation:
         and Klipper refuses any move before a home, so this one check holds
         the whole gantry still on a unit nobody has checked.
         """
+        self._home_ran = False
         if not self.motor_direction_checked:
             return {"ok": False, "error": DIRECTION_UNCHECKED}
         self._homing = True
+        self._home_ran = True
         try:
             result = self.klipper.home_gantry()
         finally:
@@ -730,8 +763,12 @@ class GreenThumbAutomation:
             self._moved()
         # Any home that lands settles the startup one: a patrol or the button
         # getting there first should not be followed by a second home.
-        if result.get("ok") and self._startup_home_pending:
+        # That includes one after the startup home gave up: the arm is homed
+        # now, so there is nothing left to report.
+        if result.get("ok") and (self._startup_home_pending or self._startup_home_gave_up):
             self._startup_home_pending = False
+            self._startup_home_gave_up = False
+            self._startup_home_error = None
             self._startup_homed = True
         return result
 
@@ -1385,9 +1422,13 @@ class GreenThumbAutomation:
         plant = self.get_plant(str(plant_id))
         return plant.name if plant else str(plant_id)
 
-    def soak_pause_reason(self) -> str | None:
-        """What to tell the owner when two misses in a row have paused watering."""
-        misses = self._soak_misses()
+    def soak_pause_reason(self, misses: list[dict[str, object]] | None = None) -> str | None:
+        """What to tell the owner when two misses in a row have paused watering.
+
+        `misses` is _soak_misses() when the caller already has it.
+        """
+        if misses is None:
+            misses = self._soak_misses()
         if len(misses) < 2:
             return None
         pots = {row["plant_id"] for row in misses[:2]}
@@ -1412,7 +1453,7 @@ class GreenThumbAutomation:
 
     # --- what the owner is told ------------------------------------------
 
-    def system_status(self) -> dict[str, object]:
+    def system_status(self, movement: dict[str, object] | None = None) -> dict[str, object]:
         """The single most important thing to say about the planter right now.
 
         The status bar used to show the newest log line, which meant it showed
@@ -1427,16 +1468,19 @@ class GreenThumbAutomation:
             return {"level": level, "message": message}
 
         # 1. Nothing can be watered if the motion board is not answering.
-        movement = self.klipper.status()
+        # `movement` is a klipper.status() result the caller already has, to
+        # save asking twice.
+        if movement is None:
+            movement = self.klipper.status()
         if movement.get("ok") is False:
             return state("problem", "Lost contact with the motion board. Nothing can be watered.")
 
         # 2. Waterings are running and the pot's own probe never saw the water
         # arrive: an empty tank, a misaimed nozzle or a probe out of the soil.
-        paused = self.soak_pause_reason()
+        misses = self._soak_misses()
+        paused = self.soak_pause_reason(misses)
         if paused:
             return state("problem", f"Automatic watering is paused. {paused}")
-        misses = self._soak_misses()
         if misses:
             name = self._plant_name(misses[0]["plant_id"])
             return state(
@@ -1476,6 +1520,13 @@ class GreenThumbAutomation:
         # Not homed is the normal state between patrols: the motor is switched
         # off and the arm homes again before its next move. Only an arm that
         # has tried to home and could not is worth a word.
+        if not movement.get("homed") and not self._has_homed and self._startup_home_gave_up:
+            return state(
+                "problem",
+                f"The arm couldn't home after {self._startup_home_failures} tries "
+                f"({self._startup_home_error}). Check the rail is clear and the home "
+                "switch works, then press Home Gantry.",
+            )
         if not movement.get("homed") and not self._has_homed and self._startup_home_error:
             return state(
                 "attention",
@@ -1946,15 +1997,26 @@ class GreenThumbAutomation:
 
     def _release_pump_lock(self) -> None:
         # Guarded: releasing a lock nobody holds would let the control loop and a
-        # manual command run the hardware at the same time.
-        if self._pump_lock_held:
+        # manual command run the hardware at the same time. And checked under
+        # its own lock, because the auto-stop timer and a Stop request can both
+        # get here at the 60 s mark, and both would otherwise see it held.
+        with self._pump_release_lock:
+            if not self._pump_lock_held:
+                return
             self._pump_lock_held = False
-            self._drop_lock()
+        self._drop_lock()
 
     def _move_and_water(
         self, plant: PlantSpec, volume_ml: int | None = None, trigger: str = "auto"
     ) -> dict[str, object]:
         volume = plant.watering_volume_ml if volume_ml is None else max(0, int(volume_ml))
+        # The last check before the pump, whatever set the volume and however.
+        if volume > care.MAX_WATERING_VOLUME_ML:
+            error = (
+                f"a dose of {volume} mL is over the {care.MAX_WATERING_VOLUME_ML} mL maximum"
+            )
+            logger.warning("Not watering %s: %s", plant.plant_id, error)
+            return {"status": "error", "plant_id": plant.plant_id, "error": error}
 
         # Resolved before the move, because a sweep starts at one end of its
         # span rather than at the pot's point position.
@@ -1982,8 +2044,15 @@ class GreenThumbAutomation:
             )
             return {"status": "error", "plant_id": plant.plant_id, "error": move.get("error")}
 
-        self.pump.deliver_ml(volume, motion=motion)
+        delivered = self.pump.deliver_ml(volume, motion=motion)
         self._moved()
+        # A dose Klipper refused or never answered is not a watering. Recording
+        # it would start a cooldown and a soak check for water that may never
+        # have left the tank, and tell the owner the pot was watered.
+        if isinstance(delivered, dict) and delivered.get("status") == "error":
+            error = f"the pump did not deliver the dose ({delivered.get('error')})"
+            logger.warning("Not counting a watering of %s: %s", plant.plant_id, error)
+            return {"status": "error", "plant_id": plant.plant_id, "error": error}
 
         self._last_watered[plant.plant_id] = datetime.now()
         try:
@@ -2072,7 +2141,7 @@ class GreenThumbAutomation:
             "clock_24h": self.clock_24h,
             # What the status bar shows. Computed rather than echoed from the
             # log, so it says what is true now instead of what was last written.
-            "system_status": self.system_status(),
+            "system_status": self.system_status(movement),
         }
 
     def get_history(self, hours: float) -> dict[str, object]:
@@ -2139,6 +2208,8 @@ class GreenThumbAutomation:
             raise ValueError(f"Unknown plant_id: {plant_id}")
         if not plant.enabled:
             raise ValueError(f"{plant.name} is turned off. Turn it on from its card to water it.")
+        if volume_ml is not None:
+            volume_ml = care.check_watering_volume(volume_ml)
 
         # Moves first, like the automatic path. Pumping without moving waters
         # whatever the nozzle happens to be parked over.
@@ -2597,11 +2668,15 @@ class GreenThumbAutomation:
         length of the travel before serving anything. Not in __init__ either,
         for the same reason and because nothing has the hardware lock yet.
 
-        A failure is retried rather than given up on. The usual cause is the
-        Pi bringing this service up before Klipper is ready, which sorts itself
-        out within a minute or two -- and until the arm is homed, watering is
-        refused outright, so giving up would leave the planter dry until a
-        restart. One attempt a tick is slow enough not to crowd real work.
+        Klipper not being up yet is retried for as long as it lasts. It is the
+        usual cause -- the Pi brings this service up before Klipper is ready --
+        and it sorts itself out within a minute or two. One attempt a tick is
+        slow enough not to crowd real work.
+
+        A home Klipper ran and could not finish is different: after
+        STARTUP_HOME_MAX_FAILURES of those it stops and says so, rather than
+        drive the carriage down the rail every minute against a switch that
+        is not answering. A home by hand clears it.
 
         Held during quiet hours and a snooze like every other unattended
         movement; still owed, so it homes as soon as the window closes.
@@ -2641,6 +2716,23 @@ class GreenThumbAutomation:
             return
 
         self._startup_home_error = str(result.get("error") or "unknown error")
+        # A home Klipper ran and could not finish counts towards giving up.
+        # Klipper not being reachable or ready yet does not, and neither does
+        # a home refused before it started (the motor direction test).
+        waiting_on_klipper = bool(result.get("unreachable")) or (
+            "not ready" in self._startup_home_error.lower()
+        )
+        if self._home_ran and not waiting_on_klipper:
+            self._startup_home_failures += 1
+            if self._startup_home_failures >= STARTUP_HOME_MAX_FAILURES:
+                self._startup_home_pending = False
+                self._startup_home_gave_up = True
+                logger.warning(
+                    "Startup home failed %d times (%s), not trying again. "
+                    "Home the gantry by hand once it is sorted.",
+                    self._startup_home_failures, self._startup_home_error,
+                )
+                return
         # Warned once, then quiet: Klipper being down for an hour would
         # otherwise write sixty identical lines.
         log = logger.warning if self._startup_home_attempts == 1 else logger.debug
@@ -2665,6 +2757,9 @@ class GreenThumbAutomation:
             phase = "off"
         elif self._startup_homed:
             phase = "done"
+        elif self._startup_home_gave_up:
+            # Failed STARTUP_HOME_MAX_FAILURES times; waiting for a home by hand.
+            phase = "failed"
         elif not self._startup_home_pending:
             # Switched on after this start had already gone by.
             phase = "next_start"
@@ -2676,6 +2771,7 @@ class GreenThumbAutomation:
             "enabled": self.home_on_startup,
             "phase": phase,
             "attempts": self._startup_home_attempts,
+            "max_failures": STARTUP_HOME_MAX_FAILURES,
             "error": self._startup_home_error,
             "held": self.watering_suppressed() if phase in ("waiting", "retrying") else None,
             # Automatic watering forces it on, so the UI can lock the switch.
@@ -3104,13 +3200,11 @@ class GreenThumbAutomation:
         # A water level in the body is ignored: it is worked out from this.
         entry["target_available"] = care.check_target_available(settings.get("target_available"))
 
-        volume = settings.get("watering_volume_ml")
-        if isinstance(volume, bool) or not isinstance(volume, (int, float)):
-            raise ValueError("Watering volume must be a number of milliliters")
-        # Clamped at zero and left unbounded above, matching
-        # update_watering_volume. An upper limit enforced only here would mean
-        # the editor refusing a dose the plant card accepts.
-        entry["watering_volume_ml"] = max(0, int(volume))
+        # The same check as update_watering_volume, so the editor and the
+        # plant card accept exactly the same doses.
+        entry["watering_volume_ml"] = care.check_watering_volume(
+            settings.get("watering_volume_ml")
+        )
 
         entry["light_start_time"] = care.check_start_time(
             settings.get("light_start_time")
@@ -3167,9 +3261,16 @@ class GreenThumbAutomation:
         plant.name = key
         plant.profile = key
 
-        volume = entry.get("watering_volume_ml")
-        if not isinstance(volume, bool) and isinstance(volume, (int, float)):
-            plant.watering_volume_ml = max(0, int(volume))
+        # Checked like the fields below: a dose a hand-written profile puts
+        # over the maximum is dropped with a warning and the pot keeps its own.
+        if "watering_volume_ml" in entry:
+            try:
+                plant.watering_volume_ml = care.check_watering_volume(entry["watering_volume_ml"])
+            except ValueError:
+                logger.warning(
+                    "Ignoring unusable watering_volume_ml %r in profile %r",
+                    entry["watering_volume_ml"], key,
+                )
 
         # Each checked rather than taken as written, and a bad one is dropped
         # with a warning: a profile written by hand, or by an older build,
@@ -3642,7 +3743,7 @@ class GreenThumbAutomation:
         if plant is None:
             raise ValueError(f"Unknown plant_id: {plant_id}")
 
-        plant.watering_volume_ml = max(0, int(volume_ml))
+        plant.watering_volume_ml = care.check_watering_volume(volume_ml)
         self._persist()
         return {
             "status": "ok",

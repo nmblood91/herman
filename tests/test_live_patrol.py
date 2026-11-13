@@ -323,4 +323,58 @@ assert overview["patrol"]["next"] == auto.next_patrol().isoformat(timespec="minu
 assert auto.next_patrol(datetime(2026, 10, 14, 14, 37)) == datetime(2026, 10, 14, 15, 0)
 print("ok: the overview carries the motor state and the next patrol, on the hour")
 
+
+# --- a dose the pump did not deliver is not a watering ---
+
+class FailingPump(Pump):
+    def deliver_ml(self, volume_ml=100, **kw):
+        self.klip.events.append(("dose", volume_ml))
+        return {"status": "error", "volume_ml": volume_ml, "error": "Klipper did not respond"}
+
+
+auto, klip = build()
+auto.pump = FailingPump(klip)
+auto.live_patrol(now=NOW)
+last = auto.patrol_status()["last"]
+assert last["ok"] is False and last["watered"] == [], last
+assert "Klipper did not respond" in last["error"], last
+assert auto.history.last_waterings() == {}, "a failed dose was written to the history"
+assert auto._last_watered == {}, "a failed dose started a cooldown"
+assert len(doses(klip)) == 2, "one pot's failed dose stopped the patrol trying the next"
+print("ok: a dose the pump did not deliver is reported, and not recorded as a watering")
+
+result = auto.water_plant("plant_1")
+assert result["status"] == "error" and "did not deliver" in result["error"], result
+print("ok: a manual watering whose dose failed says so")
+
+
+# --- no dose is over the maximum ---
+
+from greenthumb import care  # noqa: E402
+
+
+def refused(call):
+    try:
+        call()
+    except ValueError:
+        return True
+    return False
+
+
+auto, klip = build()
+assert care.MAX_WATERING_VOLUME_ML == 500
+assert auto.update_watering_volume("plant_1", 500)["watering_volume_ml"] == 500
+assert refused(lambda: auto.update_watering_volume("plant_1", 501))
+assert auto.get_plant("plant_1").watering_volume_ml == 500, "a refused volume was stored"
+assert care.check_watering_volume(-5) == 0
+assert refused(lambda: auto.water_plant("plant_1", 600))
+print("ok: a dose over 500 mL is refused when it is set and when it is asked for")
+
+# Whatever put it there, the pump is not started on it.
+auto.get_plant("plant_1").watering_volume_ml = 900
+result = auto.water_plant("plant_1")
+assert result["status"] == "error" and "maximum" in result["error"], result
+assert doses(klip) == [], klip.events
+print("ok: a stored volume over the maximum is not pumped")
+
 print("\nall live patrol and motor idle checks passed")
