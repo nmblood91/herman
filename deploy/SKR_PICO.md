@@ -67,9 +67,9 @@ on the Pi's USB input would be wired straight against it.
 
 ### Pi link: one 5-wire cable
 
-BTT's UART wiring picture shows a 5-wire cable from the Pico's 5-pin header
-(labeled `IO0 IO1 GND 5V 5V`, on the left edge next to FAN1) to the first five
-pins of the Pi header's outer row:
+The Pico's 5-pin header (labeled `IO0 IO1 GND 5V 5V`, on the left edge next
+to FAN1) is laid out for the Pi. A straight 5-wire cable, with no wires
+crossed, runs from it to the first five pins of the Pi header's outer row:
 
 | Pico | Pi header | Pi function |
 |---|---|---|
@@ -79,12 +79,13 @@ pins of the Pi header's outer row:
 | IO1 (RP2040 UART0 RX) | pin 8 | GPIO14, TXD |
 | IO0 (RP2040 UART0 TX) | pin 10 | GPIO15, RXD |
 
-TX goes to RX, both ways. If a cable didn't come with the board, five
-female-to-female jumpers do the same job, crossed as in the table.
+The header's order is the Pi's order reversed, so a straight cable lands each
+board's TX on the other's RX by itself. **Don't swap IO0 and IO1** to cross
+them: they already are, and swapping them puts TX on TX. Five
+female-to-female jumpers work as well, wired as in the table.
 
-**Move the soil-sensor hub's ground off pin 6**, which this cable takes. Pin 9
-or 14 works the same, as any ground pin does (see *Wiring the Soil Sensors* in
-[README.md](README.md)). The hub's 3.3 V (pin 1), SDA and SCL (pins 3 and 5),
+**The soil-sensor hub's ground goes on pin 9**, not pin 6, which this cable
+takes (see *Wiring the Soil Sensors* in [README.md](README.md)). The hub's 3.3 V (pin 1), SDA and SCL (pins 3 and 5),
 and the LED strip's data and ground (pins 19 and 20) are not affected.
 
 ### Gantry and pump

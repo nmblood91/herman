@@ -165,7 +165,8 @@ another, not as a figure.
   while running a few shell commands. Earlier runs read 0x0, so something in
   the chain got worse: the meter's extra connectors and shunt, a worn
   micro-USB plug or lead, or the plain 3 B drawing more than the A+.
-  `get_rsts=1000` after it (not yet compared with a clean reboot's value).
+  `get_rsts=1000` after it: a power-on reset, so a real power loss (see
+  2026-11-09 below).
   **Every Pi 3 result on this converter is now suspect**; that card also
   needs reflashing after dying mid-unpack.
 - **Board jumpers checked.** The V3's factory-fitted jumper is the 5 V source
@@ -211,6 +212,76 @@ a normal (uncut) cable. Pass is no reset through the install, then
    Still open: the V3 on the Pi 4 (different USB controller, no `dwc_otg`),
    the official wall supply (drops the converter's ground path), and
    `dwc_otg.fiq_enable=0 dwc_otg.fiq_fsm_enable=0`.
+
+   **Result 2026-11-08/09: one idle reset on the Pico, and it was a power
+   loss.** herman3a (the A+) on the bench, powered and linked by the Pico on
+   12 V, nothing else plugged in, an SSH session running `htop`. It reset
+   once after about 90 minutes, then ran about 11 hours overnight clean.
+   - The journal for that boot ends on the hourly cron at 20:17:01 with no
+     shutdown lines, no under-voltage, no `brcmf`/`mmc` errors, no Oops or
+     panic. An idle Pi logs almost nothing, so it could have died at any
+     point up to the next boot at 20:45:49.
+   - **`vcgencmd get_rsts` tells a power loss from a watchdog reset:**
+
+     | Event | `get_rsts` |
+     |---|---|
+     | `sudo reboot` (goes through the watchdog) | 1020 |
+     | Pulling the 12 V | 1000 |
+     | The unexplained reset | 1000 |
+
+     So it was not a lockup restarted by systemd's 1-minute hardware
+     watchdog. The supply dropped too fast for the under-voltage flag. The
+     Pi 3 B's 2026-10-29 reset also read 1000. Read `get_rsts` after every
+     reset from now on, before any deliberate reboot.
+   - With no USB device on the Pi, the USB link and `dwc_otg` can't explain
+     this one. Suspects: the 5-wire cable's 5 V or ground contacts at the
+     header, the Pico's 5 V (TPS5450, about 4.99 V, no protection into the
+     header), or the 12 V supply feeding the Pico (check whether it is the
+     same unit the converter tests used).
+   - **Next:** reseat the cable and wiggle it with a PC-side logger running
+     (`ssh ... 'dmesg -w & a 2 s loop of get_throttled, core volts, temp' |
+     Tee-Object`). Then power the A+ from an official micro-USB supply, with
+     the Pico on ground, TX and RX only (both 5 V wires out, so the two
+     supplies are not joined). No resets there points at the Pico's 5 V or
+     its cable; a reset there that reads 1000 points at the A+ itself.
+   - Boots ended by pulling the power look just like a reset in the
+     journal; note any deliberate power pulls when testing.
+   - **The 5-wire cable is secure** and wiggling it did nothing.
+   - **Second reset, 2026-11-09 08:10, captured by the PC-side logger**
+     (2 s samples plus `journalctl -kf`): `throttled=0x0`, core 1.2000 V,
+     37.6 °C on the last line, no kernel messages at all, then nothing. A
+     sudden, complete cut, not a sag past the under-voltage line. It came
+     15-20 minutes into the boot. (`get_rsts` was lost to a power pull
+     before it was read.)
+   - **The 12 V brick is only 3 A**, under the 5 A minimum (7 A
+     recommended) in BOM.md and POWER_SYSTEM.md, and it is **the same unit
+     behind every Pi 3 reset**: the micro-USB converter, the buck converter
+     and the Pico. On the bench the load is well under 0.5 A at 12 V, so the
+     rating alone doesn't explain a dropout; the unit itself is suspect.
+   - **Next:** a 12 V supply of 5 A or more on the Pico, everything else
+     unchanged, logger running. Clean for a day and two nights clears the
+     Pico and points the earlier V3 results back at this brick too (though
+     the V2 passing on it argues against that). Still resets: the Pico's 5 V,
+     then the split test above.
+   - **herman4's brick is the same brand and also 12 V 3 A**, and ran
+     herman4 in the real unit for a week with no reset.
+   - **Brick swap, 2026-11-09 ~10:15 to 2026-11-10 ~17:45: no resets on
+     either Pi.** herman3a (on herman4's brick) has been up since 11-09
+     10:18 and herman4 (on herman3a's old brick, real unit) since 11-09
+     11:18, both `throttled=0x0` with no under-voltage on any boot. Every
+     unclean boot on herman3a's card is accounted for: two deliberate power
+     pulls, reset 1 (11-08 ~20:45), the `get_rsts` power pull, reset 2
+     (11-09 08:10), and an unplug to measure current. Reset 2's journal ends
+     at 08:05:48 while the PC log shows the Pi alive until 08:10:44, so the
+     journal can lose about five minutes, not 30 s.
+   - That leaves the old brick dropping out in a way herman4's converter
+     rides through, or a poor connection at herman3a's old plug or the Pico's
+     12 V terminal that the swap cleared. Not worth separating: both bricks
+     are under spec.
+   - **Next:** new 12 V 5 A chargers on both Pis, 3 A bricks retired (the
+     old herman3a one labeled), herman3a's logger kept running for a few
+     more days. A reset on the new charger with a clean log points at the
+     Pico's 5 V, then the split test.
 
 Uncommitted doc edits made during this session and not yet decided:
 `BOM.md` and `POWER_SYSTEM.md` were changed to require a 5.1 V minimum
