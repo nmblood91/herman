@@ -115,6 +115,29 @@ assert state["level"] == "problem" and "after 3 tries" in state["message"], stat
 assert "endstop not triggered" in state["message"] and "Trying again" not in state["message"], state
 print("ok: a startup home that gave up says so, and says what to do")
 
+# A settings file that cannot be read: nothing is saved over it, and the bar
+# says so until a save goes through.
+from greenthumb import state as state_module  # noqa: E402
+
+auto = settled(build())
+real_update = state_module.update_state
+
+
+def unreadable(*args, **kwargs):
+    raise state_module.StateUnreadableError("The settings file is there but cannot be read")
+
+
+state_module.update_state = unreadable
+try:
+    auto.set_clock_24h(True)
+finally:
+    state_module.update_state = real_update
+said = auto.system_status()
+assert said["level"] == "problem" and "can't be read" in said["message"], said
+auto.set_clock_24h(False)
+assert "can't be read" not in auto.system_status()["message"], auto.system_status()
+print("ok: a save refused over an unreadable settings file is said, until one goes through")
+
 # Homed once, then the motor switched off: the normal state between patrols.
 auto = settled(build(klip=Klip(homed=False)))
 auto._has_homed = True

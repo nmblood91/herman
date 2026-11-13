@@ -278,6 +278,20 @@ class GreenThumbAutomation:
         # was off for a week comes back with it already expired.
         self.snooze_until: datetime | None = None
 
+        # Why settings cannot be saved, or None. Set when the state file is
+        # there but cannot be opened: the planter then starts on defaults, and
+        # writing over the file would lose what is in it. See _persist.
+        self._settings_problem: str | None = None
+        unreadable = state.unreadable_reason(self._state_path)
+        if unreadable:
+            self._settings_problem = (
+                f"The settings file is there but cannot be read ({unreadable})."
+            )
+            logger.error(
+                "State file cannot be read (%s): running on defaults, and saving nothing over it",
+                unreadable,
+            )
+
         self.plants = default_plants()
         self._warn_on_orphaned_plants()
         self._seed_last_watered()
@@ -690,8 +704,15 @@ class GreenThumbAutomation:
         turn a successful setting change into an API error."""
         try:
             state.update_state(self._snapshot(), self._state_path)
+        except state.StateUnreadableError as exc:
+            # Said in the status bar until a save goes through: the change is
+            # in force now and will be gone at the next restart.
+            self._settings_problem = str(exc)
+            logger.error("Settings not saved: %s", exc)
         except Exception:
             logger.exception("Could not persist settings")
+        else:
+            self._settings_problem = None
 
     def _led_count(self) -> int:
         """The strip's pixel count, from the controller when it has one.
@@ -1544,6 +1565,15 @@ class GreenThumbAutomation:
             movement = self.klipper.status()
         if movement.get("ok") is False:
             return state("problem", "Lost contact with the motion board. Nothing can be watered.")
+
+        # The settings file cannot be read, so the planter is on defaults --
+        # no soil profiles, so nothing is watered -- and nothing can be saved.
+        if self._settings_problem:
+            return state(
+                "problem",
+                "Settings can't be loaded or saved: the settings file can't be read. "
+                "Check the file's owner on the Pi, then restart the planter.",
+            )
 
         # 2. Waterings are running and the pot's own probe never saw the water
         # arrive: an empty tank, a misaimed nozzle or a probe out of the soil.

@@ -250,3 +250,63 @@ state.update_state({"leds": {"mode": "off"}}, p)
 after = state.load_state(p)
 assert "zones" in after, "dropped the old key while it was still the only copy"
 print("ok: an old key is kept while nothing has replaced it")
+
+
+# --- a file that cannot be read is never written over ---
+#
+# Every change is the whole file read, altered and written back. Read as
+# empty, it came back holding only the change: the soil profiles, the plant
+# profiles and the probe calibration replaced by one setting.
+
+p = temp_path()
+state.save_soil("Loam", {"field_capacity_raw": 800}, p)
+state.save_calibration_point(0x36, "dry", 331, path=p)
+kept = p.read_bytes()
+
+real_read_text, real_read_bytes = Path.read_text, Path.read_bytes
+
+
+def denied(self, *args, **kwargs):
+    if self == p:
+        raise PermissionError(13, "Permission denied")
+    return real_read_text(self, *args, **kwargs)
+
+
+def denied_bytes(self):
+    if self == p:
+        raise PermissionError(13, "Permission denied")
+    return real_read_bytes(self)
+
+
+Path.read_text, Path.read_bytes = denied, denied_bytes
+try:
+    assert state.load_state(p) == {}, "reading must still degrade, so the planter starts"
+    assert state.unreadable_reason(p) == "Permission denied", state.unreadable_reason(p)
+    for label, write in (
+        ("a settings save", lambda: state.update_state({"leds": {"mode": "off"}}, p)),
+        ("a soil save", lambda: state.save_soil("Loam", {"notes": "x"}, p)),
+        ("a soil delete", lambda: state.delete_soil("Loam", p)),
+        ("a calibration save", lambda: state.save_calibration_point(0x37, "dry", 340, path=p)),
+        ("a calibration reset", lambda: state.clear_calibration(p)),
+        ("a restore to defaults", lambda: state.keep_only((state.SOILS_KEY,), p)),
+    ):
+        try:
+            write()
+        except state.StateUnreadableError as exc:
+            assert "cannot be read" in str(exc), exc
+        else:
+            raise AssertionError(f"{label} went ahead over a file it could not read")
+finally:
+    Path.read_text, Path.read_bytes = real_read_text, real_read_bytes
+assert p.read_bytes() == kept, "the unreadable file was changed"
+assert state.unreadable_reason(p) is None and state.unreadable_reason(temp_path()) is None
+print("ok: a file that is there but cannot be opened is left alone, and every save refused")
+
+# One that opens and will not parse is kept under another name, not destroyed.
+p = temp_path()
+p.write_text('{"soil_profiles": {"Loam": {"field_capacity_raw": 800}', encoding="utf-8")
+state.update_state({"leds": {"mode": "off"}}, p)
+assert state.load_state(p)["leds"] == {"mode": "off"}
+aside = [f for f in p.parent.iterdir() if f.name.startswith("state.json.unreadable-")]
+assert len(aside) == 1 and '"Loam"' in aside[0].read_text(encoding="utf-8"), aside
+print("ok: a file that will not parse is moved aside before a save replaces it")

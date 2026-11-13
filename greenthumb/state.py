@@ -10,6 +10,11 @@ Two deliberate choices:
 * **Everything is optional.** A missing file, a missing key or a value of the
   wrong type falls back to the code default rather than raising. The appliance
   has to boot with a corrupt or hand-edited state file, not refuse to start.
+* **Reading tolerates a bad file; writing does not write over one.** Every
+  change is the whole file read, altered and written back, so a file read as
+  empty comes back holding only the one thing being saved. A file that is
+  there but cannot be opened is left alone and the save refused, and one that
+  will not parse is moved aside first (see `_load_for_write`).
 * **Writes are atomic.** A temporary file in the same directory followed by
   `os.replace`, so a power cut mid-write leaves either the old state or the new
   one. A truncated JSON file here would silently reset every setting the user
@@ -157,6 +162,73 @@ def load_state(path: str | Path | None = None) -> dict[str, Any]:
     return data
 
 
+class StateUnreadableError(RuntimeError):
+    """The state file is there but could not be read, so nothing was written."""
+
+
+def unreadable_reason(path: str | Path | None = None) -> str | None:
+    """Why the state file cannot be opened, or None when it can or is absent.
+
+    Only "cannot be opened": a file that opens and will not parse is a
+    different thing, which a save moves aside and replaces.
+    """
+    try:
+        resolve_path(path).read_bytes()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        return exc.strerror or str(exc)
+    return None
+
+
+def _load_for_write(path: str | Path | None = None) -> dict[str, Any]:
+    """The stored state, as the start of a change that will be written back.
+
+    load_state answers {} for any file it cannot use, which is right for
+    reading -- the planter has to start -- and wrong here. Written back, that {}
+    plus one change replaces the soil profiles, the plant profiles and the
+    probe calibration with nothing. It happened: an installer re-run left the
+    file owned by root for a few minutes, and a setting saved from the UI in
+    that time would have cost every measured reading.
+
+    So a file that is there and cannot be opened raises, and the caller saves
+    nothing. One that opens and is not a JSON object is not coming back as
+    settings either way, so it is moved aside under a dated name, where it can
+    still be looked at, and the change starts from empty.
+    """
+    target = resolve_path(path)
+    try:
+        text = target.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        raise StateUnreadableError(
+            f"The settings file {target} is there but cannot be read "
+            f"({exc.strerror or exc}), so nothing was saved rather than write over it. "
+            "Check who owns it: it should belong to the user the planter runs as."
+        ) from exc
+
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = None
+    if isinstance(data, dict):
+        return data
+
+    aside = target.with_name(
+        f"{target.name}.unreadable-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    )
+    try:
+        os.replace(target, aside)
+    except OSError as exc:
+        raise StateUnreadableError(
+            f"The settings file {target} is not readable as settings and could not be "
+            f"moved aside ({exc.strerror or exc}), so nothing was saved."
+        ) from exc
+    logger.warning("State file %s was not usable; kept as %s and started afresh", target, aside)
+    return {}
+
+
 def save_state(data: dict[str, Any], path: str | Path | None = None) -> bool:
     """Write state atomically. Returns False instead of raising on failure."""
     target = resolve_path(path)
@@ -231,7 +303,7 @@ def update_state(
     changes: dict[str, Any], path: str | Path | None = None
 ) -> dict[str, Any]:
     """Merge top-level keys into the stored state and write it back."""
-    data = load_state(path)
+    data = _load_for_write(path)
     data.update(changes)
     _drop_superseded(data)
     save_state(data, path)
@@ -313,7 +385,7 @@ def save_calibration_point(
             "to the soil or the pot, not to the probe."
         )
 
-    data = load_state(path)
+    data = _load_for_write(path)
     stored = data.get(CALIBRATION_KEY)
     if not isinstance(stored, dict):
         stored = {}
@@ -343,7 +415,7 @@ def clear_calibration(path: str | Path | None = None) -> None:
     two are no longer reset together. That separation is the point -- re-doing
     a dry pass should not throw away a measurement of somebody's potting mix.
     """
-    data = load_state(path)
+    data = _load_for_write(path)
     if CALIBRATION_KEY in data:
         del data[CALIBRATION_KEY]
         save_state(data, path)
@@ -354,7 +426,7 @@ def keep_only(keys: tuple[str, ...], path: str | Path | None = None) -> None:
     """Drop every top-level key except these, so the code and .env defaults
     apply again to everything else -- including keys an older version wrote
     that nothing reads any more."""
-    data = load_state(path)
+    data = _load_for_write(path)
     save_state({key: data[key] for key in keys if key in data}, path)
 
 
@@ -436,7 +508,7 @@ def _save_named(
     if not entry:
         raise ValueError(f"Nothing to save: no recognized {noun} settings given")
 
-    data = load_state(path)
+    data = _load_for_write(path)
     stored = data.get(key)
     if not isinstance(stored, dict):
         stored = {}
@@ -465,7 +537,7 @@ def _save_named(
 @_locked
 def _delete_named(key: str, name: str, path: str | Path | None = None) -> bool:
     """Remove one entry. False if there was nothing by that name."""
-    data = load_state(path)
+    data = _load_for_write(path)
     stored = data.get(key)
     if not isinstance(stored, dict):
         return False
