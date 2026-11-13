@@ -122,4 +122,59 @@ booted = build(shared)
 assert booted.quiet_hours_start == time.fromisoformat(settings.quiet_hours_start)
 print("ok: a corrupt quiet window falls back to the default instead of failing to start")
 
+
+# --- a snooze and a cooldown are instants, not readings of the local clock ---
+#
+# Kept as a local date and time, both moved by an hour when the clocks changed
+# and by hours when the timezone was set from the UI.
+
+import json  # noqa: E402
+from datetime import timezone  # noqa: E402
+from time import time as epoch_now  # noqa: E402
+
+shared = temp_state()
+first = build(shared)
+first.snooze_watering(2)
+assert abs(first._snooze_until_epoch - (epoch_now() + 2 * 3600)) < 5
+stored = datetime.fromisoformat(json.loads(shared.read_text(encoding="utf-8"))["quiet"]["snooze_until"])
+assert stored.utcoffset() is not None, "the snooze was stored without its UTC offset"
+assert abs(stored.timestamp() - first._snooze_until_epoch) < 1
+print("ok: a snooze is stored as an instant, with its UTC offset")
+
+
+def restored_snooze(text):
+    path = temp_state()
+    path.write_text(json.dumps({"quiet": {"snooze_until": text}}), encoding="utf-8")
+    return build(path)
+
+
+# Written in a zone ten hours from wherever this runs: still the same instant.
+elsewhere = timezone(timedelta(hours=10))
+in_an_hour = datetime.now(elsewhere) + timedelta(hours=1)
+auto = restored_snooze(in_an_hour.isoformat())
+assert abs(auto._snooze_until_epoch - in_an_hour.timestamp()) < 1
+remaining = (auto.snooze_until - datetime.now()).total_seconds() / 3600
+assert 0.98 < remaining < 1.01, remaining
+assert auto.watering_suppressed() is not None
+assert auto.watering_suppressed(datetime.now(elsewhere) + timedelta(hours=2)) is None
+print("ok: a snooze stored in another timezone ends at the same instant here")
+
+# One stored before the offset was kept is read as the planter's own time.
+auto = restored_snooze((datetime.now() + timedelta(hours=1)).isoformat())
+assert 0.98 < (auto.snooze_until - datetime.now()).total_seconds() / 3600 < 1.01
+print("ok: a snooze stored without an offset is still restored")
+
+minutes = settings.watering_cooldown_minutes
+auto = build()
+auto._last_watered["plant_1"] = epoch_now() - (minutes - 30) * 60
+assert not auto._cooldown_elapsed("plant_1")
+assert not auto._cooldown_elapsed("plant_1", now=datetime.now(elsewhere))
+assert auto._cooldown_elapsed("plant_1", now=datetime.now(elsewhere) + timedelta(minutes=31))
+auto._last_watered["plant_1"] = epoch_now() - (minutes + 1) * 60
+assert auto._cooldown_elapsed("plant_1")
+assert auto._last_watered_iso("plant_1") == datetime.fromtimestamp(
+    auto._last_watered["plant_1"]
+).isoformat(timespec="seconds")
+print("ok: the cooldown is elapsed real time, whatever zone the clock is read in")
+
 print("\nall quiet hours checks passed")

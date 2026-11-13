@@ -11,6 +11,13 @@ from datetime import datetime, time, timedelta
 # land mid-run and move the wall clock. A calibration divides by this
 # duration, so it has to come from a clock that only goes forwards.
 from time import monotonic, sleep
+# Seconds since the epoch, for anything that is an instant rather than a time
+# of day: when a pot was last watered, when a snooze ends. A local date and
+# time is the wrong thing to keep those in -- it moves by an hour when the
+# clocks change and by hours when the timezone is set from the UI, and a
+# cooldown measured across either came out an hour short or long. Named,
+# because `time` here is datetime.time.
+from time import time as epoch_now
 from pathlib import Path
 
 from greenthumb.config import settings
@@ -218,7 +225,8 @@ class GreenThumbAutomation:
         # -1" is also what a planter looks like one second after boot. This
         # distinguishes the two.
         self._has_polled = False
-        self._last_watered: dict[str, datetime] = {}
+        # Epoch seconds, not a local date and time: see epoch_now.
+        self._last_watered: dict[str, float] = {}
         self.history = history or HistoryStore(settings.history_db_path or DEFAULT_DB_PATH)
         # Misses before this moment (epoch seconds) no longer count towards the
         # soak-check pause: Resume sets it. Persisted, so a restart neither
@@ -275,8 +283,10 @@ class GreenThumbAutomation:
         self.quiet_hours_stop = time.fromisoformat(settings.quiet_hours_stop)
         # Absolute instant, not a duration, so it survives a restart with the
         # right amount of time left rather than starting over -- and a Pi that
-        # was off for a week comes back with it already expired.
-        self.snooze_until: datetime | None = None
+        # was off for a week comes back with it already expired. Kept as epoch
+        # seconds (see epoch_now); the snooze_until property is the same
+        # instant on the planter's clock, for showing.
+        self._snooze_until_epoch: float | None = None
 
         # Why settings cannot be saved, or None. Set when the state file is
         # there but cannot be opened: the planter then starts on defaults, and
@@ -304,6 +314,22 @@ class GreenThumbAutomation:
         # zones are split from.
         self.apply_default_led_ranges()
         self._sync_scales()
+
+    @property
+    def snooze_until(self) -> datetime | None:
+        """When the snooze ends, on the planter's clock as it is set now.
+
+        Worked out from the stored instant each time, so it reads right after
+        a timezone change rather than in the zone the snooze was started in.
+        """
+        if self._snooze_until_epoch is None:
+            return None
+        return datetime.fromtimestamp(self._snooze_until_epoch)
+
+    @snooze_until.setter
+    def snooze_until(self, moment: datetime | None) -> None:
+        # timestamp() reads a date and time with no zone as the planter's own.
+        self._snooze_until_epoch = None if moment is None else moment.timestamp()
 
     def _sync_scales(self) -> None:
         """Hand the hub both ends of each pot's scale.
@@ -579,10 +605,13 @@ class GreenThumbAutomation:
             except ValueError:
                 logger.warning("Ignoring bad snooze_until %r", text)
                 return
+            # Stored with its UTC offset, so it is the same instant whatever
+            # the timezone is now. One stored before that has no offset and is
+            # read as the planter's own time, which is what it was.
             # Dropped rather than restored once it is in the past, so a Pi that
             # was off overnight does not come back still holding a stale snooze.
-            if restored > datetime.now():
-                self.snooze_until = restored
+            if restored.timestamp() > epoch_now():
+                self._snooze_until_epoch = restored.timestamp()
 
     def _restore_led_state(self, leds: dict) -> None:
         # Chip first: selecting one resets the channel order to that chip's
@@ -659,7 +688,11 @@ class GreenThumbAutomation:
                 "enabled": self.quiet_hours_enabled,
                 "start": self.quiet_hours_start.isoformat(timespec="minutes"),
                 "stop": self.quiet_hours_stop.isoformat(timespec="minutes"),
-                "snooze_until": self.snooze_until.isoformat() if self.snooze_until else None,
+                # With its UTC offset: an instant, not a time of day.
+                "snooze_until": (
+                    datetime.fromtimestamp(self._snooze_until_epoch).astimezone().isoformat()
+                    if self._snooze_until_epoch is not None else None
+                ),
             },
             "leds": {
                 key: value
@@ -1401,7 +1434,7 @@ class GreenThumbAutomation:
             logger.exception("Could not read watering history for the cooldown")
             return
         for plant_id, row in last.items():
-            self._last_watered[plant_id] = datetime.fromtimestamp(int(row["recorded_at"]))
+            self._last_watered[plant_id] = float(row["recorded_at"])
 
     # --- did the water reach the soil? -------------------------------------
 
@@ -1969,7 +2002,10 @@ class GreenThumbAutomation:
     def _motion_held(self, now: datetime | None = None) -> str | None:
         """Why nothing may move on its own at all (snooze, quiet hours), or None."""
         moment = now or datetime.now()
-        if self.snooze_until and moment < self.snooze_until:
+        # Compared as instants. The clock is asked directly when no moment is
+        # given: a local time in the hour the clocks go back names two.
+        instant = epoch_now() if now is None else now.timestamp()
+        if self._snooze_until_epoch is not None and instant < self._snooze_until_epoch:
             return f"snoozed until {self.format_clock(self.snooze_until)}"
 
         if self.quiet_hours_enabled and within_window(
@@ -2011,7 +2047,9 @@ class GreenThumbAutomation:
             raise ValueError("Snooze length must be positive")
         if hours > 24:
             raise ValueError("Snooze is capped at 24 hours")
-        self.snooze_until = datetime.now() + timedelta(hours=hours)
+        # Hours of real time from now, not the clock reading plus that many
+        # hours: across a clock change those differ by one.
+        self._snooze_until_epoch = epoch_now() + hours * 3600
         self._persist()
         logger.info("Automatic watering snoozed until %s", self.format_clock(self.snooze_until))
         return self.quiet_status()
@@ -2041,8 +2079,10 @@ class GreenThumbAutomation:
         last = self._last_watered.get(plant_id)
         if last is None:
             return True
-        moment = now or datetime.now()
-        return moment - last >= timedelta(minutes=settings.watering_cooldown_minutes) - slack
+        # Elapsed real time, from instants: see epoch_now.
+        instant = epoch_now() if now is None else now.timestamp()
+        cooldown = timedelta(minutes=settings.watering_cooldown_minutes) - slack
+        return instant - last >= cooldown.total_seconds()
 
     def run_pump(self) -> dict[str, object]:
         """Start the pump and leave it running, for bench testing."""
@@ -2150,7 +2190,7 @@ class GreenThumbAutomation:
             logger.warning("Not counting a watering of %s: %s", plant.plant_id, error)
             return {"status": "error", "plant_id": plant.plant_id, "error": error}
 
-        self._last_watered[plant.plant_id] = datetime.now()
+        self._last_watered[plant.plant_id] = epoch_now()
         try:
             # Pending until the pot's probe shows the water (see _check_soaks),
             # which also holds automatic watering for every pot meanwhile.
@@ -2166,7 +2206,9 @@ class GreenThumbAutomation:
 
     def _last_watered_iso(self, plant_id: str) -> str | None:
         last = self._last_watered.get(plant_id)
-        return last.isoformat(timespec="seconds") if last else None
+        if last is None:
+            return None
+        return datetime.fromtimestamp(last).isoformat(timespec="seconds")
 
     def _last_soaks(self) -> dict[str, dict[str, object]]:
         """Each pot's last dose and its soak verdict, for the plant cards."""
