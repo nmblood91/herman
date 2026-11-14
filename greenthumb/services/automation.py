@@ -3353,6 +3353,19 @@ class GreenThumbAutomation:
         sensible.
         """
         clean = str(name).strip()
+        stored = state.save_profile(clean, self._checked_profile(settings), self._state_path)
+        return {"status": "ok", "name": clean, "profile": stored}
+
+    def _checked_profile(
+        self, settings: dict[str, object], soils: object = None
+    ) -> dict[str, object]:
+        """A plant profile's settings as they would be stored, or ValueError.
+
+        The checking half of write_plant_profile, apart so an import can check
+        every profile in a backup and store them together. `soils` is the names
+        a preferred soil may be one of, when the caller already has them: the
+        soil library, plus any soils being imported alongside.
+        """
         entry: dict[str, object] = {}
 
         category = settings.get("category", "")
@@ -3365,7 +3378,8 @@ class GreenThumbAutomation:
         # otherwise sit there looking like a preference.
         preferred = str(settings.get("preferred_soil") or "").strip()
         if preferred:
-            soils = state.load_soils(self._state_path)
+            if soils is None:
+                soils = state.load_soils(self._state_path)
             key = next((k for k in soils if k.casefold() == preferred.casefold()), None)
             if key is None:
                 raise ValueError(f"No soil profile called {preferred!r}")
@@ -3391,9 +3405,7 @@ class GreenThumbAutomation:
         if notes is not None and not isinstance(notes, str):
             raise ValueError("Notes must be text")
         entry["notes"] = (notes or "").strip()
-
-        stored = state.save_profile(clean, entry, self._state_path)
-        return {"status": "ok", "name": clean, "profile": stored}
+        return entry
 
     def get_plant_profile(self, name: str) -> dict[str, object]:
         """One plant profile, for an editor to load into its form."""
@@ -3672,11 +3684,58 @@ class GreenThumbAutomation:
         The two % VWC figures are both or neither: one on its own places
         nothing. None for both clears them.
         """
-        raw_changes = self._soil_raw_changes(name, field_capacity_raw, wilting_point_raw)
         # The name is validated by state.save_soil, which owns the keying for
         # every named library. Checking it again here would be a branch that
         # can never behave differently from the one beneath it.
         clean = str(name).strip()
+        stored = next(
+            (
+                values
+                for key, values in state.load_soils(self._state_path).items()
+                if key.casefold() == clean.casefold()
+            ),
+            {},
+        )
+        readings, raw_changes = self._checked_soil_settings(
+            field_capacity_vwc, wilting_point_vwc, notes,
+            field_capacity_raw, wilting_point_raw, stored,
+        )
+        entry = state.save_soil(clean, {**readings, **raw_changes}, self._state_path)
+
+        inherited = self._pots_using(clean) if "field_capacity_raw" in raw_changes else []
+        # Both ends are read live from the soil profile, so any change moves
+        # the scale of every pot using it.
+        self._sync_scales()
+        return {
+            "status": "ok",
+            "name": clean,
+            "soil": entry,
+            "wilting_fraction": state.available_water_fraction(readings),
+            "available_points": (
+                round(readings["field_capacity_vwc"] - readings["wilting_point_vwc"], 1)
+                if readings["field_capacity_vwc"] is not None
+                else None
+            ),
+            "inherited_by": inherited,
+        }
+
+    def _checked_soil_settings(
+        self,
+        field_capacity_vwc: object,
+        wilting_point_vwc: object,
+        notes: object,
+        field_capacity_raw: object,
+        wilting_point_raw: object,
+        stored: dict[str, object],
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        """A soil profile's settings as they would be stored, or ValueError:
+        the % VWC figures and note, and the changes to its sensor readings.
+
+        The checking half of save_soil, which says what each argument means,
+        apart so an import can check every soil in a backup and store them
+        together. `stored` is the soil as it is now, {} for a new one.
+        """
+        raw_changes = self._soil_raw_changes(stored, field_capacity_raw, wilting_point_raw)
         readings: dict[str, object] = {}
         if field_capacity_vwc is None and wilting_point_vwc is None:
             readings = {"field_capacity_vwc": None, "wilting_point_vwc": None}
@@ -3715,43 +3774,19 @@ class GreenThumbAutomation:
         if notes is not None and not isinstance(notes, str):
             raise ValueError("Notes must be text")
         readings["notes"] = (notes or "").strip()
+        return readings, raw_changes
 
-        entry = state.save_soil(clean, {**readings, **raw_changes}, self._state_path)
-
-        inherited = self._pots_using(clean) if "field_capacity_raw" in raw_changes else []
-        # Both ends are read live from the soil profile, so any change moves
-        # the scale of every pot using it.
-        self._sync_scales()
-        return {
-            "status": "ok",
-            "name": clean,
-            "soil": entry,
-            "wilting_fraction": state.available_water_fraction(readings),
-            "available_points": (
-                round(readings["field_capacity_vwc"] - readings["wilting_point_vwc"], 1)
-                if readings["field_capacity_vwc"] is not None
-                else None
-            ),
-            "inherited_by": inherited,
-        }
-
+    @staticmethod
     def _soil_raw_changes(
-        self, name: str, field_capacity_raw: object, wilting_point_raw: object
+        stored: dict[str, object], field_capacity_raw: object, wilting_point_raw: object
     ) -> dict[str, object]:
         """Validate typed sensor readings and turn them into state fields.
 
         Checked against each other using the stored value for whichever one is
         not being changed, so wilting point can never end up at or above field
-        capacity -- the dry end of the window above the wet end.
+        capacity -- the dry end of the window above the wet end. `stored` is
+        the soil as it is now, {} for a new one.
         """
-        stored = next(
-            (
-                values
-                for key, values in state.load_soils(self._state_path).items()
-                if key.casefold() == str(name).strip().casefold()
-            ),
-            {},
-        )
 
         def parse(value: object, label: str) -> int | None:
             if value is None:
@@ -3816,6 +3851,10 @@ class GreenThumbAutomation:
 
         Without `replace`, an entry whose name is already here is kept as it
         is: importing an old backup must not quietly undo newer tuning.
+
+        Everything is checked first and then stored in one write of the state
+        file. Saved an entry at a time, a full library was that file rewritten
+        and synced to the SD card a couple of hundred times.
         """
         # A planter's own data/state.json is accepted too: it stores both
         # libraries under the same two keys, and it is what can be pulled off
@@ -3837,7 +3876,11 @@ class GreenThumbAutomation:
             return any(key.casefold() == name.strip().casefold() for key in stored)
 
         soils_out: dict[str, str] = {}
+        soil_writes: list[tuple[str, dict[str, object]]] = []
         existing_soils = state.load_soils(self._state_path)
+        # The soil names there will be once this import is stored, which is
+        # what a plant profile's preferred soil is checked against.
+        soil_names = list(existing_soils)
         for name, entry in soils_in.items():
             if not isinstance(name, str) or not name.strip() or not isinstance(entry, dict):
                 soils_out[str(name)] = "skipped: not a soil profile"
@@ -3846,21 +3889,21 @@ class GreenThumbAutomation:
                 soils_out[name] = "kept"
                 continue
             try:
-                # None for anything missing, so a replace leaves the soil
-                # exactly as the backup has it rather than merged with what
-                # was here.
-                self.save_soil(
-                    name,
+                # None for anything missing, and checked against nothing
+                # stored, so a replace leaves the soil exactly as the backup
+                # has it rather than merged with what was here.
+                readings, raw_changes = self._checked_soil_settings(
                     entry.get("field_capacity_vwc"),
                     entry.get("wilting_point_vwc"),
                     entry.get("notes", ""),
                     entry.get("field_capacity_raw"),
                     entry.get("wilting_point_raw"),
+                    {},
                 )
             except ValueError as exc:
                 soils_out[name] = f"skipped: {exc}"
                 continue
-            # save_soil treats a reading as typed and clears where it came
+            # The check treats a reading as typed and clears where it came
             # from; put the backup's provenance back beside it.
             provenance = {
                 f"{end}_{detail}": entry[f"{end}_{detail}"]
@@ -3869,11 +3912,14 @@ class GreenThumbAutomation:
                 for detail in ("samples", "measured_at", "address")
                 if entry.get(f"{end}_{detail}") is not None
             }
-            if provenance:
-                state.save_soil(name, provenance, self._state_path)
+            clean = name.strip()
+            soil_writes.append((clean, {**readings, **raw_changes, **provenance}))
+            soil_names = [known for known in soil_names if known.casefold() != clean.casefold()]
+            soil_names.append(clean)
             soils_out[name] = "written"
 
         plants_out: dict[str, str] = {}
+        profile_writes: list[tuple[str, dict[str, object]]] = []
         existing_plants = state.load_profiles(self._state_path)
         for name, entry in plants_in.items():
             if not isinstance(name, str) or not name.strip() or not isinstance(entry, dict):
@@ -3883,11 +3929,17 @@ class GreenThumbAutomation:
                 plants_out[name] = "kept"
                 continue
             try:
-                self.write_plant_profile(name, entry)
+                profile_writes.append((name.strip(), self._checked_profile(entry, soil_names)))
             except ValueError as exc:
                 plants_out[name] = f"skipped: {exc}"
                 continue
             plants_out[name] = "written"
+
+        if soil_writes or profile_writes:
+            state.save_library(soil_writes, profile_writes, self._state_path)
+        if soil_writes:
+            # Both ends of a pot's scale are read live from its soil profile.
+            self._sync_scales()
 
         return {"status": "ok", "soil_profiles": soils_out, "plant_profiles": plants_out}
 

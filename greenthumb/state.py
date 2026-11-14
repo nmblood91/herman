@@ -500,19 +500,42 @@ def _save_named(
     measured in a pot. Handled here rather than in that one caller, or the next
     caller reopens the same hole.
     """
-    clean = str(name).strip()
-    if not clean:
-        raise ValueError(f"A {noun} needs a name")
-
-    entry = {field: settings[field] for field in fields if field in settings}
-    if not entry:
-        raise ValueError(f"Nothing to save: no recognized {noun} settings given")
+    # Checked before the file is touched, so a bad entry never costs a read.
+    clean, entry = _named_entry(fields, noun, name, settings)
 
     data = _load_for_write(path)
     stored = data.get(key)
     if not isinstance(stored, dict):
         stored = {}
+    entry = _upsert(stored, fields, clean, entry, merge)
+    data[key] = stored
+    save_state(data, path)
+    return entry
 
+
+def _named_entry(
+    fields: tuple[str, ...], noun: str, name: str, settings: dict[str, Any]
+) -> tuple[str, dict[str, Any]]:
+    """The name and the whitelisted settings of one entry, or ValueError."""
+    clean = str(name).strip()
+    if not clean:
+        raise ValueError(f"A {noun} needs a name")
+    entry = {field: settings[field] for field in fields if field in settings}
+    if not entry:
+        raise ValueError(f"Nothing to save: no recognized {noun} settings given")
+    return clean, entry
+
+
+def _upsert(
+    stored: dict[str, Any],
+    fields: tuple[str, ...],
+    clean: str,
+    entry: dict[str, Any],
+    merge: bool,
+) -> dict[str, Any]:
+    """Put one entry into a library held in memory, replacing any of the
+    same name. The half of _save_named that does not touch the file, so a
+    whole library can be put in and written once (save_library)."""
     # Drop the old key rather than writing alongside it, so a change of
     # capitalisation renames the entry instead of duplicating it.
     previous = _match_name(stored, clean)
@@ -527,11 +550,47 @@ def _save_named(
         del stored[previous]
 
     entry["saved_at"] = datetime.now().isoformat(timespec="seconds")
-
     stored[clean] = entry
-    data[key] = stored
-    save_state(data, path)
     return entry
+
+
+@_locked
+def save_library(
+    soils: list[tuple[str, dict[str, Any]]],
+    profiles: list[tuple[str, dict[str, Any]]],
+    path: str | Path | None = None,
+) -> None:
+    """Upsert many soils and plant profiles and write the file once.
+
+    For importing a backup. Saved one at a time, a library of a few dozen
+    entries was the whole file read, rewritten and synced to the SD card once
+    or twice for each of them. All of it is checked before anything is
+    written, so a bad entry stores nothing; the caller is expected to have
+    left those out and reported them.
+
+    Soils merge and plant profiles replace, the same as save_soil and
+    save_profile.
+    """
+    batches = (
+        (SOILS_KEY, SOIL_FIELDS, "soil", soils, True),
+        (PROFILES_KEY, PROFILE_FIELDS, "plant profile", profiles, False),
+    )
+    checked = [
+        (key, fields, [_named_entry(fields, noun, name, settings) for name, settings in entries], merge)
+        for key, fields, noun, entries, merge in batches
+    ]
+
+    data = _load_for_write(path)
+    for key, fields, entries, merge in checked:
+        if not entries:
+            continue
+        stored = data.get(key)
+        if not isinstance(stored, dict):
+            stored = {}
+        for clean, entry in entries:
+            _upsert(stored, fields, clean, entry, merge)
+        data[key] = stored
+    save_state(data, path)
 
 
 @_locked

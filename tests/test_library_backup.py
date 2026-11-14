@@ -160,4 +160,51 @@ assert "Bad Light" not in state.load_profiles(path)
 assert result["plant_profiles"]["My Basil"] == "written", result
 print("ok: bad entries are skipped with a reason, and the rest still load")
 
+
+# --- a whole library is one write of the state file ---
+#
+# Saved an entry at a time, this was the file rewritten and synced to the SD
+# card once or twice for every soil and plant in the backup.
+
+writes = []
+real_save = state.save_state
+
+
+def counting_save(data, path=None):
+    writes.append(path)
+    return real_save(data, path)
+
+
+once_path = temp_state()
+once = build(once_path)
+# A pot already filled with a mix the backup is about to bring.
+once.plants[0].soil = RICH
+state.save_state = counting_save
+try:
+    result = once.import_library(backup)
+finally:
+    state.save_state = real_save
+assert len(writes) == 1, f"the import wrote the state file {len(writes)} times"
+assert set(result["soil_profiles"].values()) == {"written"}
+assert set(result["plant_profiles"].values()) == {"written"}, result["plant_profiles"]
+assert without_saved_at(state.load_soils(once_path)) == without_saved_at(backup["soil_profiles"])
+assert without_saved_at(state.load_profiles(once_path)) == without_saved_at(backup["plant_profiles"])
+print(f"ok: {len(backup['soil_profiles']) + len(backup['plant_profiles'])} entries are stored in one write")
+
+# My Basil prefers a soil that only arrived in this same import.
+assert state.load_profiles(once_path)["My Basil"]["preferred_soil"] == RICH
+# And the pot filled with it reads against the imported field capacity at once.
+assert once.sensor_hub.field_capacity.get(once.plants[0].sensor_address) == 812
+print("ok: a profile may prefer a soil from the same backup, and pots pick up its readings")
+
+# Nothing to store, nothing written.
+writes.clear()
+state.save_state = counting_save
+try:
+    result = once.import_library(backup)
+finally:
+    state.save_state = real_save
+assert writes == [] and set(result["soil_profiles"].values()) == {"kept"}, (writes, result)
+print("ok: an import that keeps everything does not write at all")
+
 print("\nall library backup checks passed")
