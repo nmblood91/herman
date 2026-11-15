@@ -95,4 +95,34 @@ assert soil_sensors.PROBE_RETRY_SECONDS < settings.sensor_poll_seconds, (
 )
 print("ok: and probed again once the wait is up, so a probe plugged in is found")
 
+
+# --- the table's Reading column: the loop's last read, at no cost to the probes ---
+
+hub = Hub()
+auto = GreenThumbAutomation(hub, Nul(), Nul(), Nul(), history=temp_store(), state_path=temp_state())
+rows = auto.moisture_calibration()["sensors"]
+assert all(row["reading"] is None for row in rows), "showed a reading before any was taken"
+print("ok: before the first poll there is no reading, rather than a probe that did not answer")
+
+hub.reading = 577.0
+auto._poll_sensors()
+reads = []
+hub.read_one = lambda a: reads.append(a)
+rows = {row["address"]: row for row in auto.moisture_calibration()["sensors"]}
+assert not reads, "the calibration table read the probes itself"
+reading = rows["0x36"]["reading"]
+assert reading["raw"] == 577.0 and reading["temperature_c"] == 21.5, reading
+assert 0 <= reading["age_seconds"] < 5, reading
+print("ok: after a poll the table carries each probe's last reading without reading it again")
+
+auto._latest_at[0x36] -= 200
+assert 200 <= auto.moisture_calibration()["sensors"][0]["reading"]["age_seconds"] < 205
+print("ok: and says how old it is")
+
+auto.set_plant_enabled("plant_2", False)
+rows = {row["address"]: row for row in auto.moisture_calibration()["sensors"]}
+assert rows["0x37"]["reading"] is None and rows["0x37"]["enabled"] is False, rows["0x37"]
+assert rows["0x36"]["enabled"] is True
+print("ok: an off pot has no reading, and is marked off")
+
 print("\nall live moisture checks passed")

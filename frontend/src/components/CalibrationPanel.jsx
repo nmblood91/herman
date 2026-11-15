@@ -16,6 +16,14 @@ const RESET_HOLD_MS = 3000
 const LIVE_POLL_MS = 2000
 const LIVE_LIMIT_MS = 5 * 60 * 1000
 
+// How often the table is fetched again while the tab is open. It only reports
+// what the planter already read, so unlike the live check it touches no probe
+// and has no reason to stop.
+const TABLE_REFRESH_MS = 15000
+
+const ageNote = (seconds) =>
+  seconds < 90 ? `${seconds}s ago` : `${Math.round(seconds / 60)} min ago`
+
 // The probes' dry points, in open air: each probe's 0% water point, which an
 // estimated wilting point is placed up from. The moisture scale itself runs
 // from wilting point to a soil profile's field capacity reading, set in the
@@ -52,8 +60,10 @@ export function CalibrationPanel() {
       if (!canceled) await load()
     }
     loadOnMount()
+    const refresh = setInterval(loadOnMount, TABLE_REFRESH_MS)
     return () => {
       canceled = true
+      clearInterval(refresh)
     }
   }, [load])
 
@@ -194,18 +204,33 @@ export function CalibrationPanel() {
     return remaining > 0 ? `Sampling… ${remaining}s` : 'Finishing…'
   }
 
-  // The pot's scale: wilting point up to field capacity.
-  const scaleNote = (sensor) => {
-    if (sensor.scale_problem) return sensor.scale_problem
-    const where = sensor.soil ? `from ${sensor.soil}` : 'no soil profile'
-    const span = sensor.field_capacity_raw - sensor.wilting_point_raw
-    const bottom =
-      sensor.wilting_point_source === 'estimated'
-        ? `~${sensor.wilting_point_raw} estimated`
-        : sensor.wilting_point_raw
+  // A figure nobody measured is marked, so it is not read as one that was.
+  const marked = (value, note) => (
+    <>
+      {value} <span className="scale-note">{note}</span>
+    </>
+  )
+
+  // What a probe reads now: the live check's figure while it runs, otherwise
+  // the planter's own last read, which can be a minute old and says so.
+  const liveByAddress = new Map(
+    (live ? (liveReading?.sensors ?? []) : []).map((sensor) => [sensor.address, sensor]),
+  )
+  const readingCell = (sensor) => {
+    const fresh = liveByAddress.get(sensor.address)
+    const reading = fresh ?? sensor.reading
+    if (!reading) return sensor.enabled === false ? 'pot is off' : 'waiting'
+    if (reading.raw < 0) return <span className="scale-warning">not answering</span>
+    const details = [
+      reading.percent >= 0 ? `${reading.percent}%` : null,
+      reading.temperature_c == null ? null : `${reading.temperature_c}°C`,
+      fresh ? 'live' : ageNote(reading.age_seconds),
+    ].filter(Boolean)
     return (
-      `scale ${bottom}–${sensor.field_capacity_raw} ` +
-      `(${where}) · span ${span}`
+      <>
+        {Math.round(reading.raw)}
+        <span className="scale-note below">{details.join(' · ')}</span>
+      </>
     )
   }
 
@@ -214,6 +239,86 @@ export function CalibrationPanel() {
       <h2>Moisture probes</h2>
 
       <div className="general-settings-form">
+        <div className="field-row">
+          <h3>Current scale</h3>
+          {sensors.length === 0 && <p className="field-hint">No sensors reporting.</p>}
+          {sensors.length > 0 && (
+            // The pot's scale runs from wilting point up to field capacity;
+            // the air reading is the probe's own zero.
+            <table className="scale-table">
+              <thead>
+                <tr>
+                  <th>Pot</th>
+                  <th>Probe</th>
+                  <th>Soil profile</th>
+                  <th className="number">Air</th>
+                  <th className="number">Wilting point</th>
+                  <th className="number">Field capacity</th>
+                  <th className="number">Span</th>
+                  <th className="number">Reading</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sensors.map((sensor) => (
+                  <tr className={sensor.usable ? '' : 'warning'} key={sensor.address}>
+                    <th scope="row">{sensor.plant || '—'}</th>
+                    <td>{sensor.address}</td>
+                    <td>{sensor.soil || 'none'}</td>
+                    <td className="number">
+                      {sensor.calibrated_dry ? sensor.dry : marked(sensor.dry, 'default')}
+                    </td>
+                    {sensor.scale_problem ? (
+                      // No scale to show: say what is missing in its place.
+                      <td colSpan={3}>{sensor.scale_problem}</td>
+                    ) : (
+                      <>
+                        <td className="number">
+                          {sensor.wilting_point_source === 'estimated'
+                            ? marked(sensor.wilting_point_raw, 'estimated')
+                            : sensor.wilting_point_raw}
+                        </td>
+                        <td className="number">{sensor.field_capacity_raw}</td>
+                        <td className="number">
+                          {sensor.field_capacity_raw - sensor.wilting_point_raw}
+                        </td>
+                      </>
+                    )}
+                    <td className="number">{readingCell(sensor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {unmeasured.length > 0 && (
+            <p className="field-hint warning">
+              {unmeasured.length === 1 ? 'One pot has' : `${unmeasured.length} pots have`}{' '}
+              no usable scale, so {unmeasured.length === 1 ? 'it reads' : 'they read'}{' '}
+              nothing and {unmeasured.length === 1 ? 'is' : 'are'} never watered
+              automatically. Its row above says what is missing.
+            </p>
+          )}
+        </div>
+
+        <div className="field-row">
+          <button type="button" onClick={toggleLive}>
+            {live ? 'Stop live readings' : 'Show live readings'}
+          </button>
+          <p className="field-hint">
+            The table above shows each probe&apos;s last reading, taken once a
+            minute. This reads them every {LIVE_POLL_MS / 1000} seconds
+            instead, to check one responds: hold it or dip it in water and its
+            number should rise. Stops by itself after {LIVE_LIMIT_MS / 60000}{' '}
+            minutes.
+          </p>
+          {live && busy && <p className="field-hint">Paused while the calibration runs.</p>}
+          {live && liveReading?.error && (
+            <p className="field-hint warning">Could not read the probes: {liveReading.error}</p>
+          )}
+          {live && !liveReading?.error && (
+            <p className="field-hint">Live in the Reading column above.</p>
+          )}
+        </div>
+
         <p className="field-hint">
           Each probe&apos;s reading in open air, its 0% point.
         </p>
@@ -234,35 +339,6 @@ export function CalibrationPanel() {
           </p>
         </div>
 
-        <div className="field-row">
-          <button type="button" onClick={toggleLive}>
-            {live ? 'Stop live readings' : 'Show live readings'}
-          </button>
-          <p className="field-hint">
-            Reads every probe every {LIVE_POLL_MS / 1000} seconds, to check one
-            responds: hold it or dip it in water and its number should rise.
-            Stops by itself after {LIVE_LIMIT_MS / 60000} minutes.
-          </p>
-          {live && busy && <p className="field-hint">Paused while the calibration runs.</p>}
-          {live && liveReading?.error && (
-            <p className="field-hint warning">Could not read the probes: {liveReading.error}</p>
-          )}
-          {live &&
-            liveReading?.sensors?.map((sensor) => (
-              <p
-                className={sensor.raw < 0 ? 'field-hint warning' : 'field-hint'}
-                key={sensor.address}
-              >
-                <strong>{sensor.label || sensor.address}</strong>{' '}
-                {sensor.raw < 0
-                  ? 'not answering'
-                  : `reads ${Math.round(sensor.raw)} (air ${sensor.dry})` +
-                    (sensor.percent >= 0 ? ` · soil water ${sensor.percent}%` : '') +
-                    ` · ${sensor.temperature_c}°C`}
-              </p>
-            ))}
-        </div>
-
         {message && (
           <p className={message.warn ? 'field-hint warning' : 'field-hint'}>{message.text}</p>
         )}
@@ -281,28 +357,6 @@ export function CalibrationPanel() {
             ))}
           </div>
         )}
-
-        <div className="field-row">
-          <h3>Current scale</h3>
-          {sensors.length === 0 && <p className="field-hint">No sensors reporting.</p>}
-          {sensors.map((sensor) => (
-            <p
-              className={`field-hint${sensor.usable ? '' : ' warning'}`}
-              key={sensor.address}
-            >
-              <strong>{sensor.label || sensor.address}</strong> air {sensor.dry}
-              {sensor.calibrated_dry ? '' : ' (default)'} · {scaleNote(sensor)}
-            </p>
-          ))}
-          {unmeasured.length > 0 && (
-            <p className="field-hint warning">
-              {unmeasured.length === 1 ? 'One pot has' : `${unmeasured.length} pots have`}{' '}
-              no usable scale, so {unmeasured.length === 1 ? 'it reads' : 'they read'}{' '}
-              nothing and {unmeasured.length === 1 ? 'is' : 'are'} never watered
-              automatically. Each line above says what is missing.
-            </p>
-          )}
-        </div>
 
         <div className="field-row">
           <button

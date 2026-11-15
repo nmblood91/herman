@@ -210,7 +210,11 @@ class HistoryStore:
         return {row["plant_id"]: dict(row) for row in rows}
 
     def series(
-        self, addresses: list[int], hours: float, now: int | None = None
+        self,
+        addresses: list[int],
+        hours: float,
+        now: int | None = None,
+        not_before: dict[int, int] | None = None,
     ) -> tuple[int, list[int], dict[int, dict[str, list[float | None]]]]:
         """Bucketed readings per address, aligned onto one shared timestamp axis.
 
@@ -218,6 +222,10 @@ class HistoryStore:
         happens here rather than being reimplemented in the browser. A None means
         that address had no reading in that bucket, which is real information --
         the sensor was unreadable.
+
+        not_before gives an address its own earliest time, in epoch seconds,
+        where that is later than the start of the range: the readings before
+        it belong to whatever was in the pot last.
         """
         bucket = bucket_seconds_for(hours)
         end = int(time.time()) if now is None else now
@@ -227,6 +235,12 @@ class HistoryStore:
         # straight to each probe's rows in the range. With the time range alone
         # SQLite walked every reading in the table for each chart refresh.
         wanted = [int(address) for address in addresses]
+        # Each with its own start, which is what not_before needs and costs the
+        # index nothing: one range search per probe either way.
+        ranges = [
+            (address, max(since, int((not_before or {}).get(address, since))))
+            for address in wanted
+        ]
         with self._lock:
             rows = [] if not wanted else self._db.execute(
                 "SELECT sensor_address,"
@@ -240,11 +254,12 @@ class HistoryStore:
                 # But -1 in that column is "cannot say", and averaging it into
                 # a bucket drags the line to the floor, which reads as a bone
                 # dry pot.
-                f" WHERE sensor_address IN ({', '.join('?' * len(wanted))})"
-                " AND recorded_at >= ? AND moisture_percent >= 0"
+                " WHERE ("
+                + " OR ".join(["(sensor_address = ? AND recorded_at >= ?)"] * len(ranges))
+                + ") AND moisture_percent >= 0"
                 " GROUP BY sensor_address, bucket"
                 " ORDER BY bucket",
-                (bucket, bucket, *wanted, since),
+                (bucket, bucket, *(value for pair in ranges for value in pair)),
             ).fetchall()
 
         by_address: dict[int, dict[int, sqlite3.Row]] = {}

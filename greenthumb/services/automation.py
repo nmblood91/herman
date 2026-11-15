@@ -225,6 +225,9 @@ class GreenThumbAutomation:
         # -1" is also what a planter looks like one second after boot. This
         # distinguishes the two.
         self._has_polled = False
+        # When each probe was last read by the loop, in epoch seconds, so a
+        # reading shown on the Calibration tab can say how old it is.
+        self._latest_at: dict[int, float] = {}
         # Epoch seconds, not a local date and time: see epoch_now.
         self._last_watered: dict[str, float] = {}
         self.history = history or HistoryStore(settings.history_db_path or DEFAULT_DB_PATH)
@@ -468,6 +471,9 @@ class GreenThumbAutomation:
                     setattr(plant, text_field, value.strip())
             if isinstance(saved.get("enabled"), bool):
                 plant.enabled = saved["enabled"]
+            planted_at = saved.get("planted_at")
+            if isinstance(planted_at, (int, float)) and not isinstance(planted_at, bool) and planted_at > 0:
+                plant.planted_at = int(planted_at)
             # The care settings, each checked the way the editor checks it. A
             # bad value keeps the default rather than failing the restore.
             for field_name, check in (
@@ -655,6 +661,7 @@ class GreenThumbAutomation:
                     "sweep_max_mm": plant.sweep_max_mm,
                     "soil": plant.soil,
                     "profile": plant.profile,
+                    "planted_at": plant.planted_at,
                     "light_color": list(plant.light_color),
                     "manual_color": list(plant.manual_color),
                     "manual_brightness": plant.manual_brightness,
@@ -1369,6 +1376,7 @@ class GreenThumbAutomation:
                 continue
             sample = self.sensor_hub.read_one(address)
             self._latest[address] = sample
+            self._latest_at[address] = epoch_now()
             samples.append(sample)
             if sample.moisture_raw >= 0:
                 self._history[address].append(sample.moisture_raw)
@@ -2293,7 +2301,13 @@ class GreenThumbAutomation:
     def get_history(self, hours: float) -> dict[str, object]:
         """Bucketed history for the chart, plants aligned onto one timestamp axis."""
         addresses = [plant.sensor_address for plant in self.plants]
-        bucket, timestamps, series = self.history.series(addresses, hours)
+        # Nothing from before the pot's present plant went in: the last one's
+        # readings and waterings stay in the database, and off the chart.
+        bucket, timestamps, series = self.history.series(
+            addresses, hours,
+            not_before={plant.sensor_address: plant.planted_at for plant in self.plants},
+        )
+        planted_at = {plant.plant_id: plant.planted_at for plant in self.plants}
 
         return {
             "hours": hours,
@@ -2317,7 +2331,10 @@ class GreenThumbAutomation:
                 }
                 for plant in self.plants
             ],
-            "waterings": self.history.waterings(hours),
+            "waterings": [
+                dose for dose in self.history.waterings(hours)
+                if dose["t"] >= planted_at.get(dose["plant_id"], 0)
+            ],
         }
 
     def clear_history(self) -> dict[str, object]:
@@ -2431,6 +2448,24 @@ class GreenThumbAutomation:
         """Address to the name currently shown for that plant."""
         return {plant.sensor_address: plant.name for plant in self.plants}
 
+    def _last_reading(self, address: int) -> dict[str, object] | None:
+        """The loop's last read of one probe, in the shape live_moisture gives.
+
+        None when there is none to show: before the first poll, or for an off
+        pot, whose probe is not read. A probe that was read and did not answer
+        is a reading, with a raw of -1.
+        """
+        sample = self._latest.get(address)
+        read_at = self._latest_at.get(address)
+        if sample is None or read_at is None:
+            return None
+        return {
+            "raw": sample.moisture_raw,
+            "percent": sample.moisture_percent,
+            "temperature_c": sample.temperature_c,
+            "age_seconds": max(0, int(epoch_now() - read_at)),
+        }
+
     def moisture_calibration(self) -> dict[str, object]:
         """Both ends of every probe's scale, with where each came from.
 
@@ -2461,6 +2496,10 @@ class GreenThumbAutomation:
                     # dry point is only a check on the probe.
                     "usable": self.sensor_hub.span_for(address) is not None,
                     "scale_problem": self.scale_problem(plant) if plant else None,
+                    "enabled": plant.enabled if plant else True,
+                    # From the loop's once-a-minute read, so showing it costs
+                    # the probes nothing.
+                    "reading": self._last_reading(address),
                 }
             )
         return {
@@ -3445,6 +3484,11 @@ class GreenThumbAutomation:
             raise ValueError(f"No plant profile called {wanted!r}")
 
         entry = profiles[key]
+        if plant.profile != key:
+            # A different plant from here on: the History chart starts its
+            # line now. Loading the same profile again, to pick up an edit to
+            # it, is the same plant and keeps its history.
+            plant.planted_at = int(epoch_now())
         plant.name = key
         plant.profile = key
 

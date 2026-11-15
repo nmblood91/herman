@@ -998,7 +998,8 @@ input[type='color'] {
   color: #8fd6a6;
 }
 
-.help-page table {
+.help-page table,
+.scale-table {
   width: 100%;
   border-collapse: collapse;
   margin: 8px 0;
@@ -1006,15 +1007,47 @@ input[type='color'] {
 }
 
 .help-page th,
-.help-page td {
+.help-page td,
+.scale-table th,
+.scale-table td {
   text-align: left;
   vertical-align: top;
   padding: 8px 10px;
   border: 1px solid #2a4737;
 }
 
-.help-page th {
+.help-page th,
+.scale-table thead th {
   background: #1d382a;
+}
+
+/* The probes' scales on the Calibration tab. Figures line up on the right so
+   four pots can be compared down a column. */
+.scale-table .number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scale-table tbody th {
+  font-weight: 600;
+}
+
+.scale-table tr.warning td {
+  color: #e6a04a;
+}
+
+.scale-note {
+  font-size: 0.78rem;
+  color: #8fae9c;
+}
+
+.scale-note.below {
+  display: block;
+}
+
+.scale-warning {
+  color: #e6a04a;
 }
 
 /* The Wikipedia-style contents box. */
@@ -1052,7 +1085,8 @@ input[type='color'] {
 /* A phone has no room for a wide table, so it scrolls sideways in place
    rather than pushing the whole page wider than the screen. */
 @media (max-width: 640px) {
-  .help-page table {
+  .help-page table,
+  .scale-table {
     display: block;
     overflow-x: auto;
   }

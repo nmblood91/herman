@@ -64,6 +64,12 @@ class PlantSpec:
     # care settings are the code's placeholders, and the card says so rather
     # than presenting them as though somebody chose them.
     profile: str = ""
+    # When this plant went into the pot, in epoch seconds: the moment a
+    # different plant profile was last loaded onto it. The History chart draws
+    # nothing from before it, so a new plant does not inherit the last one's
+    # line. 0 means "never", and nothing is hidden. Reloading the same profile
+    # or renaming the pot is not a new plant and leaves it alone.
+    planted_at: int = 0
     # Auto-managed LED segment for the global strip. This is calculated by the app,
     # not exposed to the user for manual editing.
     led_start_index: int = 0
