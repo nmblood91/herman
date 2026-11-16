@@ -1,8 +1,8 @@
 # SKR Pico
 
-The BTT SKR Pico V1.0 as Herman's motion board, in place of an SKR Mini E3.
-It powers the Pi from its own 5 V regulator and talks to it over the Pi's GPIO
-UART, so one 5-wire cable replaces both the DC-DC converter and the USB cable.
+The BTT SKR Pico V1.0 is Herman's motion board. It powers the Pi from its own
+5 V regulator and talks to it over the Pi's GPIO UART, so one 5-wire cable
+carries both the Pi's power and the motion link.
 
 **Status: supported in software, not yet proven on the planter.** The firmware
 builds and is checked by `tests/test_firmware_pin.py`, the printer.cfg it gets
@@ -12,8 +12,9 @@ checks in *First power-up* below are what prove it.
 
 ## Why it might end the reset hunt
 
-The Pi 3 + SKR Mini E3 V3 resets ([pi/PI3A_RESET_HANDOFF.md](pi/PI3A_RESET_HANDOFF.md))
-are tied to two things the Pico takes away:
+The resets seen on a Pi 3 with a USB motion board
+([pi/PI3A_RESET_HANDOFF.md](pi/PI3A_RESET_HANDOFF.md)) are tied to two things
+the Pico takes away:
 
 - **The USB link.** Klipper resets a USB board when it connects and the board
   re-enumerates. Over UART nothing re-enumerates, and `restart_method: command`
@@ -23,8 +24,8 @@ are tied to two things the Pico takes away:
   and pump are on, over the same cable, so no ground loop runs through a signal
   cable.
 
-What it does not fix is a weak 5 V. That moves from the DC-DC converter to the
-Pico's regulator, which is covered next.
+What it does not fix is a weak 5 V. That now rests on the Pico's regulator,
+which is covered next.
 
 ## Power: what the board actually delivers
 
@@ -39,11 +40,10 @@ From BTT's schematic (`Hardware/BTT SKR Pico V1.0-SCH.pdf` in
   reference's ±1.5% that's 4.92–5.07 V at the regulator, before the fuse and
   the cable to the Pi.
 
-So the Pi sees roughly 4.9–5.0 V. **That is below the "5.1 V minimum" written
-into BOM.md and POWER_SYSTEM.md after the 4.90 V micro-USB converter failed**,
-and those edits are still uncommitted, waiting on exactly this kind of result.
-The Pico's path is better than the converter's in ways that number doesn't
-show:
+So the Pi sees roughly 4.9–5.0 V. **That is below the 5.1 V a Pi's own supply
+puts out**, and a 4.90 V micro-USB converter tried earlier logged
+under-voltage. The Pico's path is better than that converter's in ways the
+number doesn't show:
 
 - a real regulator with tight load regulation, where the cheap module sagged
   as load rose
@@ -90,8 +90,7 @@ and the LED strip's data and ground (pins 19 and 20) are not affected.
 
 ### Gantry and pump
 
-Every connector Herman uses on the Mini E3 is on the Pico under the same name.
-The installer writes the matching pins, mapped in
+The installer writes these pins into `printer.cfg`, from
 [klipper/skr-pico/pins.map](klipper/skr-pico/pins.map):
 
 | What | Connector | Pico pin |
@@ -101,10 +100,9 @@ The installer writes the matching pins, mapped in
 | Pump | HB screw terminal (`IO21 12/24V`) | gpio21 |
 | 12 V in | POWER | — |
 
-The pump wiring is the same as on the Mini E3, and so is the 1 A fuse on the
-pump's positive lead, upstream of the flyback diode (see
-[README.md](README.md)): HB's `12/24V` terminal is the board's input rail, and
-`IO21` is the low-side MOSFET.
+The pump takes a 1 A fuse on its positive lead, upstream of the flyback diode
+(see [README.md](README.md)): HB's `12/24V` terminal is the board's input
+rail, and `IO21` is the low-side MOSFET.
 
 **Leave the X-DIAG jumper off.** The Pico's sensorless-homing jumpers connect a
 driver's DIAG output to that axis's endstop pin, and BTT notes that an external
@@ -134,15 +132,17 @@ build can't lock the board out, and no SD card is involved.
 
 ## Installing
 
-On a fresh Pi, or one moving over from a Mini E3:
+On a fresh Pi:
 
 ```bash
-sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh --board skr-pico
+sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
 sudo reboot
 ```
 
-The installer remembers the board, so later re-runs need no option. For the
-Pico it:
+The Pico is the board the installer sets up for unless told otherwise. A Pi
+that was installed for a USB board stays on it: the installer remembers the
+board, and a plain re-run keeps it. Pass `--board skr-pico` once to move that
+Pi over. For the Pico it:
 
 - writes `enable_uart=1` and `dtoverlay=disable-bt` to `config.txt`
 - removes the serial console from `cmdline.txt`
@@ -179,16 +179,15 @@ the test on the Calibration tab has been run again.
 3. Load the Pi with the four-`yes` loop for a minute (see
    [pi/PI3A_RESET_HANDOFF.md](pi/PI3A_RESET_HANDOFF.md)), then check
    `get_throttled` again.
-4. Run the installer with `--board skr-pico` and reboot.
+4. Run the installer and reboot. On a Pi that has been running a USB board,
+   add `--board skr-pico`.
 5. Check `sudo systemctl status klipper`. The app's status bar should show the
    motion board connected.
 6. Run the motor direction test on the Calibration tab, then home.
 7. Run the pump from the Controls tab and confirm it stops.
 8. Run `get_throttled` once more after homing and watering. A non-zero result
    means the Pico's 5 V is sagging under real load, and that has to be dealt
-   with before this board can replace the converter.
+   with before the planter runs unattended.
 
-**Not done until that passes:** BOM.md, POWER_SYSTEM.md and PRINTED_PARTS.md
-still describe the Mini E3, the DC-DC converter and its Wago run. The Pico has
-a different footprint (85 × 56 mm, Pi-sized) from the Mini E3, so the
-electronics holder needs a new mount.
+**Still to do:** the Pico's footprint is 85 × 56 mm, Pi-sized, and the
+electronics holder needs a mount for it.

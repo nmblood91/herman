@@ -4,9 +4,9 @@
 
 Herman uses four Adafruit STEMMA soil moisture sensors, reached through three passive STEMMA QT hubs, on the Raspberry Pi's I2C bus 1. Each sensor reads capacitive moisture and temperature for one plant.
 
-## Master Hub Connection to Raspberry Pi
+## Branch Hub Connection to Raspberry Pi
 
-The master hub connects to the Raspberry Pi's I2C Bus 1 using four wires:
+The branch hub connects to the Raspberry Pi's I2C Bus 1 using four wires:
 
 | Wire Color | Function | Raspberry Pi Pin |
 |-----------|----------|------------------|
@@ -30,49 +30,26 @@ Configure sensor addresses using the A0 and A1 address pads on each sensor accor
 
 ## Sensor Hub Layout
 
-Four 5-port passive hubs. The three that do the fan-out hang over the plants
-on the **front** rail; the fourth sits at the electronics box and joins them
-to the Pi.
+Three 5-port passive hubs. Two sit over the plants with two soil sensors
+attached to each. Each joins the third, the branch hub inside the electronics
+box, by a 500 mm STEMMA QT (Qwiic) cable, and a 200 mm Qwiic to Dupont
+header cable takes the branch hub to the Pi's header pins.
 
 | Hub | Where | Ports used | To |
 |---|---|---|---|
-| Left sub | front, over the plants | 3 of 5 | front master · two soil sensors |
-| Right sub | front, over the plants | 3 of 5 | front master · two soil sensors |
-| Front master | front, over the plants | 3 of 5 | both sub hubs · the junction hub |
-| Junction | at the electronics box | 2 of 5 | the front master · the Pi |
+| Left sub | front, over the plants | 3 of 5 | branch · two soil sensors |
+| Right sub | front, over the plants | 3 of 5 | branch · two soil sensors |
+| Branch | in the electronics box | 3 of 5 | both sub hubs · the Pi |
 
-**The hubs hang rather than lie flat.** Turned ninety degrees so they sit over
+**The sub hubs hang rather than lie flat.** Turned ninety degrees so they sit over
 the plants, each sub hub ends up more or less above the two pots it serves.
-The sensor cable is a stock 150 mm either way, so what this buys is not less
+The sensor cable is 200 mm either way, so what this buys is not less
 cable but a shorter path with slack in it — which means the probe can go where
 it should sit in the pot rather than wherever the cable happened to reach.
 
-Two things to check once they are hanging, both consequences of putting a
-bare board above a pot that gets watered:
-
-- **Keep them out of the splash line.** The nozzle dribbles into the pot from
-  the traveling carriage, and these hubs are unsealed PCBs with open JST
-  sockets facing whichever way they are hung. Sitting over the rim or the gap
-  between pots keeps the drop just as short as sitting over the soil, without
-  putting the board under the water. Point the connectors sideways or down so
-  nothing can pool in them.
-- **Check carriage clearance across the full travel.** The gantry sweeps the
-  whole rail now that it re-homes and runs routines on its own, so anything
-  hanging into that path gets found eventually. Run a *Patrol* and watch it
-  rather than trusting a static measurement.
-
-**The junction hub is a junction, not a fan-out** — two ports used, and
-nothing else hangs off it. It is there because joining two stock cables end to
-end is easier than sourcing one long enough to span the whole path, and
-splicing STEMMA QT is not something to volunteer for. Worth knowing before
-anyone decides it looks redundant: the replacement is a single cable longer
-than any in the kit.
-
 **The bus never goes near the back rail.** That rail carries the stepper, the
 pump and the LED data line, and running I2C alongside an 800 kHz LED data line
-causes more trouble than cable capacitance ever will. The run from the front
-master crosses over the plants and enters the **front** face of the
-electronics box, so it never parallels any of it.
+causes more trouble than cable capacitance ever will.
 
 The hubs are passive, so this is still electrically **one** bus. Which sub hub
 a sensor hangs off changes nothing about its address — that is set by the A0

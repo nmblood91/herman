@@ -6,61 +6,18 @@ This folder contains the deployment files needed to run Herman on a Raspberry Pi
 
 - `systemd/greenthumb-api.service` — runs the FastAPI backend on `127.0.0.1:8000`, reached through nginx
 - `nginx/greenthumb.conf` — serves the built React app and proxies `/api` to the backend
-- `klipper/skr-mini-e3-v2/firmware.bin` and `klipper/skr-mini-e3-v3/firmware.bin` — pre-built Klipper MCU firmware, one per supported SKR board (flash via SD card)
-- `klipper/skr-pico/firmware.uf2` — the same for the SKR Pico, which talks to the Pi over UART and powers it; see [SKR_PICO.md](SKR_PICO.md)
+- `klipper/skr-pico/firmware.uf2` — pre-built Klipper MCU firmware for the SKR Pico, which talks to the Pi over UART and powers it; see [SKR_PICO.md](SKR_PICO.md)
 - `klipper/printer.cfg.example` — bare-bones single-axis gantry Klipper template, written by `klipper/make-printer-cfg.py`
 - `pi/install-green-thumb.sh` — install script for the Pi
 - `pi/send-gcode.py` — sends one gcode command to Klipper and prints the reply
 
-## Flashing the SKR Mini E3 Board
+## Flashing the SKR Pico
 
-Herman runs on either the **SKR Mini E3 V2** or the **SKR Mini E3 V3**. They use
-different chips (STM32F103 and STM32G0B1), so each has its own firmware, and
-flashing the wrong one leaves the board silent. Check the version printed on
-the board itself.
-
-| Board | Firmware |
-|---|---|
-| SKR Mini E3 V2 | `deploy/klipper/skr-mini-e3-v2/firmware.bin` |
-| SKR Mini E3 V3 | `deploy/klipper/skr-mini-e3-v3/firmware.bin` |
-
-The **SKR Pico** is flashed differently (a USB drive, not an SD card) and
-installed with `--board skr-pico`; it has its own page, [SKR_PICO.md](SKR_PICO.md).
-The rest of this section is the Mini E3.
-
-Both boards have an onboard micro-SD card reader with a bootloader, and the
-Klipper firmware is flashed through it. Every pin Herman uses is in the same
-place on both boards, so the wiring and `printer.cfg` do not change between
-them, and they share a mounting hole pattern, so one electronics holder takes
-either. After swapping one board for another, re-run the installer: each board
-has its own USB serial name, and the installer writes the new one into
-`printer.cfg`.
-
-### Flashing steps (per unit):
-
-1. **Get the firmware file onto an SD card:**
-   - On your laptop: Clone or download the GreenThumb repo (the software keeps its own name)
-   - Locate your board's `firmware.bin` from the table above
-   - Insert the SD card into your laptop's card reader
-   - Copy `firmware.bin` to the root of the SD card (it must be named exactly `firmware.bin`)
-
-2. **Power the board for flashing**, either way:
-   - **12V**, on the board's power input, as it runs in the planter. Check the
-     polarity before switching on. Nothing else needs to be connected.
-   - **USB from a laptop (V3).** Fit a jumper across the two **SW_USB** pins
-     and the board runs from USB alone, with no 12V supply. The motor drivers
-     and the pump output stay unpowered, which flashing does not need.
-     **Take the jumper off again before the board goes into the planter**:
-     left on, the SKR and the Pi feed each other 5V through the USB cable.
-
-3. **Flash the board:**
-   - Safely eject the SD card from your laptop
-   - Turn off SKR
-   - Insert the SD card into the SKR
-   - Turn on SKR
-   - Watch for 2nd red light to begin flashing
-   - Once that stops it is flashed
-   - After a successful flash, the bootloader renames the file to `FIRMWARE.CUR` to prevent re-flashing
+Herman's motion board is the **BTT SKR Pico**. Its firmware is
+`deploy/klipper/skr-pico/firmware.uf2`, and it is flashed once per board by
+copying that file onto the USB drive the board presents in boot mode. No SD
+card is involved. The steps, the wiring to the Pi and the first power-up
+checks are in [SKR_PICO.md](SKR_PICO.md).
 
 ## Fresh Pi Setup
 
@@ -114,8 +71,8 @@ For a clean installation with the latest OS, start here:
    ```
    This will take 10-15 minutes. Watch for "GreenThumb install complete" at the end.
 
-   On an **SKR Pico**, add `--board skr-pico` the first time and reboot when
-   it asks; see [SKR_PICO.md](SKR_PICO.md). A Mini E3 needs no option.
+   It sets the Pi up for the SKR Pico and asks for a reboot at the end; see
+   [SKR_PICO.md](SKR_PICO.md).
 
    It also seeds the **starter soil and plant libraries**. Both keep anything
    already there, so re-running the installer never replaces a mix or a plant
@@ -140,9 +97,9 @@ For a clean installation with the latest OS, start here:
       and is never watered automatically — the status bar names the mixes it is
       waiting on.
 
-6. **Configure Klipper** (if SKR board is connected):
-   - If auto-detected: ✓ Already configured
-   - If not detected: See **Configure Klipper** section below
+6. **Reboot.** Klipper reaches the SKR Pico over the UART the installer just
+   set up, and that only exists after a reboot. The installer has already
+   written `printer.cfg` for the board.
 
 7. **Verify everything is running**:
    ```bash
@@ -340,9 +297,9 @@ with it.
 ## Wiring the X Endstop
 
 X homes against a mechanical switch on the **X-STOP** connector. Sensorless
-(StallGuard) homing is not usable on this board: the TMC2209 drives its DIAG
-output correctly, but that signal is not routed to `PC0`, so the pin reads high
-forever and `G28 X` completes instantly without moving.
+(StallGuard) homing is not used: the board's X-DIAG jumper would route the
+driver's DIAG output to the endstop pin, and an external switch cannot be used
+with it fitted. Leave that jumper off.
 
 Mount the switch inside the dead zone at the **right** end of the rail, next to
 the motor, so the carriage trips it before reaching the mechanical limit.
@@ -358,12 +315,13 @@ position in `homing_override` move together.
 
 ```
 Switch COM ──→ X-STOP  GND
-Switch NC  ──→ X-STOP  signal (PC0)
+Switch NC  ──→ X-STOP  signal (IO4)
 ```
 
-X-STOP is a 2-pin connector, and a mechanical switch is a passive contact:
-`^PC0` enables the MCU's internal pull-up, so the pin idles high on its own and
-the switch only has to pull it to ground. Nothing here needs power.
+X-STOP is a 3-pin connector, `IO4 GND 5V`, and a mechanical switch is a
+passive contact: `^gpio4` enables the MCU's internal pull-up, so the pin idles
+high on its own and the switch only has to pull it to ground. Nothing here
+needs power, so the `5V` pin stays empty.
 
 **Most limit switches sold for printers are 3-pin, so one wire comes off.**
 Which one depends on the board, and the S / G / V silkscreen is not a reliable
@@ -388,16 +346,16 @@ normally-open, a broken wire is indistinguishable from a healthy untriggered
 switch, and the first sign of trouble is the carriage driving into the end of
 the rail.
 
-`printer.cfg` uses `endstop_pin: ^PC0`, which expects a **normally-closed**
+`printer.cfg` uses `endstop_pin: ^gpio4`, which expects a **normally-closed**
 switch. The polarity convention is worth getting straight, because it is easy to
 state backwards — "TRIGGERED" is a logical 1, `^` is the pull-up, and `!` inverts:
 
 | Config | Switch | Released | Pressed |
 |---|---|---|---|
-| `^PC0` | **NC** | closed → pin low → `open` | open → pull-up high → `TRIGGERED` |
-| `^!PC0` | **NO** | open → high → inverted → `open` | closed → low → inverted → `TRIGGERED` |
+| `^gpio4` | **NC** | closed → pin low → `open` | open → pull-up high → `TRIGGERED` |
+| `^!gpio4` | **NO** | open → high → inverted → `open` | closed → low → inverted → `TRIGGERED` |
 
-So the bare `^PC0` is the normally-closed config and `^!PC0` is the
+So the bare `^gpio4` is the normally-closed config and `^!gpio4` is the
 normally-open one. Verify before homing:
 
 ```bash
@@ -423,7 +381,7 @@ triggered is the point: homing fails immediately instead of driving the carriage
 into the end of the rail.
 
 Y and Z read `TRIGGERED` and should be ignored. They are placeholder axes with
-nothing wired to PC15 and PC14, and an unconnected pin with a pull-up reads high
+nothing wired to gpio16 and gpio22, and an unconnected pin with a pull-up reads high
 — which is deliberate, so a stray `G28 Y` fails fast.
 
 ### If homing reports "Unknown command: G28.1"
@@ -458,12 +416,12 @@ The test is `FORCE_MOVE STEPPER=stepper_x DISTANCE=10 VELOCITY=20` followed by
 makes it usable before homing and also why the distance is small. `M84` turns
 the motor off afterwards, so the carriage slides by hand for another try.
 
-**Answering "away from the switch"** flips `dir_pin` (`PB12` becomes `!PB12`
+**Answering "away from the switch"** flips `dir_pin` (`gpio10` becomes `!gpio10`
 or back again) and restarts Klipper, then asks for the test again. The flipped
 pin goes in `~/printer_data/config/motor-direction.cfg`, not in
 `printer.cfg`. `printer.cfg` includes that file as its last section, and Klipper
 merges a repeated `[stepper_x]` with the later value winning, so the file
-overrides the template's `!PB12`. The installer creates the file empty and
+overrides the template's `!gpio10`. The installer creates the file empty and
 never rewrites it, which is why the fix survives the installer regenerating
 `printer.cfg`. Don't edit `dir_pin` in `printer.cfg.example` to fix one unit;
 that changes it for every unit.
@@ -525,76 +483,65 @@ full traverse of the rail after every home, so raise the feedrate in
 `position_endstop` sitting at the top of the range, but then a later edit to
 `position_max` could silently reverse which way the carriage homes.
 
-## The SKR's power connector edge
+## The SKR's power connectors
 
-![BTT SKR Mini E3 V2.0 pinout](images/skr-mini-e3-v2-pinout.png)
+BigTreeTech's pinout for the board is in
+[bigtreetech/SKR-Pico](https://github.com/bigtreetech/SKR-Pico). The two screw
+terminals this build uses:
 
-*BigTreeTech's own pinout for the Mini E3 V2.0, kept here so the board can be
-read without going hunting. Every pin this project uses is on it, and the
-tables below are taken from it rather than from memory.*
-
-![BTT SKR Mini E3 V3.0 pinout](images/skr-mini-e3-v3-pinout.png)
-
-*The same for the V3.0. Every pin Herman uses is the same on both boards: X
-motor PB13/PB12/PB14, X-STOP PC0, the driver UART on PC11/PC10, and HB on PC9.*
-
-Along the bottom edge, the V2 has four screw blocks and the V3 three. Several
-look alike:
-
-| Block | Silkscreen | Pins | What it is |
-|---|---|---|---|
-| Corner | POWER | 12/24V, GND | power **in** |
-| 2nd, V2 only | +POWER- | VIN, GND | power **in**, parallel with the corner |
-| Next | - HB + | PC9, 12/24V | bed output — **the pump** |
-| Last | - E0 + | PC8, 12/24V | hotend output — **spare** |
+| Silkscreen | Terminals | What it is |
+|---|---|---|
+| POWER | 12/24V, GND | power **in** |
+| HB | IO21, 12/24V | bed output — **the pump** |
 
 Two things to take from that table.
 
-**The `+` on every block is the same node.** It is the board's VIN rail
-brought out, live whenever the SKR is powered. Only the `-` differs: on POWER
-it is ground, and on HB and E0 it is that output's MOSFET drain. This is why
-the pump fuse goes in the positive leg, and why putting the supply into HB or
-E0 by mistake is the one genuinely damaging error here — the board appears to
-power up while the supply's return sits on a MOSFET drain instead of ground.
+**The `12/24V` terminal on HB is the same node as the supply.** It is the
+board's input rail brought out, live whenever the SKR is powered. The other
+terminal differs: on POWER it is ground, and on HB it is the output's MOSFET
+drain. This is why the pump fuse goes in the positive leg, and why putting the
+supply into HB by mistake is the one genuinely damaging error here — the board
+appears to power up while the supply's return sits on a MOSFET drain instead
+of ground.
 
-**The silkscreen marks polarity**, so there is no guessing at the terminal:
-`- HB +` means the left screw is PC9 and the right is 12/24V. Pump positive
-goes to the `+` screw through the fuse; pump negative goes to `-`.
+**The silkscreen names each terminal**, so there is no guessing: pump positive
+goes to `12/24V` through the fuse; pump negative goes to `IO21`.
 
 ### Spare switched outputs
 
-Three MOSFET outputs go unused (four on a V3), all low-side like HB and all
-usable the same way with an `[output_pin]` section:
+Four MOSFET outputs go unused, all low-side like HB and all usable the same
+way with an `[output_pin]` section. Pins are from Klipper's stock config for
+the board:
 
 | Output | Pin | Connector |
 |---|---|---|
-| E0 (hotend) | PC8 | screw terminal |
-| FAN0 | PC6 | 2-pin header |
-| FAN1 | PC7 | 2-pin header |
-| FAN2, V3 only | PB15 | 2-pin header |
+| HE (hotend) | gpio23 | screw terminal |
+| FAN1 | gpio17 | 2-pin header |
+| FAN2 | gpio18 | 2-pin header |
+| FAN3 | gpio20 | 2-pin header |
 
-E0 is the one to reach for if anything else ever needs switching — a second
+HE is the one to reach for if anything else ever needs switching — a second
 pump, a solenoid, a box fan — because like HB it takes real wire without a
-crimp. Z-STOP (PC2) is also free as a spare input.
+crimp. Z-STOP (gpio25) is also free as a spare input.
 
 ## Wiring the Pump to SKR Board
 
-The peristaltic pump is controlled via the SKR's **HB (bed) connector** on the
-bottom edge of the board, which is how Klipper can switch it on and off. It is
-a screw terminal, so 18 AWG lands in it directly, and its MOSFET is sized for
-a 10 A+ bed heater — so a 0.3 A pump never troubles it.
+The peristaltic pump is controlled via the SKR's **HB (bed) connector**, which
+is how Klipper can switch it on and off. It is a screw terminal, so 18 AWG
+lands in it directly, and its MOSFET is sized for a bed heater — so a 0.3 A
+pump never troubles it.
 
 **HB switches the ground side, not the positive side.** The mosfet sits between
-PC9 and ground. The connector's other pin is the board's own 12V input rail
+IO21 and ground. The connector's other pin is the board's own 12V input rail
 brought out, so it is live whenever the SKR is powered — but the pump does not
-run, because its return path through PC9 stays open until Klipper closes the
+run, because its return path through IO21 stays open until Klipper closes the
 mosfet.
 
 That is worth being clear about, because it decides where the fuse goes. The
 pump's current path is:
 
 ```
-SKR VIN → HB 12/24V pin → pump (+) → motor → pump (−) → PC9 → mosfet → GND
+SKR VIN → HB 12/24V → pump (+) → motor → pump (−) → IO21 → mosfet → GND
 ```
 
 A fuse protects the pump only if it sits somewhere in *that* loop.
@@ -602,15 +549,13 @@ A fuse protects the pump only if it sits somewhere in *that* loop.
 **Wiring — both pump leads land on HB:**
 ```
 HB "12/24V" ──[1A Pump Fuse]──→ Pump (+)
-HB "PC9"    ──────────────────→ Pump (−)
+HB "IO21"   ──────────────────→ Pump (−)
 ```
 
 **Connection summary:**
-- HB 12/24V pin → 1A fuse → pump positive
-- Pump negative → HB PC9 pin
+- HB `12/24V` terminal → 1A fuse → pump positive
+- Pump negative → HB `IO21` terminal
 - Nothing from the pump goes to the busbar — the SKR's own power feed supplies it
-- If your HB connector has a third GND pin, it is unused here; the mosfet
-  already grounds the pump through PC9
 
 Pump (+) could equally be taken from the busbar, since the HB 12/24V pin is
 electrically the same node. Keeping the pair together at the connector just
@@ -641,15 +586,15 @@ inline with a wire, and not at the board end.
        │              │
        ├──────────────┘
        │
-  HB "PC9"  ──→ mosfet ──→ GND
+  HB "IO21" ──→ mosfet ──→ GND
 ```
 
 **Striped end (cathode) to the positive terminal.** Orientation is not optional.
-Reversed, the diode is forward-biased from +12V toward PC9, which is a dead
+Reversed, the diode is forward-biased from +12V toward IO21, which is a dead
 short through the mosfet.
 
 It does not short at power-up, though, and that is worth being precise about:
-the diode's path to ground runs through PC9, and the mosfet holds that open
+the diode's path to ground runs through IO21, and the mosfet holds that open
 until Klipper switches it. **A reversed diode draws nothing until the first time
 the pump is commanded on**, and blows the 1A fuse then. So a clean power-up is
 not evidence the diode is the right way round — check continuity before
@@ -665,7 +610,7 @@ the pump's positive lead. A fuse upstream of that branch point is in series with
 every path through it. A fuse on the pump branch alone protects only the pump,
 and leaves two faults uncovered:
 
-- **A reversed diode.** Its fault path is `12V → diode → PC9 → mosfet → GND`,
+- **A reversed diode.** Its fault path is `12V → diode → IO21 → mosfet → GND`,
   which never passes through a fuse sitting on the pump branch. That short is
   then held back only by the 5A main fuse, and the mosfet fails long before a 5A
   fast-blow responds. The component the diode protects is destroyed by the diode.
@@ -700,10 +645,10 @@ internally, so each block becomes a junction of three conductors:
                                ▲  1N5822
                                │
                           ┌────┴─────────────────┐
-                          │  "−" BLOCK (3-way)   │   PC9 · anode · pump−
+                          │  "−" BLOCK (3-way)   │   IO21 · anode · pump−
                           └────┬──────────┬──────┘
                                │          └──────────→ Pump (−)
-  SKR HB "PC9" ───────────────┘
+  SKR HB "IO21" ──────────────┘
 ```
 
 That puts the diode in parallel with the motor, cathode to positive, downstream
@@ -713,7 +658,7 @@ of the fuse — the topology the diagram above describes. Four things to respect
   running together. Wire between the diode and the winding is unprotected
   inductance, which is the whole thing the diode exists to absorb.
 - **The "+" block is live whenever the SKR is powered.** HB's 12/24V pin is the
-  board's input rail, not a switched output — the pump is off because PC9 is
+  board's input rail, not a switched output — the pump is off because IO21 is
   open, not because the positive side is dead. Power the board down before
   opening the block, and do not assume an idle pump means a safe node.
 - **Seat the diode leads fully.** They are stiff 0.9 mm solid wire, within a
@@ -735,7 +680,7 @@ The pump is declared in `printer.cfg` as an `[output_pin]`, not a heater:
 
 ```
 [output_pin pump]
-pin: PC9
+pin: gpio21
 value: 0
 shutdown_value: 0
 ```
@@ -763,11 +708,11 @@ per-plant mapping are in [SENSOR_WIRING.md](../SENSOR_WIRING.md).
 Hub red (3.3V) ----> Pin 1   (or pin 17)
 Hub blue (SDA) ----> Pin 3   (GPIO 2)
 Hub yellow (SCL) --> Pin 5   (GPIO 3)
-Hub black (GND) ---> Pin 9   (or any GND: 6, 14, 20, 25, 30, 34, 39)
+Hub black (GND) ---> Pin 9   (or any GND: 14, 20, 25, 30, 34, 39)
 ```
 
-Not pin 6 on an SKR Pico build: the Pico's cable takes pins 2–10 of the outer
-row, 6 included ([SKR_PICO.md](SKR_PICO.md)).
+Not pin 6: the SKR Pico's cable takes pins 2–10 of the outer row, 6 included
+([SKR_PICO.md](SKR_PICO.md)).
 
 Bus 1 is what `i2cdetect -y 1` queries and what the install script's
 `dtparam=i2c_arm_baudrate` applies to. Nothing else in the build touches these
@@ -780,39 +725,37 @@ which the Pi's pins are not tolerant of.
 
 ### Cable length and bus capacitance
 
-The soil sensors hang off a hub tree rather than home runs back to the Pi. The
-fan-out hangs over the plants on the front rail; a fourth hub at the
-electronics box joins it to the Pi:
+The soil sensors hang off a hub tree rather than home runs back to the Pi. Two
+sub-hubs hang over the plants on the front rail; a branch hub in the
+electronics box joins them to the Pi:
 
 | Run | Length |
 |---|---|
-| 4 × sensor drops into the two sub-hubs | 150 mm each |
-| Left sub-hub → front master | 300 mm |
-| Right sub-hub → front master | 400 mm |
-| Front master → junction hub at the box | 400 mm |
-| Junction hub → Pi | 100 mm |
-| **Total** | **≈ 1.8 m** |
+| 4 × sensor drops into the two sub-hubs | 200 mm each |
+| Left sub-hub → branch hub in the box | 500 mm |
+| Right sub-hub → branch hub in the box | 500 mm |
+| Branch hub → Pi | 200 mm |
+| **Total** | **≈ 2.0 m** |
 
 The two sub-hub runs do not have to match — they are separate branches, and only
-the total matters. The right side needed 400 mm to reach; the left came in at
-300 mm.
+the total matters. Both are 500 mm here because that reaches from either side.
 
-The sensor drops stay at 150 mm wherever the hubs are: that is the cable the
-sensor comes with, so hanging the hubs closer buys a tidier route and freer
-probe placement rather than less cable. The 1.8 m total and the capacitance
-below are the real figures, not a stage on the way to something shorter.
+The sensor drops stay at 200 mm wherever the hubs are, so hanging the hubs
+closer buys a tidier route and freer probe placement rather than less cable.
+The 2.0 m total and the capacitance below are the real figures, not a stage on
+the way to something shorter.
 
 **Total bus capacitance is what matters, not the longest run**, and it is the sum
-of every branch. I2C allows 400 pF; at roughly 60 pF/m that 1.8 m contributes
-about 108 pF, plus ~10 pF per sensor pin and a little for the four hub boards.
-Call it 163 pF, so about 40% of budget. The tree also uses *less* cable than
+of every branch. I2C allows 400 pF; at roughly 60 pF/m that 2.0 m contributes
+about 120 pF, plus ~10 pF per sensor pin and a little for the three hub boards.
+Call it 172 pF, so about 43% of budget. The tree also uses *less* cable than
 home running each sensor would.
 
 If your runs differ, redo that sum rather than comparing against the total here —
 the figure that matters is the sum of every branch, not the longest one.
 
 **Measured, as a baseline.** A 120 s soak at 50 kHz with the harness open and
-nothing else in the loom. Taken on the earlier three-hub layout with everything
+nothing else in the loom. Taken on an earlier, shorter layout with everything
 on the back rail, so it is the number the front-rail tree has to match rather
 than a measurement of it:
 
@@ -826,8 +769,8 @@ addr     reads  errors    rate  raw min/mean/max       verdict
 
 1896 reads, no errors, and a raw spread of only 6-13 counts per address — so the
 bus was quiet, not merely working. Re-soak after moving the hubs and keep that
-result as the new baseline; matching this means the extra hub and the extra
-400 mm cost nothing. Worth keeping as the reference point: once the
+result as the new baseline; matching this means the longer runs cost nothing.
+Worth keeping as the reference point: once the
 LED data line and stepper leads are in the loom, a soak that degrades against
 this is a routing problem rather than a cable-length or pull-up problem, which
 narrows the search considerably.
@@ -848,7 +791,7 @@ Three things keep it healthy:
   adds its own drags that lower until the sensors cannot pull the line
   convincingly low. If your hubs have them, remove the resistors rather than
   buying different hubs.
-- **Route away from the LED data line and the stepper wiring.** 1.5 m of I2C run
+- **Route away from the LED data line and the stepper wiring.** 2 m of I2C run
   parallel to an 800 kHz addressable-LED data line will cause more trouble than the
   capacitance ever will. Crossing at right angles is fine; running alongside is
   not. Sharing a few centimeters near the Pi header is harmless.
@@ -932,7 +875,7 @@ pumps identically. Two things to watch, both about prime:
 Supported strips, selectable as **LED strip type** in the Calibration tab:
 
 All 12V. A 5V strip is deliberately not supported: sixty 5V pixels pull about
-3.6A, well past what the 12V-to-5V converter can give on top of the Pi.
+3.6A, well past what the SKR Pico's 5V regulator can give on top of the Pi.
 
 | Chip | Supply | Pixels | Pads | Notes |
 |---|---|---|---|---|
@@ -950,7 +893,7 @@ GS8208); cuttable only every third LED means WS2811.
 Busbar GND -----> Strip GND --+-- Pi GND (pin 20)
 Pi GPIO10 (pin 19, MOSI) -----+---------------------------> Strip DIN
 
-(12V strips. A 5V strip needs its own 5V supply, not the DC-DC.)
+(12V strips. A 5V strip needs its own 5V supply, not the Pico's.)
 ```
 
 The 2A fuse is what keeps a shorted solder joint at the strip's input end from
@@ -1088,8 +1031,8 @@ parked, because holding current is chopped too. The pump is the milder one: a
 0.2-0.3A brushed motor with two switching events per dose.
 
 The endstop would normally be the victim, except that **the way it is wired keeps
-it out of trouble**. `endstop_pin: ^PC0` with an NC switch means the untriggered
-state is *switch closed*, so PC0 is tied to ground through a few ohms of contact
+it out of trouble**. `endstop_pin: ^gpio4` with an NC switch means the untriggered
+state is *switch closed*, so gpio4 is tied to ground through a few ohms of contact
 resistance for the whole approach. Capacitive coupling from a 12V bundle cannot
 lift that to a logic high. The high-impedance state — the MCU's internal pull-up,
 tens of kΩ — only exists *after* the switch trips, by which point homing has
@@ -1131,7 +1074,7 @@ the gantry is busy rather than hang.
 ### The NC wiring is load-bearing
 
 When `QUERY_ENDSTOPS` reads inverted, the tempting fix is to add `!` to the pin
-and move on. It does make the reading correct — `^!PC0` is the normally-open
+and move on. It does make the reading correct — `^!gpio4` is the normally-open
 config — but it costs both properties this section depends on. Wired NO, the pin
 floats on the internal pull-up for the whole homing approach instead of being
 clamped to ground, which is the susceptible arrangement in a shared bundle; and a

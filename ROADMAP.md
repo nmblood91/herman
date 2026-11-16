@@ -218,9 +218,8 @@ What the host actually has to provide:
    the strip works, and the two supported chip families need rates in windows
    that barely touch.
 4. **WiFi**, there being no Ethernet in the chassis plan.
-5. **A USB host port** for the SKR serial link, with an SKR Mini E3 — see
-   below for why GPIO UART is not the escape hatch it looks like there, and
-   why the SKR Pico is different.
+5. **A UART on the header** for the SKR Pico's link, on the cable that also
+   carries the Pi's power — see [deploy/SKR_PICO.md](deploy/SKR_PICO.md).
 
 Requirement 3 is the one that eliminates whole categories, because `spidev`
 silently substitutes the nearest rate its driver supports. A host that cannot
@@ -255,8 +254,8 @@ three meters is unreliable, and it makes every unit depend on a household
 server. Reasonable on a bench, fatal for something sold.
 
 **At volume the answer is none of the above.** The saving is not a cheaper
-host, it is one board instead of four - SKR, Pi, DC-DC converter and the Wago
-distribution collapsed into a single PCB. That is where the cost actually
+host, it is one board instead of three - SKR, Pi and the Wago distribution
+collapsed into a single PCB. That is where the cost actually
 falls, and it is a five-figure tooling decision rather than a parts
 substitution. Not near.
 
@@ -297,45 +296,19 @@ implies. Check for `140°D` before believing it.
   mattering at all — and close-ups of individual plants are more useful than
   one distorted wide shot.
 
-**The blocker is the USB port, not the camera.** The A+ has a single USB-A and
-the SKR owns it, Klipper talking to the board over USB serial.
-
-**Klipper over GPIO UART is ruled out**, so do not reach for it as the way to
-free that port. It looks like the clean fix and is not, mostly because of the
-Pi 3 specifically: its good PL011 UART is wired to the Bluetooth radio, leaving
-the mini-UART, whose baud rate follows the VPU core clock and so drifts as the
-core throttles unless the clock is pinned. Either way the fix is boot-config
-surgery plus giving up the serial console. On top of that it trades one plug
-for a hand-wired link across the enclosure, and the SKR has to be reflashed for
-serial-on-USART, which costs the USB recovery path. A motion link that can
-desync under thermal load is the wrong place to economise.
-
-**That is the SKR Mini E3's case, and the SKR Pico answers most of it**
+**The USB port is free for it.** The SKR Pico talks to the Pi over the header
+UART and powers it over the same cable
 ([deploy/SKR_PICO.md](deploy/SKR_PICO.md), supported, not yet proven on the
-planter). `disable-bt` gives the PL011 to the header, so the link never sees the
-core clock; the RP2040's boot ROM keeps USB recovery whatever firmware is on
-it; and the link is one ready-made cable that also carries the Pi's power. What
-remains is the boot-config surgery, which the installer does, and Bluetooth,
-which goes off until BLE provisioning needs it back.
+planter), so the A+'s single USB-A is left for a camera. `disable-bt` gives
+the PL011 to the header, so the link never sees the core clock. What that
+costs is Bluetooth, which goes off until BLE provisioning needs it back.
 
-That leaves two honest options, and the second is better:
+**Power is the thing to check.** A Pi with a USB camera draws more from the
+Pico's 5 V regulator than a bare one. Test `vcgencmd get_throttled` with the
+camera running before committing to it.
 
-- **A powered USB hub.** Works, and makes the hub a single point of failure in
-  front of both the motion board and the camera, on the port that is also the
-  recovery path.
-- **The camera unit carries a Pi 4.** Since the camera is an add-on rather
-  than base equipment, the board is allowed to differ by tier — which keeps a
-  peripheral from dictating the base unit's compute. This is the one to take.
-
-  **Specifically a Pi 4, not a 3 B+**, for a reason beyond price. Every USB
-  port on a Pi 3 shares a single USB 2.0 link to the SoC through the same hub
-  chip that carries Ethernet, so roughly 300 Mbps aggregate is split between a
-  camera and the motion board. The Pi 4 puts USB 3.0 on its own PCIe-attached
-  controller with Ethernet separate, so a camera and the SKR do not contend at
-  all. For this use the Pi 4 is both cheaper and architecturally right.
-
-The development Pi 4 has four ports, so a camera can be proven out without
-deciding any of this.
+The development Pi 4 has four ports, so a camera can be proven out there
+first.
 
 **Insist on hardware MJPEG.** A UVC camera that compresses on-board means the
 host only copies frames, which is *lighter* than the CSI path and its libcamera
@@ -366,7 +339,7 @@ the adapter.
 Going back to a printed chain is worth another look later:
 - it would take a bought part off the BOM, and a part someone else's listing
   can change or drop;
-- the printed chain was 150 g, about $3–4 of filament against $10;
+- the printed chain was 150 g, $1.80 of filament at $12 per kg against $10;
 - the chain could be sized to this rail and carriage exactly, rather than the
   design fitting the chain.
 

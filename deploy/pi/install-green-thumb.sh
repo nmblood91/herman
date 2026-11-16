@@ -13,25 +13,26 @@ if [ "$ARCH" != "arm64" ]; then
   exit 1
 fi
 
-# Which motion board drives the gantry. An SKR Mini E3 (V2 or V3) is found on
-# USB by itself. An SKR Pico talks over the Pi's GPIO UART, where nothing can be
-# detected before Klipper is already configured for it, so it is named once:
+# Which motion board drives the gantry. The planter is built around the SKR
+# Pico, on the Pi's GPIO UART, so a fresh install sets up for that. The USB
+# boards are still supported and are named once:
 #
-#   sudo bash install-green-thumb.sh --board skr-pico
+#   sudo bash install-green-thumb.sh --board skr-mini-e3
 #
-# and remembered, so a later plain re-run keeps it. A Pi installed before the
-# board was remembered has a printer.cfg and no record, and was a Mini E3.
+# The choice is remembered, so a later plain re-run keeps it. A Pi installed
+# before the board was remembered has a printer.cfg and no record, and was a
+# Mini E3; it stays one rather than being switched to the UART unasked.
 BOARD_FILE=/home/pi/printer_data/motion-board
 SAVED_BOARD=$(cat "$BOARD_FILE" 2>/dev/null || true)
 if [ -z "$SAVED_BOARD" ] && [ -f /home/pi/printer_data/config/printer.cfg ]; then
   SAVED_BOARD=skr-mini-e3
 fi
-BOARD=${SAVED_BOARD:-skr-mini-e3}
+BOARD=${SAVED_BOARD:-skr-pico}
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --board)
       if [ "$#" -lt 2 ]; then
-        echo "--board needs a value: skr-mini-e3 or skr-pico"
+        echo "--board needs a value: skr-pico or skr-mini-e3"
         exit 1
       fi
       BOARD=$2
@@ -42,7 +43,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     *)
-      echo "Unknown option: $1 (the only option is --board skr-mini-e3|skr-pico)"
+      echo "Unknown option: $1 (the only option is --board skr-pico|skr-mini-e3)"
       exit 1
       ;;
   esac
@@ -50,7 +51,7 @@ done
 case "$BOARD" in
   skr-mini-e3 | skr-pico) ;;
   *)
-    echo "Unknown board: $BOARD. Use skr-mini-e3 (V2 or V3) or skr-pico."
+    echo "Unknown board: $BOARD. Use skr-pico or skr-mini-e3 (V2 or V3)."
     exit 1
     ;;
 esac
@@ -60,7 +61,7 @@ echo "Motion board: $BOARD"
 echo "Enabling I2C interface..."
 sudo raspi-config nonint do_i2c 0
 
-# Halve the I2C clock. The sensor tree is around 1.5 m of cable across three
+# Halve the I2C clock. The sensor tree is around 2 m of cable across three
 # hubs, and capacitance that long slows the rise time of SDA/SCL; a slower clock
 # leaves more time for the line to reach a valid high. Sensors are read once a
 # minute, so the lost bandwidth costs nothing.

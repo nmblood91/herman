@@ -9,8 +9,7 @@ are the parts that get ordered in the wrong size, and because a part that has
 already been printed cannot be re-tapped for a different insert.
 
 **One planter is 1,284 g of printed parts**, everything but the camera mount.
-At typical PETG pricing that is roughly $27–32 of filament per unit, which is
-enough to be worth watching — two parts are 37% of it: the main electronics
+At $12 per kg, PETG or PLA, that is $15.41 of filament per unit. Two parts are 37% of it: the main electronics
 rear at 270 g and the right gantry holder rear at 205 g.
 
 The water tube's cable chain is bought, not printed: an S10 chain, 1 m for
@@ -95,8 +94,8 @@ before a redesign adds two more bosses to something.
 The idler wheels the shoulder bolts carry are not counted here — they are a
 drive component and sit in [BOM.md](BOM.md) under core structure.
 
-Against the filament: 1,284 g is roughly $27–32 at typical PETG pricing, so
-**$48–53 of raw material per planter** for everything printed and everything
+Against the filament: 1,284 g is $15.41 at $12 per kg, so
+**$36.60 of raw material per planter** for everything printed and everything
 holding it together.
 
 **The thread-by-thread check**, worth re-running after any edit:
@@ -174,19 +173,16 @@ Only the parts with a constraint worth recording.
   revised, the plant positions captured with the *use current position* button
   are measured against the old geometry and need recapturing.
 
-- **Main electronics holder** (rear and front) has to take the BTT SKR Mini E3
-  (V2 or V3, which share a mounting hole pattern)
-  and the Pi, and [BOM.md](BOM.md) calls for **two Pi mounting patterns**,
-  not one: 85 × 56 mm for the Pi 4 / 3 B / 3 B+ development boards, and
-  65 × 56 mm for the Pi 3 A+ that is the production target. Port faces differ
-  too. It also sits inside the enclosure while the water path stays outside, so
+- **Main electronics holder** (rear and front) has to take the BTT SKR Pico
+  (85 × 56 mm) and the Pi, in either outline: 85 × 56 mm for the Pi 4 / 3 B /
+  3 B+ development boards, and 65 × 56 mm for the Pi 3 A+ that is the
+  production target. Port faces differ too. It also sits inside the enclosure while the water path stays outside, so
   nothing on it should be reachable by a leak from above. The 12 `#4` screws
   here are half of every `#4` in the build, which fits — that is board
   mounting. The two 5-slot Wagos are the distribution point.
 
-- **STEMMA QT sub hubs** (each rear and front) — the cable runs back to the
-  main hub are not equal: **300 mm on the left, 400 mm on the right**, measured
-  on the build rather than estimated. The two hubs take identical hardware —
+- **STEMMA QT sub hubs** (each rear and front) — each runs back to the branch
+  hub in the electronics box on a **500 mm** cable. The two hubs take identical hardware —
   4 × M4 inserts, 4 × M4×16 and 4 × `#4` on each rear, nothing on either
   front — but they are not the same prints: the left is 104 g and 21 g, the
   right 85 g and 30 g. I2C is routed away from the motor, pump and LED

@@ -10,29 +10,29 @@ there where you need more.
 ## What you need first
 
 - A Raspberry Pi with a microSD card, on your network
-- An SKR Mini E3 V2 or V3 board, wired to the gantry motor and X endstop
+- A BTT SKR Pico, wired to the gantry motor and X endstop, and to the Pi by
+  its 5-wire cable, which also powers the Pi (see
+  [deploy/SKR_PICO.md](deploy/SKR_PICO.md))
 - The pump, wired to the SKR's HB connector with its fuse and flyback diode
 - The four soil sensors on their hub, each at its own address (see
   [SENSOR_WIRING.md](SENSOR_WIRING.md))
 - A computer with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
 
-Wire the hardware before step 5 if you can. The installer detects the SKR and
-reads the sensors, and it reports what it cannot find. Re-running it later is safe.
+Wire the hardware before step 5 if you can. The installer reads the sensors
+and reports what it cannot find. Re-running it later is safe.
 
 ## 1. Flash the SKR board (once per board)
 
 Skip this if the board has already been flashed.
 
-1. Copy your board's firmware to the root of a micro-SD card:
-   `deploy/klipper/skr-mini-e3-v2/firmware.bin` for a V2, or
-   `deploy/klipper/skr-mini-e3-v3/firmware.bin` for a V3. Check the version
-   printed on the board: the wrong one won't boot. The file must be named
-   exactly `firmware.bin`.
-2. Power the SKR off, put the card in the SKR's card slot, and power it on.
-   On 12V, or for a V3, from a laptop's USB with a jumper across the two
-   **SW_USB** pins. Remove that jumper before the board goes into the planter.
-3. Wait for the second red light to start and then stop. That is the flash.
-4. The bootloader renames the file to `FIRMWARE.CUR` when it succeeds.
+1. With the board powered off, fit a jumper on the **Boot** pins.
+2. Connect the board's USB-C to a computer and power it, either from 12V or
+   with the USB Power jumper fitted.
+3. Press **Reset**. A USB drive named `RPI-RP2` appears.
+4. Copy `deploy/klipper/skr-pico/firmware.uf2` onto it. The board reboots by
+   itself and the drive goes away.
+5. Remove the Boot jumper, and the USB Power jumper if you fitted it, and
+   press Reset.
 
 ## 2. Flash the Pi
 
@@ -75,8 +75,6 @@ Do the clone **without `sudo`**. A root-owned checkout breaks every later
 
 ## 5. Run the installer
 
-Plug the SKR into the Pi by USB first, so the installer can find it.
-
 ```bash
 sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
 ```
@@ -91,7 +89,8 @@ and it needs root.
 It ends with "GreenThumb install complete" and prints the address to open.
 
 **Reboot after the first run**, even if it does not ask. It changes the I2C clock
-and that only takes effect after a reboot. If it says I2C or SPI is missing,
+and sets up the UART the SKR talks over, and both only take effect after a
+reboot. If it says I2C or SPI is missing,
 reboot and run the same command again:
 
 ```bash
@@ -103,8 +102,9 @@ sudo bash /opt/greenthumb/deploy/pi/install-green-thumb.sh
 
 The second run is much quicker, since most of the work is already done.
 
-**If it says no Klipper device was found**, the SKR is not visible. Check the USB
-cable and that the board is powered, then run the installer again.
+**If the app says the motion board is not connected** after the reboot, check
+that the 5-wire cable is straight, with no wires crossed, and seated on the
+first five pins of the Pi header's outer row. Then run the installer again.
 
 ## 6. Check it came up
 

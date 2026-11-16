@@ -13,26 +13,25 @@ cannot be subtotalled yet.
 | Section | Priced so far | Lines still to price |
 |---|---|---|
 | Core structure | $156.00 | complete |
-| Printed parts — filament | ~$27–32 | complete |
+| Printed parts — filament | $15.41 | complete — 1,284 g at $12 per kg |
 | Printed parts — fasteners and inserts | $21.19 | complete |
 | Motion and control | $43.00 | 1 — wiring harness |
 | Compute and monitoring | $40.00 | complete for the base build |
-| Sensing | $69.00 | complete |
-| Watering system | $45.00 | 1 — intake weight |
+| Sensing | $61.00 | complete |
+| Watering system | $45.00 | complete |
 | Lighting | $10.00 | 2 — hook-up wire, connectors |
-| Power and electronics | $27.00 | 8 — fuses, fuse holders, wire, heat shrink |
-| **Running total** | **~$438–443** | **12 lines outstanding** |
+| Power and electronics | $14.00 | 8 — fuses, fuse holders, wire, heat shrink |
+| **Running total** | **$405.60** | **11 lines outstanding** |
 
 Close to final. The frame, motion, compute and sensing are all fully costed.
 What is left is small electrical hardware — three fuses and their holders,
-wire, connectors and heat shrink — plus the intake weight. Call
-it another $25, which puts a finished prototype
-around **$463**.
+wire, connectors and heat shrink. Call it another $25, which puts a finished
+prototype around **$431**.
 
 Two lines carry no cost on purpose. The reservoir is bring-your-own, and
 there is no bought nozzle — the tube is held by a printed part.
 
-The **camera add-on is $35 on top** and is deliberately in none of the totals
+The **webcam add-on is $20 on top** and is deliberately in none of the totals
 above, since it is sold as an upgrade rather than built into every unit. It
 needs a printed mount that does not exist yet, so budget that separately.
 
@@ -62,7 +61,7 @@ system.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| BTT SKR Mini E3 V2 or V3 control board | 1 | $40.00 | $40.00 | TMC2209 drivers are **embedded**, not a separate purchase; either version works, each with its own firmware |
+| BTT SKR Pico | 1 | $40.00 | $40.00 | TMC2209 drivers are **embedded**, not a separate purchase; often cheaper on Alibaba |
 | Wiring harness and JST/XH connectors | TBD | TBD | TBD |  |
 | Mechanical limit switch, X homing | 1 | $3.00 | $3.00 | wired normally-closed |
 
@@ -79,18 +78,17 @@ being duplicated here; there is one 12 V supply for the whole machine.
 |---|---|---|---|---|
 | Raspberry Pi 3 Model A+ | 1 | $30.00 | $30.00 | production target; allow +$20 for a larger board or a price rise |
 | MicroSD card | 1 | $10.00 | $10.00 |  |
-| Raspberry Pi Camera Module 3 Wide | 1 | $35.00 | $35.00 | **paid add-on, not base build**; 120° lens, and still short of seeing all four plants at once |
+| Webcam | 1 | $20.00 | $20.00 | **optional — future roadmap** |
 
-**Base subtotal $40.00**, the camera excluded as an add-on. The 12 V to 5 V
-step-down that feeds the Pi is priced under *Power and electronics* with the
-rest of the supply chain, so it is not counted twice here.
+**Base subtotal $40.00**, the webcam excluded as an add-on. The Pi is powered
+from the SKR Pico's own 5 V regulator, so there is no separate step-down to
+buy; see [deploy/SKR_PICO.md](deploy/SKR_PICO.md).
 
 **Production target: Raspberry Pi 3 Model A+.** Chosen on cost. Same BCM2837B0
-and 1.4 GHz quad A53 as the 3 B+, dual-band WiFi, the standard 15-pin CSI
-camera connector, and the same 40-pin pinout — so nothing about the wiring or
-the camera ribbon changes. What differs: 512 MB RAM, a single USB-A port
-(the SKR takes it), no Ethernet, and a smaller 65 × 56 mm board with its own
-mounting pattern. See the hardware notes in [ROADMAP.md](ROADMAP.md) for the
+and 1.4 GHz quad A53 as the 3 B+, dual-band WiFi, and the same 40-pin pinout —
+so nothing about the wiring changes. What differs: 512 MB RAM, a single USB-A
+port, no Ethernet, and a smaller 65 × 56 mm board with the same mounting
+pattern. See the hardware notes in [ROADMAP.md](ROADMAP.md) for the
 two things still to validate before this is locked.
 
 **Boards to test, highest to lowest.** Each step answers whether the stack
@@ -103,48 +101,19 @@ still fits as RAM and ports come off:
 | Pi 3 B+ | 1 GB | same 85 × 56 mm outline and mounting holes as the Pi 4 |
 | Pi 3 A+ | 512 MB | the production target, and the only one that tests anything new |
 
-The A+ is the one that matters: the only 512 MB board, the only one without
-Ethernet, and the only one with a different mounting pattern. **If the
+The A+ is the one that matters: the only 512 MB board and the only one
+without Ethernet. **If the
 on-device frontend build fits on the A+, it fits on everything above it** — so
 test that first rather than working down the list.
-
-A Pi 4 and a 3 B/3 B+ share mounting holes but **not** port positions: the
-Pi 4 has two micro-HDMI jacks, USB-C power, and Ethernet and USB swapped.
-
-**Do not buy a 3 B+ for this ladder.** It is discontinued at most channels and
-now lists around $49, against $35 for a Pi 4 with the same 1 GB — the gap runs
-to 2x in some regions. It also tests nothing the 3 B does not: the row above
-already covers that outline and mounting pattern, and the features the B+ adds
-over the B are ones this project does not use.
-
-**In the Pi line, older does not mean cheaper.** Price tracks production
-volume, not age. A board past its ramp gets scarcer rather than cheaper, and
-remaining stock is priced as legacy. The A+ is inexpensive because it is still
-in volume production at $30 until 2030, not because it is old — which is also
-why that production date is the fact worth tracking rather than the spec
-sheet.
 
 **The A+ is in production until at least January 2030**, per Raspberry Pi's
 own obsolescence statement. Worth having written down, because several retailer
 listings still show the older January 2026 date, and that would mean the board
 was already past its declared window. It is not. Nothing is forcing a change.
 
-**Not worth it: Pi Zero 2 W.** The closest thing to a step down, and it is
-software-transparent — same Cortex-A53, same 512 MB, same `raspi-config` and
-the same SPI and I2C, so the installer would not change. Three reasons it still
-loses:
-
-- **Supply.** Sold out at most major resellers through 2026, with markups above
-  the $15 list where it is in stock. A board you cannot buy at list is not a
-  saving, and this is the one component the whole stack runs on.
-- **The saving is small and partly eaten.** $15 against $30, less $3–5 for the
-  USB OTG adapter it needs — the Zero has no USB-A, and Klipper reaches the SKR
-  over USB serial. Call it $10–12 on a ~$463 build, under 3%.
-- **It costs a third mounting pattern** (65 × 30 mm) on top of the two below,
-  and runs at 1 GHz rather than 1.4, which makes the prebuilt frontend bundle
-  more necessary rather than less.
-
-Revisit if supply normalizes *and* volume makes 3% worth a third chassis.
+**Not worth it: Pi Zero 2 W.** It is hard to buy at list price, saves only
+about $10 a unit, and needs a mounting pattern of its own. Revisit if supply
+normalizes *and* volume makes that saving worth a second chassis.
 
 **Not suitable at all:** Pi Zero / Zero W and any ARMv6 Pi. No 64-bit, and
 NodeSource ships no ARMv6 packages — though note that second objection
@@ -153,52 +122,21 @@ at all. What remains is the disqualifier: one ARMv11 core at 1 GHz shared
 between the Klipper host, the API and nginx, and Klipper's host loop is
 latency-sensitive.
 
-**If unit cost is the goal, the board is the wrong line.** Compute is $40 of
-~$463 with the SD card, and the Pi itself is $30 — 6.5%. The VITTSJÖ frame and
-the rail together are $130, nearly a third of the build, and neither has been
-shopped. Sensing is another $69.
-
-The enclosure needs to carry both the A+ and a development board — different
-outlines and different port faces, so plan for two mounting patterns rather
-than one.
-
-The camera add-on is scoped to timelapse; the standard 15-pin ribbon fits both
-the A+ and the development boards. The API can also serve a live MJPEG view,
-which is a local tool for aiming and checking rather than something sold — see
-[ROADMAP.md](ROADMAP.md).
-
-**Which lens matters more than which sensor, and neither is enough for one
-fixed shot of everything.** What a lens covers scales with how far back it
-sits:
-
-| Lens | Covers | To reach 890 mm |
-|---|---|---|
-| Wide, 120° | **~3.5× its standoff** | 260 mm |
-| Standard, 75° | ~1.5× its standoff | 590 mm |
-
-The Wide is still the one to order — it needs less than half the depth — but
-**this frame does not give even 260 mm**, so a fixed camera sees a subset of
-the rail rather than all four plants. Either accept the partial view, put the
-camera on the gantry so it carries to each plant in turn, or treat the rail as
-needing two cameras. The 120° lens also bows the rail and stretches whatever
-is at the edges, which is the lens and not a mounting error.
-
 ## Sensing
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| Capacitive soil moisture sensor (Adafruit STEMMA) + cable | 4 | $12.00 | $48.00 | one per plant; price includes the sensor's own STEMMA QT cable |
-| STEMMA QT 5-port passive hub | 4 | $3.00 | $12.00 | two sub hubs and a master on the front rail, plus a junction hub at the Pi |
-| STEMMA QT cable, 300 mm | 1 | $3.00 | $3.00 | left sub hub to master |
-| STEMMA QT cable, 400 mm | 2 | $3.00 | $6.00 | right sub hub to master, and master to the junction hub |
+| Capacitive soil moisture sensor (Adafruit STEMMA) | 4 | $9.00 | $36.00 | one per plant; its cable is the line below |
+| STEMMA QT cable, 200 mm | 4 | $2.00 | $8.00 | each sensor to its sub hub |
+| STEMMA QT (Qwiic) to Dupont header cable, 200 mm | 1 | $2.00 | $2.00 | the branch hub to the Pi's header pins |
+| STEMMA QT 5-port passive hub | 3 | $3.00 | $9.00 | two sub hubs over the plants, and a branch hub in the electronics box |
+| STEMMA QT cable, 500 mm | 2 | $3.00 | $6.00 | each sub hub to the branch hub |
 
-**Four hubs.** The fan-out hangs over the plants on the front rail — a left
-and a right sub hub feeding two sensors each, into a front master — and a
-fourth at the electronics box joins that to the Pi. The fourth is a junction
-rather than a fan-out, which is cheaper than sourcing a single cable long
-enough to span the whole path. Keeping the bus off the back rail also takes it
-away from the stepper, the pump and the LED data line; see
-[SENSOR_WIRING.md](SENSOR_WIRING.md).
+**Three hubs.** A left and a right sub hub hang over the plants on the front
+rail, feeding two sensors each over 200 mm cables. Each runs 500 mm back to a
+branch hub in the electronics box, and 200 mm joins that to the Pi. Keeping
+the bus off the back rail takes it away from the stepper, the pump and the LED
+data line; see [SENSOR_WIRING.md](SENSOR_WIRING.md).
 
 Three sensor address pads (A0/A1) give the sensors unique I2C addresses; those
 are solder pads on the sensors rather than a purchased part.
@@ -209,7 +147,6 @@ are solder pads on the sensors rather than a purchased part.
 |---|---|---|---|---|
 | 12 V peristaltic pump | 1 | $30.00 | $30.00 | not tapped — mounts on M3 inserts |
 | Reservoir | 1 | BYO | — | top-loaded; a Nalgene works |
-| Intake weight | 1 | TBD | TBD | only if dipping a tube from the top |
 | Tubing and barb fittings | 1 set | $5.00 | $5.00 | |
 | Cable chain, S10, 1 m | 1 | $10.00 | $10.00 | Amazon; carries the tube to the carriage. Moving end takes 2 × M4×8 into the V-slot adapter, fixed end sits in the printed anchor. Was printed — see [ROADMAP.md](ROADMAP.md) |
 
@@ -220,9 +157,7 @@ it is a printed part rather than a purchased one.
 
 The reservoir is whatever you have to hand. With a top-loaded tank, feed the
 tube through a hole in the lid rather than over the rim — the rim crossing is
-a high spot in a suction line. The intake weight is what stops that tube
-floating up and sucking air as the tank drains, so it is not optional on a
-dipped setup.
+a high spot in a suction line.
 
 A stopped peristaltic pump already occludes the tube, so there is no check
 valve to add.
@@ -254,14 +189,13 @@ from the Pi with no level shifter.
 
 | Item | Qty | Unit | Line total | Notes |
 |---|---|---|---|---|
-| 12 V power supply, 5 A min (7 A recommended) | 1 | $15.00 | $15.00 | the only supply in the build |
-| DC-DC converter, 12 V to 5.1 V min @ 3 A | 1 | $10.00 | $10.00 | Yipin hexa; this is what powers the Pi. **Must put out at least 5.1 V**: a 5.0 V unit leaves the Pi no margin, and the micro-USB one measured 4.90 V. Buy the version whose output plug fits the board: **micro-USB** for a Pi 3 A+ / 3 B+, **USB-C** for a Pi 4 |
+| 12 V power supply, 5 A min (7 A recommended) | 1 | $12.00 | $12.00 | the only supply in the build |
 | Fuse, 5 A fast-blow | 1 | TBD | TBD | charger output into the busbar |
 | Fuse, 1 A fast-blow | 1 | TBD | TBD | SKR HB to pump positive |
 | Fuse, 2 A fast-blow | 1 | TBD | TBD | busbar to strip +12 V |
 | Inline fuse holder, 16 AWG leads | 3 | TBD | TBD | one per fuse above |
 | 1N5822 flyback diode, 3 A Schottky | 1 | $2.00 | $2.00 | **required**, see [POWER_SYSTEM.md](POWER_SYSTEM.md) |
-| Wire, 14 AWG | TBD | TBD | TBD | charger to busbar, busbar to SKR and DC-DC |
+| Wire, 14 AWG | TBD | TBD | TBD | charger to busbar, busbar to SKR |
 | Wire, 18 AWG | TBD | TBD | TBD | LED strip and pump runs |
 | Wire, 22 AWG | TBD | TBD | TBD | LED data and the Pi ground reference |
 | Heat shrink, assorted | TBD | TBD | TBD | used throughout, not only on the LED runs |
@@ -293,10 +227,3 @@ than being soldered to the pump terminals; see
 - A per-species plant profile library is a roadmap item, not a current part;
   plant definitions live in `greenthumb/plants.py` and only the user-editable
   fields persist
-
-## Notes
-
-This BOM is a functional starting point for a prototype and product planning.
-A production version should include manufacturing-ready connectors, safety
-certifications, and reliability checks for pump cycle life, moisture
-calibration drift, and product enclosure durability.

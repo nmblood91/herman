@@ -1,7 +1,7 @@
 # Herman Power System
 
 ## Overview
-Herman uses a 12V primary bus with a DC-DC converter for 5V logic. All components draw from a central busbar with fused circuits.
+Herman uses a 12V primary bus. The SKR Pico's own regulator makes the Pi's 5V. All components draw from a central busbar with fused circuits.
 
 ## Power Supply Specifications
 
@@ -28,16 +28,15 @@ Herman uses a 12V primary bus with a DC-DC converter for 5V logic. All component
   [5A Inline Fuse Holder]
     │
   Busbar (+12V / GND)
-    ├─→ 12V-to-5V DC-DC Converter (3A output) ─→ Raspberry Pi
     ├─→ [2A Inline Fuse Holder] ─→ LED strip +12V
-    └─→ BTT SKR Mini E3 V2/V3 (main power input)
+    └─→ BTT SKR Pico (main power input)
              │
+             ├─→ 5-wire cable (5V, GND, UART) ─→ Raspberry Pi
              └─→ HB connector ─→ [1A Inline Fuse Holder] ─→ 12V Peristaltic Pump
 ```
 
-**The busbar is 12V only. There is no 5V busbar.** The converter's 5V output
-feeds the Pi and nothing else; anything small that needs 5V takes it from the
-Pi's header (pin 2 or 4).
+**The busbar is 12V only. There is no 5V busbar.** The Pico's 5V regulator
+feeds the Pi over its cable and nothing else.
 
 **The pump hangs off the SKR, not off the busbar**, so Klipper can switch it.
 HB's mosfet switches the pump's *return* path to ground; the connector's
@@ -53,7 +52,7 @@ See [deploy/README.md](deploy/README.md) for the connector-level wiring.
 - **Purpose:** Protects entire system from shorts in busbar or downstream
 
 ### Pump Circuit Protection
-- **Location:** SKR HB "12/24V" pin → the `+` junction block, upstream of where
+- **Location:** SKR HB `12/24V` terminal → the `+` junction block, upstream of where
   the diode and the pump lead branch off
 - **Type:** Fast-blow glass fuse
 - **Rating:** 1A
@@ -61,7 +60,7 @@ See [deploy/README.md](deploy/README.md) for the connector-level wiring.
   a reversed flyback diode and the HB mosfet
 
 **Why it sits on the pump's positive lead.** The pump's current path is
-SKR VIN → HB 12/24V pin → pump (+) → motor → pump (−) → PC9 → mosfet → ground.
+SKR VIN → HB 12/24V → pump (+) → motor → pump (−) → IO21 → mosfet → ground.
 Only a fuse somewhere in that loop protects anything. A fuse on a *second* wire
 run from the busbar to the HB 12/24V pin protects nothing, because that pin is
 already the same node as the busbar — it is the board's own input rail brought
@@ -70,7 +69,7 @@ out to the connector.
 **Why upstream of the junction, not on the pump branch.** The `+` block joins
 three conductors: the feed, the diode cathode, and the pump lead. Fused upstream,
 the fuse is in series with every path through that node. Fused on the pump branch
-instead, a reversed diode shorts `12V → diode → PC9 → mosfet → GND` without ever
+instead, a reversed diode shorts `12V → diode → IO21 → mosfet → GND` without ever
 crossing it, leaving only the 5A main fuse — which the mosfet does not survive
 waiting for. See [deploy/README.md](deploy/README.md).
 
@@ -94,14 +93,14 @@ on a full-white scene, move to 3A rather than assuming a fault.
 
 **A 5V strip does not belong on this branch at all**, and the software no
 longer offers one: only 12V chips are selectable. Sixty WS2812B pixels pull
-about 3.6A at 5V, which the DC-DC converter's 3A budget cannot absorb on top of
-the Pi. A 5V strip needs its own 5V supply and its own fuse sized to it.
+about 3.6A at 5V, which the Pico's 5V regulator cannot absorb on top of the
+Pi. A 5V strip needs its own 5V supply and its own fuse sized to it.
 
 ## Power Budget
 
 | Component | Voltage | Current | Power |
 |-----------|---------|---------|-------|
-| SKR Mini E3 V2/V3 | 12V | 0.3A | 3.6W |
+| SKR Pico | 12V | 0.3A | 3.6W |
 | Raspberry Pi | 5V | 0.6A | 3W |
 | Pi Camera *(optional add-on)* | 5V | 0.1A | 0.5W |
 | Soil Moisture Sensors (4x) | 3.3V | 0.05A | 0.15W |
@@ -136,16 +135,19 @@ means WS2811. Picking the strip type on the Calibration tab sets the pixel
 count, since the strip is always 1 m at 60 LEDs a meter. Only a strip of
 another density needs `LED_COUNT` in `.env`, and then in pixels, not LEDs.
 
-## DC-DC Converter Specifications
+## 5V for the Pi
 
-- **Input:** 12V DC (8-18V range typical)
-- **Output:** 5.1V DC minimum @ 3A (15W continuous). Not 5.0V: a Pi 3 on a
-  micro-USB unit measuring 4.90V logged under-voltage at idle and reset with
-  an SKR Mini E3 V3 attached, while a Pi 4 on a 5.10V unit ran clean. (An SKR
-  Pico powers the Pi itself instead; see deploy/SKR_PICO.md.)
-- **Efficiency:** ~85-90%
-- **Purpose:** Powers Raspberry Pi, camera, and sensors
-- **Mounting:** Secure with thermal paste or small heatsink to prevent shutdown under load
+There is no separate converter. The SKR Pico's own regulator powers the Pi
+through the 5-wire cable that also carries the motion link.
+
+- **Regulator:** a 5A buck converter on the Pico, fed from its 12V input
+- **Output fuse:** 3.5A, on the board
+- **Set point:** about 4.99V, so the Pi sees roughly 4.9–5.0V
+- **The test:** `vcgencmd get_throttled` must read `0x0`, idle and under load
+
+**Never power the Pi from its own USB port at the same time.** The two
+supplies would be wired straight against each other. The figures and the
+first power-up checks are in [deploy/SKR_PICO.md](deploy/SKR_PICO.md).
 
 ## Wiring & Connectors
 
@@ -172,8 +174,7 @@ joints have to open for service without a soldering iron.
 | Run | Current | Fuse | Gauge |
 |---|---|---|---|
 | Charger → Wago busbar | 2.4 A peak | 5 A | **14 AWG** |
-| Wago → SKR | 0.6 A | none | **14 AWG** |
-| Wago → DC-DC converter | 0.25 A | none | **14 AWG** |
+| Wago → SKR, which also feeds the Pi | 0.9 A | none | **14 AWG** |
 | Wago → LED strip, ~750 mm | 1.5 A peak | 2 A | **18 AWG** |
 | SKR HB pin → pump, ~500 mm | 0.3 A | 1 A | **18 AWG** |
 | LED data, Pi ground reference | signal | — | 22 AWG |
@@ -213,10 +214,10 @@ Watch the splice itself while you are at it. A loose lever joint or a cold
 crimp is a resistance heater in series with the load, and no fuse will ever
 notice it.
 
-**That includes the SKR and DC-DC feeds**, which look like light loads and are
-not separately fused — a fault on either draws until the 5 A main blows, so
-they are sized for 5 A rather than for the 0.6 A and 0.25 A they actually
-carry. They are short runs, so this costs nothing but stiffness.
+**That includes the SKR feed**, which looks like a light load and is not
+separately fused — a fault on it draws until the 5 A main blows, so it is
+sized for 5 A rather than for the 0.9 A it actually carries. It is a short
+run, so this costs nothing but stiffness.
 
 
 ### Fuse Holders
@@ -269,7 +270,7 @@ carry. They are short runs, so this costs nothing but stiffness.
 
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
-| Pi won't boot / reboots randomly | Low 5V voltage | Measure the converter's output at the Pi; under 5.1V at rest, replace it. May need heatsink |
+| Pi won't boot / reboots randomly | Low 5V voltage | Run `vcgencmd get_throttled`; anything but `0x0` means the Pico's 5V is sagging. See [deploy/SKR_PICO.md](deploy/SKR_PICO.md) |
 | Pump doesn't run | Blown 1A fuse | Check for shorts in pump wiring, and that the flyback diode is not reversed |
 | Strip dead but everything else fine | Blown 2A LED fuse | Inspect the strip's input end for a solder bridge |
 | LEDs flicker or dim | Voltage sag under LED draw | Upgrade charger or add capacitor |

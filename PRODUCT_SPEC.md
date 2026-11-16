@@ -21,7 +21,7 @@ A 4-plant smart indoor planter system using:
 - addressable LED strip for plant lighting and ambient modes
 - Raspberry Pi as host controller
 - Pi camera for monitoring and timelapse, as an optional paid add-on
-- BTT SKR Mini E3 V2 or V3 motion board
+- BTT SKR Pico motion board
 
 ## Functional goals
 
