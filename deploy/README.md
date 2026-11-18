@@ -1056,10 +1056,9 @@ almost none. So:
 
 ### Testing it from the UI
 
-The Calibration tab has a **Test home switch** control that reads the switch and
-interprets the reading, which saves going to `QUERY_ENDSTOPS` by hand. Its
-**Watch for 20s** mode polls once a second so you can press the switch and see
-the reading follow.
+The Calibration tab's **Watch for 20s** button reads the switch once a second
+and interprets each reading, which saves going to `QUERY_ENDSTOPS` by hand. Press
+the switch while it runs and watch the reading follow.
 
 That live watch is the test worth doing, because a single reading cannot tell
 a switch on the NO terminal from a broken wire -- wired normally closed, both

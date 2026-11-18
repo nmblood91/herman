@@ -10,11 +10,9 @@ import { API_BASE } from '../api'
 // on the wrong terminal from a broken wire.
 export function HomeSwitchPanel() {
   const [endstop, setEndstop] = useState(null)
-  const [endstopBusy, setEndstopBusy] = useState(false)
   const [watching, setWatching] = useState(false)
 
   const readEndstop = async () => {
-    setEndstopBusy(true)
     try {
       const response = await fetch(`${API_BASE}/diagnostics/endstop`)
       const data = await response.json()
@@ -31,8 +29,6 @@ export function HomeSwitchPanel() {
         verdict: 'unavailable',
         detail: `Could not reach Herman: ${error.message}`,
       })
-    } finally {
-      setEndstopBusy(false)
     }
   }
 
@@ -70,9 +66,6 @@ export function HomeSwitchPanel() {
       <div className="general-settings-form">
         <div className="field-row">
           <div className="slider-row">
-            <button type="button" disabled={endstopBusy || watching} onClick={readEndstop}>
-              {endstopBusy && !watching ? 'Reading…' : 'Test home switch'}
-            </button>
             <button type="button" className="primary" onClick={toggleWatching}>
               {watching ? 'Stop watching' : 'Watch for 20s'}
             </button>
@@ -85,10 +78,10 @@ export function HomeSwitchPanel() {
 
           {!endstop ? (
             <p className="field-hint">
-              Reads the switch at the far end of the rail and says what the
-              reading means. <strong>Watch for 20s</strong> then press the
-              switch by hand — seeing it change is the only check that tells a
-              switch on the wrong terminal apart from a broken wire.
+              Press <strong>Watch for 20s</strong>, then press the switch at
+              the far end of the rail by hand. Seeing the reading change is the
+              only check that tells a switch on the wrong terminal apart from a
+              broken wire.
             </p>
           ) : (
             <p className={endstopTone}>{endstop.detail}</p>

@@ -100,6 +100,38 @@ The installer writes these pins into `printer.cfg`, from
 | Pump | HB screw terminal (`IO21 12/24V`) | gpio21 |
 | 12 V in | POWER | — |
 
+![SKR Pico pinout](images/skr-pico-pinout.png)
+
+#### Wiring the home switch
+
+**Do not plug a 3-pin limit switch into X-STOP one-to-one.** GND is the
+*middle* pin, so the switch's two outer wires land on IO4 and 5V. On this
+build's module (S = common, G = NO, V = NC) that ties 5V to IO4 at rest, and
+pressing the lever shorts 5V to GND, which browns out the board, the Qwiic hub
+and the Pi. Common goes to the middle GND pin, NC goes to IO4, and nothing
+touches 5V.
+
+Starting from a straight 3-wire cable, all the changes are at the switch end:
+
+1. **Leave the Pico-end plug as it is.** It plugs into X-STOP one-to-one.
+2. **Leave the wire in the switch's V slot alone.** It runs to IO4, and V is NC.
+3. **Pull the other two wires out of the switch-end housing.** Lift each
+   retention tab with a pin and slide the contact out. One is the middle wire
+   (G), which runs to the Pico's GND; the other is the outer wire from S, which
+   runs to the Pico's 5V.
+4. **Put the middle wire (GND) into the switch's S slot.** Common is now on
+   GND, and G stays empty.
+5. **Deal with the leftover wire.** It is still live 5V at the Pico end, so its
+   cut end must never be left bare. Either peel it away from the cable all the
+   way back to the Pico plug and cut it off flush there, or trim it and fold the
+   end into the heat shrink on the main harness that carries the pump power and
+   the motor cable.
+
+Check with a multimeter on continuity at the Pico end before plugging in: the
+IO4 and GND slots are closed with the lever released and open with it pressed,
+and the 5V slot connects to nothing. Then `QUERY_ENDSTOPS` should read `open`
+released and `TRIGGERED` pressed.
+
 The pump takes a 1 A fuse on its positive lead, upstream of the flyback diode
 (see [README.md](README.md)): HB's `12/24V` terminal is the board's input
 rail, and `IO21` is the low-side MOSFET.
